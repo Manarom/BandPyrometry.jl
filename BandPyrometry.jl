@@ -5,7 +5,7 @@
 
 
 # THIS SHOULD BE EVALUATED IN THE MAIN MODULE
-#include("Planck.jl") # Brings Planck module 
+include("Planck.jl") # Brings Planck module 
 #
 module BandPyrometry
     using LinearAlgebra, #
@@ -44,9 +44,7 @@ module BandPyrometry
         return lower_bond_vector
     end
     """
-
         Evaluates upper box boundary
-
     """    
     function upper_box_constraints(bp::BandPyrometryPoint) # methods calculates box constraints 
         # of the fesible region dumb version
@@ -62,7 +60,6 @@ module BandPyrometry
     """
         Evaluates maximum emissivity in the whole wavelength range 
         This function is used in the constraints
-
     """
     function em_cons!(constraint_value::AbstractArray,x::AbstractVector, bp::BandPyrometryPoint)
         # evaluate the constraints on emissivity (it should not be greater than one in a whole spectra range)
@@ -80,7 +77,6 @@ module BandPyrometry
     end
     """
         Fills emissivity and emission spectra 
-
     """
     function feval!(bp::BandPyrometryPoint,x::AbstractVector)
         # evaluates residual vector
@@ -105,12 +101,17 @@ module BandPyrometry
         bp.e_p.r[] = 0.5*norm(bp.r)^2 # discrepancy value
         return bp.r # returns residual vector
     end
-    
+    """
+        Calculates discrepancy function
+
+    """    
     function  disc(x::AbstractVector,bp::BandPyrometryPoint)
         residual!(bp,x)
         return bp.e_p.r[]# returns current value of discrepancy
     end
-
+    """
+        Fills emissivity  ,emission spectra and evaluates residual vector
+    """
     function jacobian!(x::AbstractVector,bp::BandPyrometryPoint) # evaluates Planck function
         ∇!(x[end],bp.e_p) # refresh Planck function first derivative
         if x!=bp.x_jac_vec
@@ -122,13 +123,19 @@ module BandPyrometry
             bp.x_jac_vec.=x
         end
     end   
-
+    """
+        Fills gradient
+    """
     function grad!(g::AbstractVector,x::AbstractVector,bp::BandPyrometryPoint)
         residual!(bp,x)
         jacobian!(x,bp) # calculated Jₘ
         g .= -transpose(bp.jacobian)*bp.r # calculates gradient ∇f = -Jₘᵀ*r
         return nothing
     end
+    """
+        Calculates approximate hessian which is Hₐ = Jᵀ*J (J - Jacobian)
+
+    """
     function hess_approx!(ha, x::AbstractVector,bp::BandPyrometryPoint)
         # calculates approximate hessian which is Hₐ = Jᵀ*J (J - Jacobian)
         if x!=bp.x_hess_approx
