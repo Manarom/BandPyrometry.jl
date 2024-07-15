@@ -4,4 +4,4 @@ the spectral emissivity of the sample can be approximated as a polynomial
 - BandPyrometryTypes.jl  - script file with type descriptions
 - JDXreader.jl  - small JCAMP format reader
 - Planck.jl  - Planck function derivatives and integrals
-- Pyrometers.jl  - Module with varioaus pyrometers types
+- Pyrometers.jl  - Module with various pyrometers types
