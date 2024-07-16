@@ -23,12 +23,12 @@ module BandPyrometry
                             "BFGS"=>BFGS,
                             "GradientDescent"=>GradientDescent,
                             "NewtonTrustRegion"=>NewtonTrustRegion,
-                            "ParticleSwarm"=>ParticleSwarm,
+                            "ParticleSwarm"=>ParticleSwarm, # Particle swarm methos supports only box_type constraints
                             "Default"=>NelderMead,
                             "LBFGS"=>LBFGS,
                             "IPNewton"=>IPNewton) # list of supported optimizers
 
-    const support_constraint_optimizers = ["NelderMead", "LBFGS","IPNewton"]
+    const support_constraint_optimizers = ["NelderMead", "LBFGS","IPNewton","ParticleSwarm"]
     
     #include("BandPyrometryTypes.jl") # Brings types
 """
