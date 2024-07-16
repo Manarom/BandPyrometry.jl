@@ -406,7 +406,8 @@ end
         if is_constraint
             name = filter(x -> ==(name,x),support_constraint_optimizers)
         end
-        return get(optim_dic,name,optim_dic["Default"])
+        return length(name)>=1 ? get(optim_dic,name[1],optim_dic["Default"]) :
+                                 optim_dic["Default"]
     end
     # PLOTTING TOOLS
     function internal_fields(st,prop::Vector{Symbol})
