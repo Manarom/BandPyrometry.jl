@@ -1,8 +1,3 @@
-#cur_dir = @__DIR__
-#cd(cur_dir)
-#import Pkg
-#Pkg.activate(cur_dir)]
-
 
 # THIS SHOULD BE EVALUATED IN THE MAIN MODULE
 include("Planck.jl") # Brings Planck module 
@@ -127,7 +122,7 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
             J1 = @view bp.jacobian[:,1:end-1] # Jacobian without temperature derivatives
             J2 = @view bp.jacobian[:,end] # Last column of the jacobian 
             #a  = @view (x,1,end-1)
-            J1 .= bp.e_p.Ib.*bp.vandermonde
+            J1 .= bp.e_p.Ib.*bp.vandermonde.v
             J2 .= bp.e_p.∇I.*emissivity!(bp,x)
             bp.x_jac_vec.=x
         end
@@ -163,7 +158,7 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
             # initial formula: Hm_vec = Vᵀ*I'ᴰ*r  => transpose(V)*diagm(I')*r 
             # A*diagm(b) <=> A.*transpose(b) <=> transpose(Aᵀ.*b) 
             # Hm_vec = (V.*I')ᵀ*r
-            last_hess_col .-= transpose(bp.vandermonde.*bp.e_p.∇I)*bp.r
+            last_hess_col .-= transpose(bp.vandermonde.v*bp.e_p.∇I)*bp.r
             bp.h[end,1:end-1] .=last_hess_col # the sample
             # only right-down corner of hessian contains the second derivative
             # hm = rᵀ*(∇²Ibb)ᴰ*V*a
