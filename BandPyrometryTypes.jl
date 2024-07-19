@@ -1,5 +1,7 @@
-using LinearAlgebra,Interpolations
-import Polynomials,LegendrePolynomials
+# Uncomment to use as a standalone script
+#using LinearAlgebra,Interpolations
+#import Polynomials,LegendrePolynomials
+
 
 struct TrigPoly
     coeffs::AbstractVector
