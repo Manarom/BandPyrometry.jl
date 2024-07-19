@@ -14,6 +14,7 @@ module BandPyrometry
     OptimizationOptimJL, 
     DataInterpolations,
     StaticArrays, #,
+    Polynomials,
     Plots,
     ..Planck # ATTENTION Planck module should be in the scope!!
     #Makie,
@@ -23,179 +24,33 @@ module BandPyrometry
                             "BFGS"=>BFGS,
                             "GradientDescent"=>GradientDescent,
                             "NewtonTrustRegion"=>NewtonTrustRegion,
-                            "ParticleSwarm"=>ParticleSwarm, # Particle swarm methos supports only box_type constraints
+                            "ParticleSwarm"=>ParticleSwarm,
                             "Default"=>NelderMead,
                             "LBFGS"=>LBFGS,
                             "IPNewton"=>IPNewton) # list of supported optimizers
-
-    const support_constraint_optimizers = ["NelderMead", "LBFGS","IPNewton","ParticleSwarm"]
-    
-    #include("BandPyrometryTypes.jl") # Brings types
-"""
-EmPoint type stores data about thermal emission spectrum and its first and second derivatives
-it also stores "Measurements " vector which further can be fitted? it also provides the constructor
-EmPoint(I_measured,λ) -  I_measured is a measured spectrum
-                      -  λ - wavelength vector (in μm)
-
-"""
-
-struct EmPoint{VectType,AmatType} 
-
-    I_measured :: VectType#MVector{N,Float64}# data to fit
-    λ:: VectType #MVector{N,Float64}  # wavelength vector (it is constant during the optimization)
-    Ib::VectType#MVector{N,Float64} # Planck function values vector ????
-    ri::VectType#MVector{N,Float64} # discrepancy vector
-    r::Base.RefValue{Float64} # discrepancy value
-    ∇I::VectType#MVector{N,Float64} # first derivative value
-    ∇²I::VectType#MVector{N,Float64} # second derivative vector
-    amat::AmatType#MMatrix{N,3,Float64,L} # intermediate private data 
-    #                           temparatures of :
-    Tib::Base.RefValue{Float64} # Intensity evaluation
-    Tri::Base.RefValue{Float64} # Residual vector evaluation
-    T∇ib::Base.RefValue{Float64} # Planck derivative evaluation
-    Tgrad::Base.RefValue{Float64} # Gradient of emission discrapancy function evaluation
-    T∇²ib::Base.RefValue{Float64} # Planck function second derivative evaluation
-    Thess::Base.RefValue{Float64} # Discrapancy function evaluation
-
-    points_number::Int64 # number of points in wavelength
-    EmPoint(I_measured::AbstractVector,λ::AbstractVector) = begin 
-       #new(yin,similar(yin),similar(yin)) # fills fi vector with the same values
-       points_number = length(λ)
-       L = points_number*3
-       VectType = MVector{points_number,Float64}
-       MatType = MMatrix{points_number,3,Float64,3*points_number} 
-       @assert length(I_measured)==points_number
-       new{VectType,MatType}(MVector{points_number}(I_measured), # measured value
-            VectType(λ),# wavelength
-            VectType(undef),#Ib::AbstractVector# Planck function values vector
-            VectType(undef),#ri::AbstractVector  # discrepancy vector
-            Ref(maxintfloat(Float64)),#r::Base.RefValue{Float64}# discrepancy value
-            VectType(undef),#∇I::AbstractVector # first derivative value
-            VectType(undef),#∇²I::AbstractVector # second derivative vector
-            triplicate_columns(λ,MatType),#amat::Matrix{Float64} # intermediate private data 
-            Ref(Float64(0)),#Ti::Float64 # this field stores the temperature of 
-            Ref(Float64(0)), # Tri
-            Ref(Float64(0)),# T∇ibb
-            Ref(Float64(0)),#Tgrad
-            Ref(Float64(0)),# T∇²ibb
-            Ref(Float64(0)),#Tsec
-            points_number#points_number::Int64 # number of points in wavelength            
-       ) # calling the constructor
-
-    end
-end
-
-function triplicate_columns(a::AbstractVector,T)
-    return T(repeat(a,1,3))
-end
-"""
-BandPyrometryPoint type stores data about thermal emission spectrum of a real body with 
-emissivity polynomial approximation, and  its first and second derivatives
-it also stores "Measurements " vector which further can be fitted? it also provides the constructor
-BandPyrometryPoint(I_measured,λ,initial_x,polynomial_type) where
-                    -  I_measured is a measured spectrum
-                    -  λ - wavelength vector (in μm)
-                    - initial_x - starting parameters vector (initial_x[end] - starting temperature,
-                                other - emissivity approximation)
-                    - polynomial_type - string of polynomial (this value governs the Vandermonde matrix form)
-                      
-"""
-struct BandPyrometryPoint{Lx1,Px1,LxP,PxP,LxPm1} 
-    # Stores data about the spectral band
-    e_p::EmPoint
-    # Additional data storages
-    x::Px1 # Optimization variables vector
-    # x[end] - temperature, x[1:end-1] - emissivity poynomial approximation
-    Ic::Lx1 # sample spectral emittance
-    Iₛᵤᵣ::Lx1 # surrounding radiation spectra
-    ϵ::Lx1 # spectral emissivity in band
-    r::Lx1 # residual vector
-    jacobian::LxP # Jacobian matrix
-    hessian_approx::PxP # approximate hessian matrix
-    hessian::PxP # Hesse matrix
-    vandermonde::LxPm1 # Vandermonde matrix type
-    # internal usage
-    x_em_vec::Px1 # vector of emissivity evaluation values
-    x_jac_vec::Px1 # vector of jacobian claculation parameters
-    x_hess_approx::Px1 # vector of the approximate hessian calculation
-    x_hess_vec::Px1 # vector of hessian calculation parameters
-
-    is_has_Iₛᵤᵣ::Bool # flag 
-    """
-    BandPyrometryPoint(measured_Intensity::AbstractVector,
-                        λ::AbstractVector,
-                        initial_x::AbstractVector;
-                        polynomial_type::String="simple")
-
-    Type for band pyrometry fitting
-"""
-BandPyrometryPoint(measured_Intensity::AbstractVector,
-                        λ::AbstractVector,
-                        initial_x::AbstractVector;
-                        polynomial_type::String="simple",
-                        I_sur::AbstractVector=[-1.0]) = begin 
-       L = length(λ) #total number of spectral points
-       P = length(initial_x) # full number of the optimization variables
-       polynomial_degree =  P - 2 #degree of emissivity polynomial approximation
-       # polynomial degree goes from 0,1... where 1 is linear approximation
-       Lx1 = MVector{L,Float64} # independent data column
-       Px1 = MVector{P,Float64} # optimization variables vector 
-       LxP = MMatrix{L,P,Float64,L*P} # Jacobian type
-       PxP = MMatrix{P,P,Float64,P*P} # Hessian type     
-       LxPm1 = MMatrix{L,P-1,Float64,L*(P-1)} #Vandermonde matrix type
-       is_has_Iₛᵤᵣ = length(I_sur)==length(λ)
-       is_has_Iₛᵤᵣ ? Isr =Lx1(I_sur) : Isr =Lx1(undef)
-       @assert length(measured_Intensity)==L
-       new{Lx1,Px1,LxP,PxP,LxPm1}(
-                EmPoint(measured_Intensity::AbstractVector{Float64},λ::AbstractVector{Float64}),# filling BB emission obj
-                Px1(initial_x), #em_poly
-                Lx1(undef), # emissivity
-                Lx1(undef), # Ic corrected emission spectrum
-                Isr, # Iₛᵤᵣ surrounding radiotion exclusion
-                Lx1(undef), # r,residual vector function
-                LxP(undef),# jacobian
-                PxP(undef),# approximate hessian
-                PxP(undef),# hessian
-                Vandermonde(λ,polynomial_degree,LxPm1,polynomial_type), #vandermonde
-                Px1(undef), # x_em_vec
-                Px1(undef), # x_jac_vec
-                Px1(undef), #x_hess_approx
-                Px1(undef), # x_hess_vec
-                is_has_Iₛᵤᵣ  # is_has_Iₛᵤᵣ
-                )
-    end
-end
-
-"""
-    Vandermonde(λ,polynomial_degree,MatrixType,polynomial_type)
-
-    Returns Vandermonde matrix
-
-"""
-function Vandermonde(λ,polynomial_degree,MatrixType,polynomial_type)
-    V = MatrixType(repeat(λ,1,polynomial_degree+1))
-    v_view = @views eachcol(V)
-    if polynomial_type=="simple"
-        for (i,col) in enumerate(v_view)
-            col.^=(i-1)
-        end
-    end
-    return V
-end
+    const support_constraint_optimizers = ["NelderMead", 
+                                            "LBFGS",
+                                            "IPNewton",
+                                            "ParticleSwarm"]
+    const support_lagrange_constraints = ["IPNewton"]
+    include("BandPyrometryTypes.jl") # Brings types and functions for working with types
     ## BAND PYROMETRY POINT METHODS
     """
         Evaluates lower box boundary
     """
-    function lower_box_constraints(bp::BandPyrometryPoint) # methods calculates box constraints 
+    function lower_box_constraints(bp::BandPyrometryPoint) 
+        # methods calculates box constraints 
         # of the fesible region dumb version
         lower_bond_vector = copy(bp.x)
         a = @view lower_bond_vector[1:end-1]
-        fill!(a,0.0)
-        lower_bond_vector[end] =200
+        fill!(a,-1.0)
+        lower_bond_vector[end] =200 # 200 Kelvins limit for the temperature
         return lower_bond_vector
     end
     """
+
         Evaluates upper box boundary
+
     """    
     function upper_box_constraints(bp::BandPyrometryPoint) # methods calculates box constraints 
         # of the fesible region dumb version
@@ -203,7 +58,7 @@ end
         #max_wavelength = max(bp.e_p.λ)
         max_ind = argmax(bp.e_p.λ)
         a = @view upper_bond_vector[1:end-1]
-        vm = @view bp.vandermonde[max_ind,:]
+        vm = @view bp.vandermonde.v[max_ind,:]
         a .= 1.0 ./vm
         upper_bond_vector[end] =5000.0
         return upper_bond_vector
@@ -211,8 +66,11 @@ end
     """
         Evaluates maximum emissivity in the whole wavelength range 
         This function is used in the constraints
+
     """
-    function em_cons!(constraint_value::AbstractArray,x::AbstractVector, bp::BandPyrometryPoint)
+    function em_cons!(constraint_value::AbstractArray,
+                            x::AbstractVector, 
+                            bp::BandPyrometryPoint)
         # evaluate the constraints on emissivity (it should not be greater than one in a whole spectra range)
         feval!(bp,x)  
         constraint_value.=extrema(bp.ϵ) # (minimum,maximum) values of the emissivity 
@@ -235,7 +93,7 @@ end
         feval!(bp.e_p,x[end]) # refreshes planck function values
         if x!=bp.x_em_vec
             if bp.is_has_Iₛᵤᵣ
-                bp.Ic .= (bp.e_p.Ib .- bp.e_p.Iₛᵤᵣ).*emissivity!(bp,x) # I=Ibb*ϵ
+                bp.Ic .= (bp.e_p.Ib .- bp.e_p.Iₛᵤᵣ).*emissivity!(bp,x) # I=(Ibb-Isur)*ϵ
             else
                 bp.Ic .= bp.e_p.Ib.*emissivity!(bp,x) # I=Ibb*ϵ
             end
@@ -244,25 +102,25 @@ end
         return bp.Ic
     end
     """
-        Fills emissivity  ,emission spectra and evaluates residual vector
+        Fills emissivity, emission spectra and evaluates residual vector
     """
     function residual!(bp::BandPyrometryPoint,x::AbstractVector)
-        feval!(bp,x)   
-        bp.r .=bp.e_p.I_measured .- bp.Ic
+        feval!(bp,x)   # feval! calculates function value only if current x is not the same as 
+        bp.r .=bp.e_p.I_measured .- bp.Ic # measured data - calculated 
         bp.e_p.r[] = 0.5*norm(bp.r)^2 # discrepancy value
         return bp.r # returns residual vector
     end
+    
     """
-        Calculates discrepancy function
+    disc(x::AbstractVector,bp::BandPyrometryPoint)
 
-    """    
-    function  disc(x::AbstractVector,bp::BandPyrometryPoint)
+    Fills discrepancy value, bo.e_p strores the residual function norm
+"""
+function  disc(x::AbstractVector,bp::BandPyrometryPoint)
         residual!(bp,x)
         return bp.e_p.r[]# returns current value of discrepancy
     end
-    """
-        Fills emissivity  ,emission spectra and evaluates residual vector
-    """
+
     function jacobian!(x::AbstractVector,bp::BandPyrometryPoint) # evaluates Planck function
         ∇!(x[end],bp.e_p) # refresh Planck function first derivative
         if x!=bp.x_jac_vec
@@ -274,33 +132,45 @@ end
             bp.x_jac_vec.=x
         end
     end   
-    """
-        Fills gradient
-    """
+
     function grad!(g::AbstractVector,x::AbstractVector,bp::BandPyrometryPoint)
         residual!(bp,x)
         jacobian!(x,bp) # calculated Jₘ
         g .= -transpose(bp.jacobian)*bp.r # calculates gradient ∇f = -Jₘᵀ*r
         return nothing
     end
-    """
-        Calculates approximate hessian which is Hₐ = Jᵀ*J (J - Jacobian)
-
-    """
     function hess_approx!(ha, x::AbstractVector,bp::BandPyrometryPoint)
         # calculates approximate hessian which is Hₐ = Jᵀ*J (J - Jacobian)
         if x!=bp.x_hess_approx
             jacobian!(x,bp)
-            bp.hessian_approx .= transpose(bp.jacobian)*bp.jacobian
+            bp.hessian_approx .= transpose(bp.jacobian)*bp.jacobian 
+            # this matrix is always symmetric positive definite
         end
         ha .= bp.hessian_approx
         return nothing
     end
     function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
         if x!=bp.x_hess_vec
-            hess_approx!(h,x,bp)
-            #error("NOT SUPPORTED")
+            hess_approx!(h,x,bp) # filling approximate hessian Jᵀ*J
+            ∇²!(x,bp.e_p) # refreshes second derivative of the Planck function
+            # H = Ha - Hm, Ha is approximate Hessian
+            # Hm_vec = Vᵀ*I'ᴰ*r - vector Hm,
+            # V - Vandermonde matrix, I'ᴰ - first 
+            # derivative diagonal matrix,
+            # r - residual vector
+            last_hess_col = @view bp.h[1:end-1,end] 
+            # view of last column of hessian without 
+            # initial formula: Hm_vec = Vᵀ*I'ᴰ*r  => transpose(V)*diagm(I')*r 
+            # A*diagm(b) <=> A.*transpose(b) <=> transpose(Aᵀ.*b) 
+            # Hm_vec = (V.*I')ᵀ*r
+            last_hess_col .-= transpose(bp.vandermonde.*bp.e_p.∇I)*bp.r
+            bp.h[end,1:end-1] .=last_hess_col # the sample
+            # only right-down corner of hessian contains the second derivative
+            # hm = rᵀ*(∇²Ibb)ᴰ*V*a
+            bp.h[end,end] .-= dot(bp.r.*bp.e_p.∇²I,bp.ϵ) # dot product
         end
+        h.=bp.h
+        return nothing
     end
 
     # EMISSION POINT METHODS
@@ -377,9 +247,8 @@ end
         optimizer_name="Default", 
         is_constraint=true)
         optimizer = optimizer_switch(optimizer_name,is_constraint)
-        #e_p = EmPoint(data_to_fit,lam) # creating spectral struct
-        #t0 = 
-        fun=OptimizationFunction(disc,grad=grad!,hess=hess!) # by default all derivatives are supported
+        fun=OptimizationFunction(disc,grad=grad!,hess=hess!) 
+        # by default all derivatives are supported
         if point isa EmPoint
             starting_vector = MVector{1}([235.0])
         else
@@ -396,11 +265,8 @@ end
                                 starting_vector,
                                 point)           
         end
-        #display("NEWTON-TRUST-REGION")
-        #display(@benchmark solve($prob_NEW_TR_AN,NewtonTrustRegion()))
         results = solve(probl,optimizer())
-        #display(results.original)
-        return (results.u, results)
+        return (results.u, results,optimizer)
     end
     function optimizer_switch(name::String,is_constraint::Bool)
         if is_constraint
