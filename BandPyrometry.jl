@@ -7,13 +7,12 @@ module BandPyrometry
     MKL, # using MKL turns default LinearAlgebra from library from openBLAS to mkl  
     Optimization,
     OptimizationOptimJL, 
-    DataInterpolations,
+    Interpolations,
     StaticArrays, #,
     Polynomials,
     Plots,
     ..Planck # ATTENTION Planck module should be in the scope!!
-    #Makie,
-    #GLMakie
+    import Polynomials,LegendrePolynomials
     const optim_dic = Base.ImmutableDict("NelderMead"=>NelderMead,
                             "Newton"=>Newton,
                             "BFGS"=>BFGS,
