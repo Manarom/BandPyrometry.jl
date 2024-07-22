@@ -272,7 +272,6 @@ struct BandPyrometryPoint{Lx1,Px1,LxP,PxP,LxPm1}
     hessian_approx::PxP # approximate hessian matrix
     hessian::PxP # Hesse matrix
     vandermonde::VanderMatrix # Vandermonde matrix type
-    em_poly_type::String # emissivity polynomial approximation type
     # internal usage
     x_em_vec::Px1 # vector of emissivity evaluation values
     x_jac_vec::Px1 # vector of jacobian claculation parameters
