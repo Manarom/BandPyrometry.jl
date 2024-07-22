@@ -173,18 +173,19 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
             # V - Vandermonde matrix, I'ᴰ - first 
             # derivative diagonal matrix,
             # r - residual vector
-            last_hess_col = @view bp.h[1:end-1,end] 
+            last_hess_col = @view bp.hessian[1:end-1,end] 
             # view of last column of hessian without 
             # initial formula: Hm_vec = Vᵀ*I'ᴰ*r  => transpose(V)*diagm(I')*r 
             # A*diagm(b) <=> A.*transpose(b) <=> transpose(Aᵀ.*b) 
             # Hm_vec = (V.*I')ᵀ*r
-            last_hess_col .-= transpose(bp.vandermonde.*bp.e_p.∇I)*bp.r
+            last_hess_col .-= transpose(bp.vandermonde.v.*bp.e_p.∇I)*bp.r
             bp.h[end,1:end-1] .=last_hess_col # the sample
             # only right-down corner of hessian contains the second derivative
             # hm = rᵀ*(∇²Ibb)ᴰ*V*a
-            bp.h[end,end] .-= dot(bp.r.*bp.e_p.∇²I,bp.ϵ) # dot product
+            bp.hessian[end,end] .-= dot(bp.r.*bp.e_p.∇²I,bp.ϵ) # dot product
+            bp.x_hess_vec .=x
         end
-        h.=bp.h
+        h.=bp.hessian
         return nothing
     end
 
