@@ -179,7 +179,7 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
             # A*diagm(b) <=> A.*transpose(b) <=> transpose(Aᵀ.*b) 
             # Hm_vec = (V.*I')ᵀ*r
             last_hess_col .-= transpose(bp.vandermonde.v.*bp.e_p.∇I)*bp.r
-            bp.h[end,1:end-1] .=last_hess_col # the sample
+            bp.hessian[end,1:end-1] .=last_hess_col # the sample
             # only right-down corner of hessian contains the second derivative
             # hm = rᵀ*(∇²Ibb)ᴰ*V*a
             bp.hessian[end,end] .-= dot(bp.r.*bp.e_p.∇²I,bp.ϵ) # dot product
