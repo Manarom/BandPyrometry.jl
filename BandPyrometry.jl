@@ -293,7 +293,12 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
                                 point)           
         end
         results = solve(probl,optimizer())
-        return (results.u, results,optimizer)
+        return  point isa BandPyrometryPoint ? 
+                        (T=results.u[end],a=results.u[1:end-1],
+                        ϵ=point.vandemonde*results.u[1:end-1],
+                        res=results,
+                        optimizer=optimizer) :
+                        (T=results.u[end],res=results,optimizer=optimizer)
     end
     # PLOTTING TOOLS
     function internal_fields(st,prop::Vector{Symbol})
