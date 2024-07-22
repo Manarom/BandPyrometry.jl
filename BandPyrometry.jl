@@ -142,7 +142,7 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
             J1 = @view bp.jacobian[:,1:end-1] # Jacobian without temperature derivatives
             J2 = @view bp.jacobian[:,end] # Last column of the jacobian 
             #a  = @view (x,1,end-1)
-            J1 .= bp.e_p.Ib.*bp.vandermonde
+            J1 .= bp.e_p.Ib.*bp.vandermonde.v
             J2 .= bp.e_p.∇I.*emissivity!(bp,x)
             bp.x_jac_vec.=x
         end
