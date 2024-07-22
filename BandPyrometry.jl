@@ -9,7 +9,6 @@ module BandPyrometry
     OptimizationOptimJL, 
     Interpolations,
     StaticArrays, #,
-    Polynomials,
     Plots,
     ..Planck # ATTENTION Planck module should be in the scope!!
     import Polynomials,LegendrePolynomials
@@ -27,6 +26,27 @@ module BandPyrometry
                                             "IPNewton",
                                             "ParticleSwarm"]
     const support_lagrange_constraints = ["IPNewton"]
+    """
+    optimizer_switch(name::String,is_constraint::Bool)
+
+    Switch the appropriate optimizer
+"""
+function optimizer_switch(name::String;is_constraint::Bool=false,
+            is_lagrange_constraint::Bool=false)
+        if is_lagrange_constraint
+            name = filter(x -> ==(name,x),support_lagrange_constraints)
+            default_ = optim_dic[support_lagrange_constraints[1]]
+            return length(name)>=1 ? get(optim_dic,name[1],default_ ) :
+                                                                default_            
+        elseif is_constraint
+            name = filter(x -> ==(name,x),support_constraint_optimizers)
+            return length(name)>=1 ? get(optim_dic,name[1],optim_dic["Default"]) :
+            optim_dic["Default"]
+        else
+            return get(optim_dic,name,optim_dic["Default"])
+        end
+
+end
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
     ## BAND PYROMETRY POINT METHODS
     """
@@ -68,6 +88,7 @@ module BandPyrometry
         # evaluate the constraints on emissivity (it should not be greater than one in a whole spectra range)
         feval!(bp,x)  
         constraint_value.=extrema(bp.ϵ) # (minimum,maximum) values of the emissivity 
+        return nothing
         #   in a whole spectrum range
     end
     """
@@ -121,7 +142,7 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
             J1 = @view bp.jacobian[:,1:end-1] # Jacobian without temperature derivatives
             J2 = @view bp.jacobian[:,end] # Last column of the jacobian 
             #a  = @view (x,1,end-1)
-            J1 .= bp.e_p.Ib.*bp.vandermonde.v
+            J1 .= bp.e_p.Ib.*bp.vandermonde
             J2 .= bp.e_p.∇I.*emissivity!(bp,x)
             bp.x_jac_vec.=x
         end
@@ -157,7 +178,7 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
             # initial formula: Hm_vec = Vᵀ*I'ᴰ*r  => transpose(V)*diagm(I')*r 
             # A*diagm(b) <=> A.*transpose(b) <=> transpose(Aᵀ.*b) 
             # Hm_vec = (V.*I')ᵀ*r
-            last_hess_col .-= transpose(bp.vandermonde.v*bp.e_p.∇I)*bp.r
+            last_hess_col .-= transpose(bp.vandermonde.*bp.e_p.∇I)*bp.r
             bp.h[end,1:end-1] .=last_hess_col # the sample
             # only right-down corner of hessian contains the second derivative
             # hm = rᵀ*(∇²Ibb)ᴰ*V*a
@@ -238,17 +259,29 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
     end
     # OPTIMIZATION TOOLS
     function fit_T(point::Union{EmPoint,BandPyrometryPoint};
-        optimizer_name="Default", 
-        is_constraint=true)
-        optimizer = optimizer_switch(optimizer_name,is_constraint)
-        fun=OptimizationFunction(disc,grad=grad!,hess=hess!) 
+        optimizer_name="Default",is_constraint::Bool=false,
+        is_lagrange_constraint::Bool=false)
+        optimizer = optimizer_switch(optimizer_name,
+                                    is_constraint = is_constraint,
+                                    is_lagrange_constraint = is_lagrange_constraint)
+        if is_lagrange_constraint
+            fun=OptimizationFunction(disc,grad=grad!,hess=hess!,cons=em_cons!)
+        else
+            fun=OptimizationFunction(disc,grad=grad!,hess=hess!) 
+        end
         # by default all derivatives are supported
         if point isa EmPoint
             starting_vector = MVector{1}([235.0])
         else
             starting_vector = copy(point.x);
         end
-        if is_constraint
+        if is_lagrange_constraint
+            probl= OptimizationProblem(fun, 
+                            starting_vector,
+                            point, 
+                            lcons = [0.0,0.0], 
+                            ucons = [1.0,1.0])         
+        elseif is_constraint
             probl= OptimizationProblem(fun, 
                             starting_vector,
                             point, 
@@ -261,13 +294,6 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
         end
         results = solve(probl,optimizer())
         return (results.u, results,optimizer)
-    end
-    function optimizer_switch(name::String,is_constraint::Bool)
-        if is_constraint
-            name = filter(x -> ==(name,x),support_constraint_optimizers)
-        end
-        return length(name)>=1 ? get(optim_dic,name[1],optim_dic["Default"]) :
-                                 optim_dic["Default"]
     end
     # PLOTTING TOOLS
     function internal_fields(st,prop::Vector{Symbol})
