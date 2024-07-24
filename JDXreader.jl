@@ -1,10 +1,8 @@
 
 # module to read JCAMP-DX=4.24 file formats
-
-module JDXreader
 """
-JCAMP file example: 
-            ##TITLE=1
+JCAMP file example: \n
+            ##TITLE=1 
             ##JCAMP-DX=4.24
             ##DATATYPE=INFRARED SPECTRUM
             ##DATE=2021/10/17
@@ -33,8 +31,11 @@ Header lines start with ##
 Data start after headers lines
 
 """
+module JDXreader
+
     export JDXfile,read!,read_jdx_file
     #using ..DelimitedFiles
+
     mutable struct JDXfile
         # Main struct, prepares loads file name, parses data and data headers
         file_name::String
