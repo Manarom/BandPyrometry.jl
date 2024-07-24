@@ -1,3 +1,8 @@
+#cur_dir = @__DIR__
+#cd(cur_dir)
+#import Pkg
+#Pkg.activate(cur_dir)]
+
 
 # THIS SHOULD BE EVALUATED IN THE MAIN MODULE
 include("Planck.jl") # Brings Planck module 
@@ -12,6 +17,7 @@ module BandPyrometry
     Plots,
     ..Planck # ATTENTION Planck module should be in the scope!!
     import Polynomials,LegendrePolynomials
+    include("BandPyrometryTypes.jl") # Brings types and functions for working with types
     const optim_dic = Base.ImmutableDict("NelderMead"=>NelderMead,
                             "Newton"=>Newton,
                             "BFGS"=>BFGS,
@@ -29,58 +35,46 @@ module BandPyrometry
     """
     optimizer_switch(name::String,is_constraint::Bool)
 
-    Switch the appropriate optimizer
+    Switch the appropriate optimizer, name - the name of th eoptimizer, 
+    is_constraint - is box constraint problem formulation, 
+    is_lagrange_constraint - use Lagrange constraint problem IPNewton 
 """
-function optimizer_switch(name::String;is_constraint::Bool=false,
-            is_lagrange_constraint::Bool=false)
-        if is_lagrange_constraint
-            name = filter(x -> ==(name,x),support_lagrange_constraints)
-            default_ = optim_dic[support_lagrange_constraints[1]]
-            return length(name)>=1 ? get(optim_dic,name[1],default_ ) :
-                                                                default_            
-        elseif is_constraint
-            name = filter(x -> ==(name,x),support_constraint_optimizers)
-            return length(name)>=1 ? get(optim_dic,name[1],optim_dic["Default"]) :
-            optim_dic["Default"]
-        else
-            return get(optim_dic,name,optim_dic["Default"])
-        end
-
-end
-    include("BandPyrometryTypes.jl") # Brings types and functions for working with types
+    function optimizer_switch(name::String;is_constraint::Bool=false,
+                is_lagrange_constraint::Bool=false)
+            if is_lagrange_constraint
+                name = filter(x -> ==(name,x),support_lagrange_constraints)
+                default_ = optim_dic[support_lagrange_constraints[1]]
+                return length(name)>=1 ? get(optim_dic,name[1],default_ ) :
+                                                                    default_            
+            elseif is_constraint
+                name = filter(x -> ==(name,x),support_constraint_optimizers)
+                return length(name)>=1 ? get(optim_dic,name[1],optim_dic["Default"]) :
+                optim_dic["Default"]
+            else
+                return get(optim_dic,name,optim_dic["Default"])
+            end
+    end
     ## BAND PYROMETRY POINT METHODS
     """
-        Evaluates lower box boundary
-    """
-    function lower_box_constraints(bp::BandPyrometryPoint) 
+    box_constraints(bp::BandPyrometryPoint)
+
+    Evaluates box-constraint of the problem
+"""
+    function box_constraints(bp::BandPyrometryPoint) 
         # methods calculates box constraints 
-        # of the fesible region dumb version
-        lower_bond_vector = copy(bp.x)
-        a = @view lower_bond_vector[1:end-1]
-        fill!(a,-1.0)
-        lower_bond_vector[end] =200 # 200 Kelvins limit for the temperature
-        return lower_bond_vector
+        # of the feasible region (dumb version)
+        lb = copy(bp.x)
+        ub = copy(bp.x)
+        lb[1:end-1].=-100.0
+        ub[1:end-1].=100.0
+        lb[end] =20.0 # 20 Kelvins limit for the temperature
+        ub[end] = 5000.0
+        return (lb=lb,ub=ub)
     end
-    """
-
-        Evaluates upper box boundary
-
-    """    
-    function upper_box_constraints(bp::BandPyrometryPoint) # methods calculates box constraints 
-        # of the fesible region dumb version
-        upper_bond_vector = copy(bp.x)
-        #max_wavelength = max(bp.e_p.λ)
-        max_ind = argmax(bp.e_p.λ)
-        a = @view upper_bond_vector[1:end-1]
-        vm = @view bp.vandermonde.v[max_ind,:]
-        a .= 1.0 ./vm
-        upper_bond_vector[end] =5000.0
-        return upper_bond_vector
-    end
+    
     """
         Evaluates maximum emissivity in the whole wavelength range 
         This function is used in the constraints
-
     """
     function em_cons!(constraint_value::AbstractArray,
                             x::AbstractVector, 
@@ -88,7 +82,7 @@ end
         # evaluate the constraints on emissivity (it should not be greater than one in a whole spectra range)
         feval!(bp,x)  
         constraint_value.=extrema(bp.ϵ) # (minimum,maximum) values of the emissivity 
-        return nothing
+        return constraint_value
         #   in a whole spectrum range
     end
     """
@@ -96,7 +90,7 @@ end
     """
     function emissivity!(bp::BandPyrometryPoint,x::AbstractVector)
         a = @view x[1:end-1] #emissivity approximation variables
-        bp.ϵ .= bp.vandermonde*a
+        bp.ϵ .= bp.vandermonde.v*a
         return bp.ϵ
     end
     """
@@ -118,6 +112,7 @@ end
     end
     """
         Fills emissivity, emission spectra and evaluates residual vector
+
     """
     function residual!(bp::BandPyrometryPoint,x::AbstractVector)
         feval!(bp,x)   # feval! calculates function value only if current x is not the same as 
@@ -129,69 +124,94 @@ end
     """
     disc(x::AbstractVector,bp::BandPyrometryPoint)
 
-    Fills discrepancy value, bo.e_p strores the residual function norm
+    Fills discrepancy value, bp.e_p strores the residual function norm
 """
-function  disc(x::AbstractVector,bp::BandPyrometryPoint)
+    function  disc(x::AbstractVector,bp::BandPyrometryPoint)
         residual!(bp,x)
         return bp.e_p.r[]# returns current value of discrepancy
     end
 
-    function jacobian!(x::AbstractVector,bp::BandPyrometryPoint) # evaluates Planck function
+    """
+    jacobian!(x::AbstractVector,bp::BandPyrometryPoint)
+
+    Fills the Jacobian matrix
+"""
+function jacobian!(x::AbstractVector,bp::BandPyrometryPoint) # evaluates Planck function
         ∇!(x[end],bp.e_p) # refresh Planck function first derivative
         if x!=bp.x_jac_vec
             J1 = @view bp.jacobian[:,1:end-1] # Jacobian without temperature derivatives
             J2 = @view bp.jacobian[:,end] # Last column of the jacobian 
             #a  = @view (x,1,end-1)
-            J1 .= bp.e_p.Ib.*bp.vandermonde.v
-            J2 .= bp.e_p.∇I.*emissivity!(bp,x)
-            bp.x_jac_vec.=x
+            J1 .= bp.e_p.Ib.*bp.vandermonde.v # diag(ibb)*V
+            J2 .= bp.e_p.∇I.*emissivity!(bp,x)# 
+            bp.x_jac_vec .=x # refresh jacobian calculation vector
         end
     end   
 
+    """
+    grad!(g::AbstractVector,x::AbstractVector,bp::BandPyrometryPoint)
+
+    In-place filling of the gradient of BandPyrometryPoint at point x
+"""
     function grad!(g::AbstractVector,x::AbstractVector,bp::BandPyrometryPoint)
         residual!(bp,x)
         jacobian!(x,bp) # calculated Jₘ
         g .= -transpose(bp.jacobian)*bp.r # calculates gradient ∇f = -Jₘᵀ*r
         return nothing
     end
-    function hess_approx!(ha, x::AbstractVector,bp::BandPyrometryPoint)
+
+    """
+    hess_approx!(ha, x::AbstractVector,bp::BandPyrometryPoint)
+
+    In-place filling of the approximate hessian (Hₐ = Jᵀ*J (J - Jacobian)) 
+    of BandPyrometryPoint at point
+"""
+function hess_approx!(ha, x::AbstractVector,bp::BandPyrometryPoint)
         # calculates approximate hessian which is Hₐ = Jᵀ*J (J - Jacobian)
         if x!=bp.x_hess_approx
             jacobian!(x,bp)
             bp.hessian_approx .= transpose(bp.jacobian)*bp.jacobian 
             # this matrix is always symmetric positive definite
+            bp.x_hess_approx .=x
         end
         ha .= bp.hessian_approx
         return nothing
     end
-    function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
+    """
+    hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
+    
+    In-place filling of hessian of BandPyrometryPoint at point x
+     
+"""
+function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
         if x!=bp.x_hess_vec
-            hess_approx!(h,x,bp) # filling approximate hessian Jᵀ*J
-            ∇²!(x,bp.e_p) # refreshes second derivative of the Planck function
+            hess_approx!(bp.hessian,x,bp) # refreech the approximate hessian 
+            # and fill hessian with approximate hessian Jᵀ*J
+            # refreshes second derivative of the Planck function
+            ∇²!(x[end],bp.e_p) 
             # H = Ha - Hm, Ha is approximate Hessian
             # Hm_vec = Vᵀ*I'ᴰ*r - vector Hm,
             # V - Vandermonde matrix, I'ᴰ - first 
             # derivative diagonal matrix,
             # r - residual vector
             last_hess_col = @view bp.hessian[1:end-1,end] 
-            # view of last column of hessian without 
+            # view of the last column of the hessian 
             # initial formula: Hm_vec = Vᵀ*I'ᴰ*r  => transpose(V)*diagm(I')*r 
             # A*diagm(b) <=> A.*transpose(b) <=> transpose(Aᵀ.*b) 
             # Hm_vec = (V.*I')ᵀ*r
             last_hess_col .-= transpose(bp.vandermonde.v.*bp.e_p.∇I)*bp.r
-            bp.hessian[end,1:end-1] .=last_hess_col # the sample
+            bp.hessian[end,1:end-1] .= last_hess_col # the sample
             # only right-down corner of hessian contains the second derivative
             # hm = rᵀ*(∇²Ibb)ᴰ*V*a
-            bp.hessian[end,end] .-= dot(bp.r.*bp.e_p.∇²I,bp.ϵ) # dot product
+            bp.hessian[end,end] =bp.hessian[end,end] - dot(bp.r.*bp.e_p.∇²I,bp.ϵ) # dot product
             bp.x_hess_vec .=x
         end
-        h.=bp.hessian
+        h.=bp.hessian # filling external matrix with internally stored hessian
         return nothing
     end
 
     # EMISSION POINT METHODS
-    lower_box_constraints(::EmPoint) = [0.0] # emissivity point has fixed boundaries
-    upper_box_constraints(::EmPoint) =[5000.0]
+    box_constraints(::EmPoint) = (lb=[20.0],ub=[5000.0]) # limits on the BB temperature
     feval!(e::EmPoint,T::AbstractArray) = feval!(e,T[end])
     function feval!(e::EmPoint,t::Float64) # fills planck spectrum
         if !isapprox(t,e.Tib[]) # if current temperature is the same as the last recorded, 
@@ -202,7 +222,6 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
         end
         return e.Ib
     end
-
     residual!(e::EmPoint,T::AbstractArray) = residual!(e::EmPoint,T[end])
     function residual!(e::EmPoint,t::Float64)
         feval!(e,t)
@@ -280,23 +299,23 @@ function  disc(x::AbstractVector,bp::BandPyrometryPoint)
             probl= OptimizationProblem(fun, 
                             starting_vector,
                             point, 
-                            lcons = [0.0,0.0], 
-                            ucons = [1.0,1.0])         
+                            lcons = [0.0,0.0], # both min and max of emissivity should be not smaller than zero
+                            ucons = [1.0,1.0]) # both min and max should be higher than one        
         elseif is_constraint
+            bx = box_constraints(point)
             probl= OptimizationProblem(fun, 
                             starting_vector,
-                            point, 
-                            lb=lower_box_constraints(point),
-                            ub=upper_box_constraints(point))
+                            point,lb=bx.lb, up=bx.ub)
         else
             probl= OptimizationProblem(fun, 
                                 starting_vector,
                                 point)           
         end
         results = solve(probl,optimizer())
+
         return  point isa BandPyrometryPoint ? 
                         (T=results.u[end],a=results.u[1:end-1],
-                        ϵ=point.vandemonde*results.u[1:end-1],
+                        ϵ=point.vandermonde*results.u[1:end-1],
                         res=results,
                         optimizer=optimizer) :
                         (T=results.u[end],res=results,optimizer=optimizer)
