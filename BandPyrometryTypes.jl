@@ -1,7 +1,5 @@
-# Uncomment to use as a standalone script
-#using LinearAlgebra,Interpolations
-#import Polynomials,LegendrePolynomials
-
+using LinearAlgebra,Interpolations
+import Polynomials,LegendrePolynomials
 
 struct TrigPoly
     coeffs::AbstractVector
@@ -46,10 +44,10 @@ end
 """
 (poly::Union{LegPolyWrapper,TrigPoly})(x::Number)
 
-Function returns the summation of polynomials values with coefficients 
-LegPolyWrapper wraps the LegendrePolynomials.jl library function to 
-make it consistent with Polynomials.jl 
-TrigPoly simple type for trigonometric function polynomils
+    Function returns the summation of polynomials values with coefficients 
+    LegPolyWrapper wraps the LegendrePolynomials.jl library function to 
+    make it consistent with Polynomials.jl 
+    TrigPoly simple type for trigonometric function polynomils
 """
 function (poly::Union{LegPolyWrapper,TrigPoly})(x::Number)
     #LegendrePolynomials.Pl(x,l) - computes Legendre polynomial of degree l at point x 
@@ -191,10 +189,11 @@ end
 denormalize_x(V::VanderMatrix) = denormalize_x(V.xi, V.x_first,V.x_last)
 #function 
 """
-EmPoint type stores data about thermal emission spectrum and its first and second derivatives
-it also stores "Measurements " vector which further can be fitted? it also provides the constructor
-EmPoint(I_measured,λ) -  I_measured is a measured spectrum
-                      -  λ - wavelength vector (in μm)
+EmPoint type stores data on thermal emission spectrum and its 
+first and second derivatives
+    it also stores "Measurements " vector which further can be fitted? it also provides the constructor
+    EmPoint(I_measured,λ) -  I_measured is a measured spectrum
+                          -  λ - wavelength vector (in μm)
 
 """
 struct EmPoint{VectType,AmatType} 
@@ -247,20 +246,21 @@ function triplicate_columns(a::AbstractVector,T)
     return T(repeat(a,1,3))
 end
 """
-BandPyrometryPoint type stores data about thermal emission spectrum of a real body with 
+BandPyrometryPoint type stores data of thermal emission spectrum of a real body with 
 emissivity polynomial approximation, and  its first and second derivatives
-it also stores "Measurements " vector which further can be fitted? it also provides the constructor
-BandPyrometryPoint(I_measured,λ,initial_x,polynomial_type) where
-                    -  I_measured is a measured spectrum
-                    -  λ - wavelength vector (in μm)
-                    - initial_x - starting parameters vector (initial_x[end] - starting temperature,
-                     x[1:end-1] - emissivity approximation coefficients)
-                    - polynomial_type - string of polynomial (this value governs the Vandermonde matrix form)
+it also stores "measurements" vector which further can be fitted, it also 
+provides the constructor BandPyrometryPoint(I_measured,λ,initial_x,polynomial_type) 
+where:
+        -  I_measured is a measured spectrum
+        -  λ - wavelength vector (in μm)
+        - initial_x - starting parameters vector (initial_x[end] - starting temperature,
+            x[1:end-1] - emissivity approximation coefficients)
+        - polynomial_type - string of polynomial (this value governs the Vandermonde matrix form)
                       
 """
 struct BandPyrometryPoint{Lx1,Px1,LxP,PxP,LxPm1} 
-    # Stores data about the spectral band
-    e_p::EmPoint
+    # Stores data about the spectral band, BBemission spectrum and experimental measured spectrum
+    e_p::EmPoint 
     # Additional data storages
     x::Px1 # Optimization variables vector
     # x[end] - temperature, x[1:end-1] - emissivity poynomial approximation
@@ -292,7 +292,7 @@ BandPyrometryPoint(measured_Intensity::AbstractVector,
                         λ::AbstractVector,
                         initial_x::AbstractVector;
                         polynomial_type::String="stand",
-                        I_sur::AbstractVector=[-1.0]) = begin 
+                        I_sur::AbstractVector=[]) = begin 
        polynomial_type = haskey(supported_polynomial_types,polynomial_type) ? polynomial_type : "stand" 
        polynomial_producing_function = supported_polynomial_types[polynomial_type]
        # if entered polynomial type is not supported then it turns to "simple"
@@ -332,3 +332,5 @@ BandPyrometryPoint(measured_Intensity::AbstractVector,
                 )
     end
 end
+
+
