@@ -1,4 +1,5 @@
-Several modules for thermal emission spectra estimation
+Several files for thermal emission spectra estimation.
+
 - BandPyrometry.jl - Module with function to fit the temperature of the sample surface in predefined spectral range (Optimization.jl and OptimizationOptimJL.jl packages are used),
 the spectral emissivity of the sample can be approximated as a Standard, Chebyshev, Legendre and trigonometric basis linear model
 - BandPyrometryTypes.jl  - script file with type descriptions
