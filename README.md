@@ -6,4 +6,4 @@ the spectral emissivity of the sample can be approximated as a Standard, Chebysh
 - JDXreader.jl  - small JCAMP-DX=4.24 files reader
 - Planck.jl  - Planck function derivatives and integrals
 - Pyrometers.jl  - Module with various pyrometers types
-- Planck_test_git - Pluto notebook with Planck.jl, BandpyrometryPoint.EmPoint type and JDXreader tests  (example of blackbody temperature fitting using zero-,first- and secondorder method from Optimizatio.jl package)
+- Planck_test_git.jl - Pluto notebook with Planck.jl, BandpyrometryPoint.jl EmPoint type and JDXreader.jl tests  (example of blackbody temperature fitting using zero-,first- and second order methods from Optimization.jl package)
