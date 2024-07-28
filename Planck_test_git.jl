@@ -37,7 +37,7 @@ is_started = Ref(false)
 
 # ╔═╡ aba2d996-2cea-4484-81d7-b33d56d525e4
 # ENTER HERE PATH TO THE FOLDER WITH BandPyrometry.jl, Planck.jl and JDXreader.jl 
-cur_dir = Ref(raw"D:\mironov\current\Emissivity Unit\new work\program\julia project\JEmissivityUnit")
+cur_dir = Ref(raw"ENTER_FOLDERNAME_HERE")
 
 # ╔═╡ 0abbeb1a-062d-43fb-b622-91ad63c2719a
 # trying to find necessary files
