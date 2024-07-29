@@ -137,9 +137,9 @@ function Vander(x::AbstractArray, poly_degree::Number;poly_type::String="stand")
     L = length(x)
     return VanderMatrix(x,
                         poly_degree,
-                        MMatrix{L,poly_degree+1,Float64,L*(poly_degree+1)},
-                        poly_type,
-                        supported_polynomial_types[poly_type])
+                        MatrixType = MMatrix{L,poly_degree+1,Float64,L*(poly_degree+1)},
+                        poly_type = poly_type,
+                        poly_constructor = supported_polynomial_types[poly_type])
 end
 """
     *(V::VanderMatrix,a::AbstractVector)
