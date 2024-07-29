@@ -131,7 +131,16 @@ VanderMatrix(x::AbstractVector,
                             )
             end
 end
-
+function Vander(x::AbstractArray, poly_degree::Number;poly_type::String="stand")
+    # more simplyfied constructor 
+    @assert haskey(supported_polynomial_types,poly_type) # polynomial must be of supported type
+    L = length(x)
+    return VanderMatrix(x,
+                        poly_degree,
+                        MMatrix{L,poly_degree+1,Float64,L*(poly_degree+1)},
+                        poly_type,
+                        supported_polynomial_types[poly_type])
+end
 """
     *(V::VanderMatrix,a::AbstractVector)
 
