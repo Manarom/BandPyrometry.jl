@@ -156,7 +156,7 @@ Base.:*(V::VanderMatrix,a::AbstractVector) =V.v*a
 function polyfit(V::VanderMatrix,x::T,y::T) where T<:AbstractVector
     if length(y)!=length(V.xi)
         #(xi_converted,x_min,x_max) = normalize_x(x)
-        yi = linear_interpolation(x,y,extrapolation_bc = Flat())(denormalize_x(V)) 
+        yi = linear_interpolation(x,y)(denormalize_x(V)) 
     else
         yi = copy(y)
     end
@@ -210,24 +210,21 @@ struct EmPoint{VectType,AmatType}
     I_measured :: VectType#MVector{N,Float64}# data to fit
     λ:: VectType #MVector{N,Float64}  # wavelength vector (it is constant during the optimization)
     Ib::VectType#MVector{N,Float64} # Planck function values vector ????
-    ri::VectType#MVector{N,Float64} # discrepancy vector
+    ri::VectType#MVector{N,Float64} # residual vector
     r::Base.RefValue{Float64} # discrepancy value
     ∇I::VectType#MVector{N,Float64} # first derivative value
     ∇²I::VectType#MVector{N,Float64} # second derivative vector
     amat::AmatType#MMatrix{N,3,Float64,L} # intermediate private data 
-    #                           temparatures of :
-    Tib::Base.RefValue{Float64} # Intensity evaluation
-    Tri::Base.RefValue{Float64} # Residual vector evaluation
-    T∇ib::Base.RefValue{Float64} # Planck derivative evaluation
-    Tgrad::Base.RefValue{Float64} # Gradient of emission discrapancy function evaluation
-    T∇²ib::Base.RefValue{Float64} # Planck function second derivative evaluation
-    Thess::Base.RefValue{Float64} # Discrapancy function evaluation
-
+    # temperatures of:
+    Tib::Base.RefValue{Float64} # Planck intensity  
+    Tri::Base.RefValue{Float64} # Residual vector  
+    T∇ib::Base.RefValue{Float64} # Planck derivative  
+    Tgrad::Base.RefValue{Float64} # Gradient of emission discrepancy function 
+    T∇²ib::Base.RefValue{Float64} # Planck function second derivative 
+    Thess::Base.RefValue{Float64} # Discrepancy function second derivative
     points_number::Int64 # number of points in wavelength
     EmPoint(I_measured::AbstractVector,λ::AbstractVector) = begin 
-       #new(yin,similar(yin),similar(yin)) # fills fi vector with the same values
        points_number = length(λ)
-       L = points_number*3
        VectType = MVector{points_number,Float64}
        MatType = MMatrix{points_number,3,Float64,3*points_number} 
        @assert length(I_measured)==points_number
@@ -341,5 +338,3 @@ BandPyrometryPoint(measured_Intensity::AbstractVector,
                 )
     end
 end
-
-
