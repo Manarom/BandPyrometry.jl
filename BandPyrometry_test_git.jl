@@ -28,7 +28,7 @@ BandPyrometry.jl implements methods for analytical calculation of a real surface
 """
 
 # ╔═╡ e2f8b0fb-52ac-4f76-afe7-a79b292eb5f6
-working_dir  = raw"D:\mironov\current\Emissivity Unit\new work\program\julia project\JEmissivityUnit"
+working_dir  = # enter folder with BandPyrometry.jl, Planck.jl and BandPyrometryTypes.jl
 
 # ╔═╡ 255e0485-a280-4142-82dd-d76d0d3d0cca
 includet(joinpath(working_dir,"BandPyrometry.jl"))
