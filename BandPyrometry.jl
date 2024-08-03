@@ -65,8 +65,8 @@ module BandPyrometry
         # of the feasible region (dumb version)
         lb = copy(bp.x)
         ub = copy(bp.x)
-        lb[1:end-1].=-100.0
-        ub[1:end-1].=100.0
+        lb[1:end-1].=-1.0
+        ub[1:end-1].=1.0
         lb[end] =20.0 # 20 Kelvins limit for the temperature
         ub[end] = 5000.0
         return (lb=lb,ub=ub)
@@ -100,8 +100,8 @@ module BandPyrometry
         # evaluates residual vector
         #a = @view x[1:end-1] #emissivity approximation variables
         feval!(bp.e_p,x[end]) # refreshes planck function values
-        if x!=bp.x_em_vec
-            if bp.is_has_Iₛᵤᵣ
+        if x!=bp.x_em_vec # x_em_vec - emissivity calculation vector
+            if bp.is_has_Iₛᵤᵣ # has surrounding radiation correction
                 bp.Ic .= (bp.e_p.Ib .- bp.e_p.Iₛᵤᵣ).*emissivity!(bp,x) # I=(Ibb-Isur)*ϵ
             else
                 bp.Ic .= bp.e_p.Ib.*emissivity!(bp,x) # I=Ibb*ϵ
@@ -214,10 +214,10 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
     box_constraints(::EmPoint) = (lb=[20.0],ub=[5000.0]) # limits on the BB temperature
     feval!(e::EmPoint,T::AbstractArray) = feval!(e,T[end])
     function feval!(e::EmPoint,t::Float64) # fills planck spectrum
-        if !isapprox(t,e.Tib[]) # if current temperature is the same as the last recorded, 
+        if t!=e.Tib[] # if current temperature is the same as the last recorded, 
             #a₁₂₃!(e_obj.amat,e_obj.λ,t) # filling amat
             Planck.a₁₂₃!(e.amat,e.λ,t) #fills amatrix
-            Planck.ibb!(e.Ib, e.λ, e.amat) 
+            Planck.ibb!(e.Ib, e.λ, e.amat) #fills BB spectrum
             e.Tib[] = t # save the current temperature
         end
         return e.Ib
@@ -225,35 +225,35 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
     residual!(e::EmPoint,T::AbstractArray) = residual!(e::EmPoint,T[end])
     function residual!(e::EmPoint,t::Float64)
         feval!(e,t)
-        if !isapprox(t,e.Tri[]) # if current temperature is the same as the last recorded, 
-            e.ri .= e.I_measured .- e.Ib
+        if t!=e.Tri[] # if current temperature is the same as the last recorded, 
+            e.ri .= e.I_measured .- e.Ib# calculating discrepancy
             e.r[] =0.5* norm(e.ri)^2 # discrepancy value
-            e.Tri[]=t
+            e.Tri[]=t# filling temperature of residual
         end
         return e.ri # returns residual vector
     end
     
     function  disc(T,e::EmPoint)
-        residual!(e,T)
+        residual!(e,T)# fills residuals
         return e.r[] # returns current value of discrepancy
     end
 
     ∇!(T::AbstractVector,e::EmPoint) = ∇!(T[end],e)
-    function ∇!(t::Float64,e::EmPoint) # evaluates Planck function
-        feval!(e,t)
-        if !isapprox(t,e.T∇ib[]) # current temperature is not equal to the temperature of gradient calculation
-            Planck.∇ₜibb!(e.∇I,t, e.amat,e.Ib)
+    function ∇!(t::Float64,e::EmPoint) # evaluates Planck function first derivative
+        feval!(e,t)# refreshes amat and Ib
+        if t!=e.T∇ib[] # current temperature is not equal to the temperature of gradient calculation
+            Planck.∇ₜibb!(e.∇I,t, e.amat,e.Ib)# fills Planck first derivative
             e.T∇ib[] = t # refresh gradient calculation temperature
         end
         return e.∇I
     end
-
-    function grad!(g::AbstractVector,T ,e::EmPoint)
-        ∇!(T,e)
-        residual!(e,T)
-        if !isapprox(T[end],e.Tgrad[])
-            g[1] = -dot(e.ri,e.∇I) # filling gradient vector
-            e.Tgrad[] = T[1]
+    grad!(g::AbstractVector,T::AbstractVector ,e::EmPoint)=grad!(g,T[end] ,e)
+    function grad!(g::AbstractVector,t::Float64 ,e::EmPoint)
+        ∇!(t,e)
+        residual!(e,t)
+        if t!=e.Tgrad[]
+            g[end]= - dot(e.ri,e.∇I) # filling gradient vector
+            e.Tgrad[] = t
         end
         return nothing
     end
@@ -261,24 +261,24 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
 
     ∇²!(T::AbstractVector,e::EmPoint)=∇²!(T[end],e)
     function ∇²!(t::Float64,e::EmPoint)
-        ∇!(t,e)
-        if !isapprox(t,e.T∇²ib[])
+        ∇!(t,e)# refreshes amat and Planck gradient
+        if t!=e.T∇²ib[]
            Planck.∇²ₜibb!(e.∇²I,t,e.amat,e.∇I) 
            e.T∇²ib[] = t # ref value
         end
         return e.∇²I
     end
-    function hess!(h,T,e::EmPoint) # calculates hessian of a simple Planck function fitting
-        t = T[end]
+    hess!(h,T::AbstractVector,e::EmPoint) = hess!(h,T[end],e)
+    function hess!(h,t::Float64,e::EmPoint) # calculates hessian of a simple Planck function fitting
         ∇²!(t,e)
-        if !isapprox(t,e.Thess[])
-            Base.@inbounds h[1]= (dot(e.∇I,e.∇I) - dot(e.ri,e.∇²I)) # fill hessian vector from current value
-            e.Thess[] = T[1]
+        if t!=e.Thess[]
+            Base.@inbounds h[1]= dot(e.∇I,e.∇I) - dot(e.ri,e.∇²I) # fill hessian vector from current value
+            e.Thess[] = t
         end
         return nothing
     end
     # OPTIMIZATION TOOLS
-    function fit_T(point::Union{EmPoint,BandPyrometryPoint};
+    function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
         optimizer_name="Default",is_constraint::Bool=false,
         is_lagrange_constraint::Bool=false)
         optimizer = optimizer_switch(optimizer_name,
@@ -305,7 +305,7 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
             bx = box_constraints(point)
             probl= OptimizationProblem(fun, 
                             starting_vector,
-                            point,lb=bx.lb, up=bx.ub)
+                            point,lb=bx.lb, ub=bx.ub)
         else
             probl= OptimizationProblem(fun, 
                                 starting_vector,
@@ -355,4 +355,3 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
         return (plot_handle,x_data,y_data)
     end
 end
-
