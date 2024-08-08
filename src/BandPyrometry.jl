@@ -1,12 +1,4 @@
-#cur_dir = @__DIR__
-#cd(cur_dir)
-#import Pkg
-#Pkg.activate(cur_dir)]
 
-
-# THIS SHOULD BE EVALUATED IN THE MAIN MODULE 4037665547 o239ae
-#include("Planck.jl") # Brings Planck module 
-#
 module BandPyrometry
     using LinearAlgebra, #
     MKL, # using MKL turns default LinearAlgebra from library from openBLAS to mkl  
@@ -17,8 +9,15 @@ module BandPyrometry
     Plots,
     Polynomials,
     LegendrePolynomials,
-    ..Planck # ATTENTION Planck module should be in the scope!!s
+    include("Planck.jl") # brings Planck module
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
+    include("Pyrometers.jl") 
+    include("JDXreader.jl")
+    export Planck, JDXreader,
+            BandPyrometryPoint,
+            EmPoint, fit_T!, 
+
+    using Planck
     const optim_dic = Base.ImmutableDict("NelderMead"=>NelderMead,
                             "Newton"=>Newton,
                             "BFGS"=>BFGS,
@@ -64,7 +63,7 @@ module BandPyrometry
     Evaluates box-constraint of the problem
 """
     function box_constraints(bp::BandPyrometryPoint) 
-        # methods calculates box constraints 
+        # method calculates box constraints 
         # of the feasible region (dumb version)
         lb = copy(bp.x)
         ub = copy(bp.x)
@@ -322,40 +321,6 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
                         res=results,
                         optimizer=optimizer) :
                         (T=results.u[end],res=results,optimizer=optimizer)
-    end
-    # PLOTTING TOOLS
-    function internal_fields(st,prop::Vector{Symbol})
-        data=st
-        for s ∈ prop
-            data = Base.getproperty(data,s)
-            if data isa AbstractVector
-                return data
-            end
-        end
-        
-    end
-    function bp_plot(plot_handle,
-        data_struct,
-        x::Union{Vector{Symbol}, Symbol},
-        y::Union{Vector{Symbol}, Symbol}) 
-        if x isa Vector
-            x_data = internal_fields(data_struct,x)
-        else
-            x_data = Base.getproperty(data_struct,x)
-        end
-        if y isa Vector
-            y_data = internal_fields(data_struct,y)    
-        else
-            y_data = Base.getproperty(data_struct,y)
-        end
-
-        if isnothing(plot_handle)
-            plot_handle = plot(plot_handle,x_data,y_data);
-        else
-            plot!(plot_handle,x_data,y_data)
-        end
-        display(plot_handle)
-        return (plot_handle,x_data,y_data)
     end
 end
 
