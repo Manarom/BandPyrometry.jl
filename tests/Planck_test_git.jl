@@ -15,7 +15,13 @@ macro bind(def, element)
 end
 
 # ╔═╡ fc6d97d3-3775-42d2-a991-09d875b0dd38
-using StaticArrays, PlutoUI, Plots, Optimization,OptimizationOptimJL,BenchmarkTools, LinearAlgebra, Interpolations,Printf,Gtk,MKL,LinearAlgebra, LegendrePolynomials, Polynomials, ForwardDiff, LaTeXStrings,StatPlots#,Revise
+using StaticArrays, 
+PlutoUI, Plots, 
+Optimization,
+OptimizationOptimJL,BenchmarkTools, 
+LinearAlgebra, Interpolations,Printf,
+Gtk,MKL,LinearAlgebra, LegendrePolynomials, 
+Polynomials, ForwardDiff, LaTeXStrings,StatPlots
 
 # ╔═╡ 500f0cb0-bf70-11ee-19a8-35930e422cab
 md"""
@@ -31,16 +37,6 @@ md"""
 * JDXreader test
 
 	"""
-
-# ╔═╡ d8d114ae-2b48-4332-a656-7d5d6c2eebc2
-import PlutoWorkspaceExplorer as PWE
-
-# ╔═╡ f28df1b7-8054-40f5-9254-67e4d15de96a
-@bind _update PWE.update_notebook()
-
-# ╔═╡ 139370dc-04aa-4687-97ee-8bd9c956d967
-_update; PWE.workspace_explorer(PlutoRunner)
-
 # ╔═╡ aba2d996-2cea-4484-81d7-b33d56d525e4
 # ENTER HERE PATH TO THE FOLDER WITH BandPyrometry.jl, Planck.jl and JDXreader.jl 
 #cur_dir = Ref(@__DIR__); # uncomment this to try load file path using dialog gui
@@ -505,14 +501,11 @@ function plot_becnhmark()
 	direct_bars_coords=1:3:3*length(performed_tests)
 	em_bars_coords=2:3:3*length(performed_tests)
 	p = plot(bar(direct_bars_coords, direct_bars_values, 
-		#fill_z = 4:-1:1, 
-		#alpha = [1, 0.2, 0.8, 0.5], 
 		label = "",
 		alpha = 0.5, 
 		bar_width = 1),
 		bar(em_bars_coords, em_bars_values, 
 		fillcolor=RGB(1,0,0),
-		#fill_z = 4:-1:1, 
 		alpha = 0.5, 
 		label = "",
 		bar_width = 1),

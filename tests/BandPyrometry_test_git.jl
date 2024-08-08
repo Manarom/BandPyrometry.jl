@@ -15,7 +15,7 @@ macro bind(def, element)
 end
 
 # ╔═╡ 1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-using Revise, Plots, StaticArrays, MKL,LinearAlgebra, Optimization,
+using Plots, StaticArrays, MKL,LinearAlgebra, Optimization,
     OptimizationOptimJL, 
     Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings
 
@@ -32,7 +32,7 @@ BandPyrometry.jl implements methods for analytical calculation of a real surface
 working_dir  = "working_dir"
 
 # ╔═╡ 255e0485-a280-4142-82dd-d76d0d3d0cca
-includet(joinpath(working_dir,"BandPyrometry.jl"))
+include(joinpath(working_dir,"BandPyrometry.jl"))
 
 # ╔═╡ 824a6af1-3f70-4de0-8a94-6c63663a546a
 md"""
