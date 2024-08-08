@@ -44,7 +44,7 @@ _update; PWE.workspace_explorer(PlutoRunner)
 # ╔═╡ aba2d996-2cea-4484-81d7-b33d56d525e4
 # ENTER HERE PATH TO THE FOLDER WITH BandPyrometry.jl, Planck.jl and JDXreader.jl 
 #cur_dir = Ref(@__DIR__); # uncomment this to try load file path using dialog gui
-cur_dir = Ref(raw"D:\mironov\current\Emissivity Unit\new work\program\julia project\JEmissivityUnit")
+cur_dir = Ref("working_dir")
 
 # ╔═╡ 3930e657-b34d-4d4b-b7a2-596118f4ce74
 is_files_imported_flag = Ref(false)
