@@ -9,13 +9,15 @@ module BandPyrometry
     Plots,
     Polynomials,
     LegendrePolynomials
+
     include("Planck.jl") # brings Planck module
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
     include("Pyrometers.jl") 
     include("JDXreader.jl")
+
     export Planck, JDXreader,
             BandPyrometryPoint,
-            EmPoint, fit_T! 
+            EmPoint, fit_T!,Pyrometers 
 
     using .Planck
     const optim_dic = Base.ImmutableDict("NelderMead"=>NelderMead,

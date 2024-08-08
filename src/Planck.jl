@@ -13,7 +13,7 @@ module Planck
             power,
             band_power
              # first on is for matrix version Dibb! is simplified
-    using StaticArrays # static arrays are used for a mutable c=onstant
+    using StaticArrays,MKL # static arrays are used for a mutable c=onstant
     const ħ = 1.054_571_817E-34::Float64 # J*s
     const C₁   = 1.191043E8::Float64#(1.191043E8,"W*μm*/m²*sr"," ","Risch","2016"),
     const C₂ = 14387.752::Float64#(14387.752,"μm**K"," ","Risch","2016"),

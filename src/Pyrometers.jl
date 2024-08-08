@@ -1,10 +1,4 @@
-#include("BandPyrometry.jl")
-#using LinearAlgebra, #
-#MKL, # using MKL turns default matrix multiplication library from openBLAS to mkl  
-#Optimization,
-#OptimizationOptimJL
 
-# include("Planck.jl")
 module Pyrometers
     using   Optimization,
             OptimizationOptimJL,
