@@ -15,7 +15,7 @@ module BandPyrometry
     include("JDXreader.jl")
     export Planck, JDXreader,
             BandPyrometryPoint,
-            EmPoint, fit_T!, 
+            EmPoint, fit_T! 
 
     using Planck
     const optim_dic = Base.ImmutableDict("NelderMead"=>NelderMead,
