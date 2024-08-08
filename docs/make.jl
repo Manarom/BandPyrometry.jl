@@ -22,3 +22,6 @@ makedocs(
                  ] 
                ]#
 			   )
+deploydocs(;
+         repo="github.com/Manarom/BandPyrometry",
+     )
