@@ -20,8 +20,8 @@ PlutoUI, Plots,
 Optimization,
 OptimizationOptimJL,BenchmarkTools, 
 LinearAlgebra, Interpolations,Printf,
-Gtk,MKL,LinearAlgebra, LegendrePolynomials, 
-Polynomials, ForwardDiff, LaTeXStrings,StatPlots
+MKL,LinearAlgebra, LegendrePolynomials, 
+Polynomials, ForwardDiff, LaTeXStrings
 
 # ╔═╡ 500f0cb0-bf70-11ee-19a8-35930e422cab
 md"""
@@ -39,7 +39,6 @@ md"""
 	"""
 # ╔═╡ aba2d996-2cea-4484-81d7-b33d56d525e4
 # ENTER HERE PATH TO THE FOLDER WITH BandPyrometry.jl, Planck.jl and JDXreader.jl 
-#cur_dir = Ref(@__DIR__); # uncomment this to try load file path using dialog gui
 cur_dir = Ref("working_dir")
 
 # ╔═╡ 3930e657-b34d-4d4b-b7a2-596118f4ce74
@@ -57,14 +56,6 @@ if !is_files_imported_flag[]
 	begin 
 		for (k,val) ∈ files_needed
 				global cur_dir,files_needed
-				cur_file_name = joinpath(cur_dir[],k) 
-				if !isfile(cur_file_name)
-					filedir = open_dialog("select file $k", GtkNullContainer(), (k,)) 
-					#open dialog function from Gtk
-					if isfile(filedir)
-						cur_dir[] = dirname(filedir)
-					end
-				end
 				files_needed[k]= joinpath(cur_dir[],k)
 		end
 	
@@ -517,14 +508,6 @@ function plot_becnhmark()
 	ylims!(p,0.9minimum(em_bars_values),1.1maximum(direct_bars_values))
 	return p
 end
-#mn = [20, 35, 30, 35, 27,25, 32, 34, 20, 25]
-#sx = repeat(["Men", "Women"], inner = 5)
-#std = [2, 3, 4, 1, 2, 3, 5, 2, 3, 3]
-#nam = repeat("G" .* string.(1:5), outer = 2)
-
-#using StatPlots
-#groupedbar(nam, mn, yerr = std, group = sx, ylabel = "Scores", 
-#        title = "Scores by group and gender")
 
 # ╔═╡ 725efcfe-6514-42d9-a92a-5b8cdbf8caa9
 ppp = plot_becnhmark()
