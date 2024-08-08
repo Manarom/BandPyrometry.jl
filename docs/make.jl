@@ -6,9 +6,6 @@ include("../src/JDXreader.jl")
 include("../src/Pyrometers.jl")
 
 using Documenter,.BandPyrometry,.Planck, .JDXreader, .Pyrometers
-#using Base
-println(pwd())
-#mathengine = Documenter.MathJax3()
 makedocs(
          #checkdocs =:none,
         sitename = "BandPyrometry.jl",
