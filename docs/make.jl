@@ -10,7 +10,9 @@ makedocs(
         sitename = "BandPyrometry.jl",
         highlightsig = false,
         checkdocs = :none,
-       pages=[
+        format=Documenter.HTML(),
+        repo = "https://github.com/Manarom/BandPyrometry/blob/{commit}{path}#{line}",
+        pages=[
                 "Home" => "index.md"
                 "Modules" => [
                     "Planck" =>"planck.md"
