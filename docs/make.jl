@@ -7,11 +7,9 @@ include("../src/Pyrometers.jl")
 
 using Documenter,.BandPyrometry,.Planck, .JDXreader, .Pyrometers
 makedocs(
-         #checkdocs =:none,
         sitename = "BandPyrometry.jl",
         highlightsig = false,
         checkdocs = :none,
-        remotes=nothing,
        pages=[
                 "Home" => "index.md"
                 "Modules" => [
