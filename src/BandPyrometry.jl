@@ -17,7 +17,7 @@ module BandPyrometry
             BandPyrometryPoint,
             EmPoint, fit_T! 
 
-    using Planck
+    using .Planck
     const optim_dic = Base.ImmutableDict("NelderMead"=>NelderMead,
                             "Newton"=>Newton,
                             "BFGS"=>BFGS,

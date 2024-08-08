@@ -2,7 +2,7 @@ push!(LOAD_PATH,"../src/")
 
 include("../src/BandPyrometry.jl")
 
-using Documenter,.BandPyrometry,.Planck, .JDXreader, .Pyrometers
+using Documenter,.BandPyrometry
 makedocs(
         sitename = "BandPyrometry.jl",
         highlightsig = false,
