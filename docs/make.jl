@@ -1,9 +1,6 @@
 push!(LOAD_PATH,"../src/")
 
-include("../src/Planck.jl")
 include("../src/BandPyrometry.jl")
-include("../src/JDXreader.jl")
-include("../src/Pyrometers.jl")
 
 using Documenter,.BandPyrometry,.Planck, .JDXreader, .Pyrometers
 makedocs(
@@ -11,7 +8,7 @@ makedocs(
         highlightsig = false,
         checkdocs = :none,
         format=Documenter.HTML(),
-        repo = "https://github.com/Manarom/BandPyrometry/blob/{commit}{path}#{line}",
+        #repo = "https://github.com/Manarom/BandPyrometry/blob/{commit}{path}#{line}",
         pages=[
                 "Home" => "index.md"
                 "Modules" => [
@@ -22,6 +19,6 @@ makedocs(
                  ] 
                ]#
 			   )
-deploydocs(;
-         repo="github.com/Manarom/BandPyrometry"
-)
+#deploydocs(;
+#         repo="github.com/Manarom/BandPyrometry"
+#)
