@@ -8,7 +8,7 @@ module BandPyrometry
     StaticArrays, #,
     Plots,
     Polynomials,
-    LegendrePolynomials,
+    LegendrePolynomials
     include("Planck.jl") # brings Planck module
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
     include("Pyrometers.jl") 
