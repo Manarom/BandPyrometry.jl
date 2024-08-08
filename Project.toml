@@ -1,5 +1,6 @@
 name = "BandPyrometry"
 authors = ["Roman Mironov"]
+uuid = "14a45906-4e2c-4b0e-b9a9-c5051fa98b9a"
 version = "0.0.1"
 
 [deps]
