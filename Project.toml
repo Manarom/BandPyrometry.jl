@@ -1,7 +1,7 @@
 name = "BandPyrometry"
-authors = ["Roman Mironov"]
-uuid = "14a45906-4e2c-4b0e-b9a9-c5051fa98b9a"
-version = "0.0.1"
+uuid = "fe3d11be-9380-49a5-9625-6df534737d98"
+authors = ["Manarom <manarom@yandex.ru>"]
+version = "0.1.0"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
