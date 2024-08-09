@@ -38,6 +38,7 @@ function _a₁₂₃!(λ::Float64,T::Float64) # filling constant vector
 end
 """
     a₁₂₃!(amat::AbstractMatrix,λ::AbstractVector,T::Float64)
+
         In-place filling of the intermediate matrix
         a₁=C₂/(λ*T)  - amat first column
         a₂ = 1/(eᵃ¹-1)  - amat second column 
@@ -62,6 +63,7 @@ end
 # BLACKBODY INTENSITY
 """
     ibb(λ,T)
+
     Blackbody intensity , [W/m2-sr-mkm]
     Ibb = (λ⁻⁵)* C₁/(eᵃ¹-1) , where a₁=C₂/(λ*T)
     Input:
@@ -79,6 +81,7 @@ end
     end
 """
     ibb(λ::AbstractVector,amat::AbstractMatrix)
+
     Blackbody intensity with intermediate matrix provided externally, [W/m2-sr-mkm]
         Ibb =  C₁*(λ⁻⁵)*a₂ , where
         a₁=C₂/(λ*T)  - amat first column
@@ -93,6 +96,7 @@ end
     end
     """
     ibb(λ::AbstractVector,T::AbstractVector)
+
     Blackbody intensity , [W/m2-sr-mkm]
     Ibb = (λ⁻⁵)* C₁/(eᵃ¹-1) , where a₁=C₂/(λ*T)
     Input:
@@ -505,8 +509,8 @@ function power(T)
     """
     Dₜibb!(input_tuple, λ::AbstractVector,T)
 
- 
-    In-place filling the tuple of (bb intensity, its first ,and second ) derivatives with respect to temperature
+    In-place filling the tuple of (bb intensity, its first ,and second ) derivatives with 
+    respect to temperature
 
     Input:
         input_tuple, [Nx0 vector or nothing,Nx0 vector or nothing, Nx0 vector or nothing]
