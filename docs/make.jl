@@ -1,7 +1,5 @@
 push!(LOAD_PATH,"../src/")
-
 include("../src/BandPyrometry.jl")
-println(pwd())
 using Documenter,.BandPyrometry
 makedocs(
         sitename = "BandPyrometry.jl",
