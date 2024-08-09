@@ -7,7 +7,7 @@
 <p>Detailed description of the underlying mathematics is available:  <a href="../src/supplementary_v_0_0_1.pdf">Download PDF</a>.</p>
 ```
 
-- Planck.jl module contains function to evaluate: 
+- Planck.jl module contains functions to evaluate: 
     - Blackbody spectral intensity 
     - Blackbody intensity first and second derivatives with respect to wavelength and temperature 
     - Blackbody integral intensity over the wavelength band 
