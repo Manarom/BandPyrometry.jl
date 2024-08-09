@@ -11,9 +11,10 @@ module BandPyrometry
     LegendrePolynomials
 
     include("Planck.jl") # brings Planck module
+    include("JDXreader.jl")
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
     include("Pyrometers.jl") 
-    include("JDXreader.jl")
+    
 
     export Planck, JDXreader,
             BandPyrometryPoint,
