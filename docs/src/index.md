@@ -4,7 +4,7 @@
 ## General description
 
 ```@raw html
-<p>Detailed description of the underlying mathematics is available:  <a href="assets/supplementary_v_0_0_1.pdf">Download PDF</a>.</p>
+<p>Detailed description of the underlying mathematics is available:  <a href="../src/supplementary_v_0_0_1.pdf">Download PDF</a>.</p>
 ```
 
 - Planck.jl module contains function to evaluate: 
