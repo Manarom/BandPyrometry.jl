@@ -9,7 +9,7 @@ And also, two small modules called `JDXreader.jl` and `Pyrometers.jl`. The first
   In `/test` folder there are two [Pluto](https://plutojl.org/) notebooks, which can be used as examples of package usage.
 
 
-  Full documentation is available at https://manarom.github.io/BandPyrometry/
+  Full documentation is available at https://manarom.github.io/BandPyrometry.jl/
 
 # Installation 
 
