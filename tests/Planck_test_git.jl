@@ -443,15 +443,15 @@ end
 
 # ╔═╡ a5565a17-6572-4946-8147-7a9c7ca203f2
 md"""
-	Load jdx file? $(@bind is_jdx_loaded CheckBox())
+	Load jdx file? $(@bind is_jdx_loaded confirm(CheckBox()))
 	"""
 
 # ╔═╡ 3f4d5d0e-8f35-4f57-8b0f-2aae19b2f7be
 if is_jdx_loaded
-begin 
-	filedir = open_dialog("select file");
+begin
+	filedir = joinpath(pwd(),"JCAM_test_file.txt")
 	if isfile(filedir)
-		xydata = Main.JDXreader.read_jdx_file(filedir);
+		xydata = BandPyrometry.JDXreader.read_jdx_file(filedir);
 		pj = plot(xydata.x,xydata.y)
 		xlabel!(xydata.headers["XUNITS"])
 		ylabel!(xydata.headers["YUNITS"])
@@ -2772,8 +2772,8 @@ version = "1.4.1+1"
 # ╠═3cd039d3-3926-4889-a743-a8b908bf1796
 # ╠═c758524b-04f3-4699-8594-cb65fe30f7a4
 # ╟─8cfa738e-05cc-4d86-b40c-86442d14b4b1
-# ╟─a5565a17-6572-4946-8147-7a9c7ca203f2
-# ╟─3f4d5d0e-8f35-4f57-8b0f-2aae19b2f7be
+# ╠═a5565a17-6572-4946-8147-7a9c7ca203f2
+# ╠═3f4d5d0e-8f35-4f57-8b0f-2aae19b2f7be
 # ╠═6f7497ac-d157-4ed5-8ed8-2a80f267efad
 # ╟─21d63be3-b945-452b-91d8-63efb3568b95
 # ╟─00000000-0000-0000-0000-000000000001
