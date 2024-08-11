@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.42
+# v0.19.45
 
 using Markdown
 using InteractiveUtils
@@ -17,7 +17,10 @@ end
 # ╔═╡ 1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
 using Plots, StaticArrays, MKL,LinearAlgebra, Optimization,
     OptimizationOptimJL, 
-    Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings
+    Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings, Revise,Printf
+
+# ╔═╡ 15a5265e-61bc-440d-9a7d-ff10773b78d8
+using Main.BandPyrometry
 
 # ╔═╡ 30743a02-c643-4bdc-837e-b97299f9520a
 md"""
@@ -27,12 +30,8 @@ BandPyrometry.jl implements methods for analytical calculation of a real surface
 
 """
 
-# ╔═╡ e2f8b0fb-52ac-4f76-afe7-a79b292eb5f6
-
-working_dir  = "working_dir"
-
 # ╔═╡ 255e0485-a280-4142-82dd-d76d0d3d0cca
-include(joinpath(working_dir,"BandPyrometry.jl"))
+includet(joinpath("../src","BandPyrometry.jl"))
 
 # ╔═╡ 824a6af1-3f70-4de0-8a94-6c63663a546a
 md"""
@@ -88,7 +87,7 @@ end)
 λ = collect(range(lam_region[1],lam_region[2],length=50));
 
 # ╔═╡ 278c2da0-b396-493e-bdcd-fc2a539780b6
-md"select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(Main.BandPyrometry.supported_polynomial_types)))))"
+md"select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(BandPyrometry.supported_polynomial_types)))))"
 
 # ╔═╡ d90da478-40b3-4677-82b9-fbfd79a72ef0
 md"""Set the "measured" spectrum coefficients:"""
@@ -122,7 +121,7 @@ md"polynomial degree = $(@bind poly_degree confirm(Select(0:4,default=2)))"
 
 # ╔═╡ 533e4f6f-c66f-4cf5-a82e-3d821fab918e
 # VanderMatrix contains basis vectors of spectral emissivity approximation
-VVV= Main.BandPyrometry.Vander(λ,poly_degree,poly_type=poly_type);
+VVV= BandPyrometry.Vander(λ,poly_degree,poly_type=poly_type);
 
 # ╔═╡ d17a5db7-0125-48b5-9016-76da6d72c673
 begin
@@ -200,15 +199,19 @@ end # starting values
 T_fitted = out[1];
 
 # ╔═╡ 73c85c85-2fc4-48ac-b5f4-4c35edcf935c
-a_vect_fitted = out[2]
+a_vect_fitted = out[2];
 
 # ╔═╡ d6406663-77e9-4987-9ddf-955d8101c401
-a_vect_real = x_data[1:end-1]
+a_vect_real = x_data[1:end-1];
+
+# ╔═╡ ebc0b228-01c8-42e4-9388-8194be1dd669
+md"""
+	Goodness of fit:
+	"""
 
 # ╔═╡ 5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
 L"""
-
-	\begin{bmatrix} T_{fitted} = %$(T_fitted) & T_{real} = %$(T_to_fit) & \Delta T /T = %$(abs(T_fitted-T_to_fit)/T_to_fit) \\ |a_{fitted}| = %$(norm(a_vect_fitted)) & |a_{real}| = %$(norm(x_data[1:end-1])) & |a_{fitted} -a_{real}|= %$(norm(a_vect_fitted - a_vect_real))\end{bmatrix}
+	\begin{bmatrix} T_{fitted} = %$(T_fitted) & T_{real} = %$(T_to_fit) & \Delta T /T = %$(abs(T_fitted-T_to_fit)/T_to_fit) \\ |\vec{a}_{fitted}| = %$(norm(a_vect_fitted)) & |\vec{a}_{real}| = %$(norm(x_data[1:end-1])) & |\vec{a}_{fitted} -\vec{a}_{real}|= %$(norm(a_vect_fitted - a_vect_real))\end{bmatrix}
 
 """
 
@@ -229,8 +232,8 @@ end
 
 # ╔═╡ fead76f5-c0b5-4fcb-a39e-c97ded034653
 begin
-	p1 = plot(λ,ϵ_data,label="Real emissivity, a=  $(x_data[1:end-1]) ");
-	scatter!(p1,λ, e_fitted_spectrum,label="Fitted emissivity, a=  $(a_vect_fitted) " )
+	p1 = plot(λ,ϵ_data,label="Real emissivity, a=  $(map(i->@sprintf("%.2f",i),x_data[1:end-1]) )");
+	scatter!(p1,λ, e_fitted_spectrum,label="Fitted emissivity, a=  $(map(i->@sprintf("%.2f",i), a_vect_fitted ))")
 	ylims!(0, 1.2)
 	xlabel!("Wavelength, μm") 
 	ylabel!(L"\epsilon")
@@ -252,6 +255,7 @@ OptimizationOptimJL = "36348300-93cb-4f02-beb5-3c3902f8871e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
@@ -265,7 +269,7 @@ OptimizationOptimJL = "~0.3.2"
 Plots = "~1.40.4"
 PlutoUI = "~0.7.59"
 Polynomials = "~4.0.11"
-Revise = "~3.5.16"
+Revise = "~3.5.18"
 StaticArrays = "~1.9.6"
 """
 
@@ -275,7 +279,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "4630d9630b23d24eef8b36b44cf661c281679a2b"
+project_hash = "a86fea3462cbd65cc2e3f0fcc451cb86adb5a1d6"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "ae44a0c3d68a420d4ac0fa1f7e0c034ccecb6dc5"
@@ -405,9 +409,9 @@ weakdeps = ["SparseArrays"]
 
 [[deps.CodeTracking]]
 deps = ["InteractiveUtils", "UUIDs"]
-git-tree-sha1 = "c0216e792f518b39b22212127d4a84dc31e4e386"
+git-tree-sha1 = "7eee164f122511d3e4e1ebadb7956939ea7e1c77"
 uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
-version = "1.3.5"
+version = "1.3.6"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -834,9 +838,9 @@ version = "3.0.3+0"
 
 [[deps.JuliaInterpreter]]
 deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
-git-tree-sha1 = "5d3a5a206297af3868151bb4a2cf27ebce46f16d"
+git-tree-sha1 = "7ae67d8567853d367e3463719356b8989e236069"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
-version = "0.9.33"
+version = "0.9.34"
 
 [[deps.LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1403,10 +1407,10 @@ uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.3.0"
 
 [[deps.Revise]]
-deps = ["CodeTracking", "Distributed", "FileWatching", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "Pkg", "REPL", "Requires", "UUIDs", "Unicode"]
-git-tree-sha1 = "677b65e17aeb6b4a0be1982e281ec03b0f55155c"
+deps = ["CodeTracking", "Distributed", "FileWatching", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "REPL", "Requires", "UUIDs", "Unicode"]
+git-tree-sha1 = "7b7850bb94f75762d567834d7e9802fc22d62f9c"
 uuid = "295af30f-e4ad-537b-8983-00126c2a3abe"
-version = "3.5.16"
+version = "3.5.18"
 
 [[deps.RuntimeGeneratedFunctions]]
 deps = ["ExprTools", "SHA", "Serialization"]
@@ -1959,9 +1963,9 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╟─30743a02-c643-4bdc-837e-b97299f9520a
-# ╟─1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-# ╠═e2f8b0fb-52ac-4f76-afe7-a79b292eb5f6
+# ╠═1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
 # ╠═255e0485-a280-4142-82dd-d76d0d3d0cca
+# ╠═15a5265e-61bc-440d-9a7d-ff10773b78d8
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
@@ -1976,28 +1980,29 @@ version = "1.4.1+1"
 # ╟─d90da478-40b3-4677-82b9-fbfd79a72ef0
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
 # ╠═8ef42759-fb53-41af-904e-8916924415fa
-# ╟─533e4f6f-c66f-4cf5-a82e-3d821fab918e
+# ╠═533e4f6f-c66f-4cf5-a82e-3d821fab918e
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
 # ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 # ╟─36c655f8-141b-4472-96d7-01c8fd1f1515
 # ╟─321172de-dcf6-4f51-ab31-edb37b8c3983
 # ╟─c4df3ad4-9f1a-414c-b02c-8161f007ccd5
-# ╠═01cd1f0d-15b8-474b-a05a-eec840c54fff
+# ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
 # ╟─3b4308dc-da18-43ab-9f50-2c8bc05acb78
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
 # ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
 # ╟─15025715-1ff3-4e7c-8136-cc442b77528a
 # ╟─6118cebc-d18e-42cc-ac1b-aa1ad95cd719
-# ╠═a73dc68d-7e41-4748-b0bb-458d6ef73305
-# ╠═73c85c85-2fc4-48ac-b5f4-4c35edcf935c
-# ╠═d6406663-77e9-4987-9ddf-955d8101c401
+# ╟─a73dc68d-7e41-4748-b0bb-458d6ef73305
+# ╟─73c85c85-2fc4-48ac-b5f4-4c35edcf935c
+# ╟─d6406663-77e9-4987-9ddf-955d8101c401
+# ╟─ebc0b228-01c8-42e4-9388-8194be1dd669
 # ╟─5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
-# ╠═e9b7169f-0d75-44bb-8505-ccfde1bdce98
+# ╟─e9b7169f-0d75-44bb-8505-ccfde1bdce98
 # ╠═68b4b548-0a96-4f67-baef-921bda3ff0a5
 # ╟─c947d126-092b-4b92-ab56-373d5a387908
-# ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
+# ╠═fead76f5-c0b5-4fcb-a39e-c97ded034653
 # ╠═3f1e1a4c-48bf-44fa-a146-020dde04d2ff
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

@@ -108,7 +108,7 @@ struct VanderMatrix{MatrixType}
 """
 VanderMatrix(x::AbstractVector,
                     poly_degree;
-                    MatrixType::AbstractMatrix=Matrix{Float64},
+                    MatrixType::Type{<:AbstractMatrix}=Matrix{Float64},
                     poly_type::String="stand",
                     poly_constructor=StandPolyWrapper) = begin
                             @assert issorted(x) "The x-vector must be sorted in ascending order"
