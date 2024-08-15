@@ -148,7 +148,7 @@ function Vander(x::AbstractArray, poly_degree::Number;poly_type::String="stand",
     end
     return VanderMatrix(x,
                         poly_degree,
-                        MatrixType = MMatrix{L,poly_degree+1,Float64,L*(poly_degree+1)},
+                        MatrixType = MatrixType,
                         poly_type = poly_type,
                         poly_constructor = supported_polynomial_types[poly_type])
 end
