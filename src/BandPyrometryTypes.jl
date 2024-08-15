@@ -139,10 +139,13 @@ end
     Creates VanderMatrix object of predefied type, all supported polynomial type can 
     be found in @supported_polynomial_types
 """
-function Vander(x::AbstractArray, poly_degree::Number;poly_type::String="stand")
+function Vander(x::AbstractArray, poly_degree::Number;poly_type::String="stand",MatrixType::Type{<:AbstractMatrix}=MMatrix)
     # more simplyfied constructor 
     @assert haskey(supported_polynomial_types,poly_type) # polynomial must be of supported type
     L = length(x)
+    if !isconcretetype(MatrixType) 
+        MatrixType=MMatrix{L,poly_degree+1,Float64,L*(poly_degree+1)}
+    end
     return VanderMatrix(x,
                         poly_degree,
                         MatrixType = MMatrix{L,poly_degree+1,Float64,L*(poly_degree+1)},

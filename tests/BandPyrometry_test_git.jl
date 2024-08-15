@@ -24,9 +24,23 @@ using Main.BandPyrometry
 
 # ╔═╡ 30743a02-c643-4bdc-837e-b97299f9520a
 md"""
-##  Notebook for testing the BandPyrometryPoint type from BandPyrometry module 
+#  Pluto notebook for testing the `BandPyrometry.jl` module  
 
-BandPyrometry.jl implements methods for analytical calculation of a real surface thermal emission spectrum. From BandPyrometryPoint perspective, real body thermal emission is approximated as a product of Planck function and linear (with respect to the optimization variables e.g. polynomial coefficients) approximation of spectral emissivity.	In this test the "measured" thermal emission spectrum is calculated as the same model  as in BandPyrometryPoint, further this spectrum is fitted using optimization
+##### Package **`BandPyrometry.jl`** contains methods to obtain the real surface's temperature from its thermal emission spectrum using multiwavelenght or band-pyrometry method. 
+____________________
+
+To run this notebook, you need:
+1) Install `julia` language itself from its official [download page](https://julialang.org/downloads) 
+2) Install [Pluto](https://plutojl.org/) notebook from `julia` REPL by entering the following commands line-by-line:
+```julia
+import Pkg
+Pkg.add("Pluto")
+using Pluto
+Pluto.run()
+```
+The last line will launch the Pluto startign page in your browser 
+3) Copy the entire GitHub [repository](https://github.com/Manarom/BandPyrometry.jl.git) to your local folder
+4) Open this notebook file `BandPyrometry_test_git.jl` in `Pluto` by providing the full path to the *"Open a notebook"* text field on `Pluto`'s starting page. As far as `Pluto` has its own package manager, it will automatically install all necessary dependancies, which are marked in `using` cell of this file . 
 
 """
 
@@ -35,20 +49,41 @@ includet(joinpath("../src","BandPyrometry.jl"))
 
 # ╔═╡ 824a6af1-3f70-4de0-8a94-6c63663a546a
 md"""
-	The emissivity is approximated as a linear combination of basis functions:
+	## Introduction
+
+	Unlike classical partial radiation pyrometry, which requires setting a constant emissivity in some relatively narrow wavelength region, the **multiwavelength pyrometry** allows one to obtain the temperature of a surface without knowing the emissivity. More about multiwavelength pyrometry can be found e.g. in [Multi-spectral pyrometry—a review](https://iopscience.iop.org/article/10.1088/1361-6501/aa7b4b) 
+
+	In order to achieve this goal, the **multiwavelength pyrometry** assumes that the dependence of emissivity on wavelength in some spectral range can be described by some relatively small number (``N``) of parameters. Hence, if you have measured thermal radiation intensity at relatively large number (``M``) of wavelengths, and if ``M>N+1``, you can formulate the optimization problem in space of ``N+1`` optimization variables viz ``\vec{x}= \begin{bmatrix} a_0 , \dots,  a_{N-1} , T\end{bmatrix}``, here `` \begin{bmatrix} a_0 , \dots,  a_{N-1}  \end{bmatrix}`` are ``N``  emissivity approximation coefficients, and the ``(N+1)``'th optimization variable ``T`` is the temperature.	The **multiwavelength pyrometry** optimization problem has several features that can be utilized in order to obtain a computationally-effective algorithm:
+
+	* First, the emissivity approximation is a linear problem, this means that emissivity approximation coefficients can be taken independent of both the optimization variables and the independent variables (wavelength)
+	* Second, a highly non-linear term (viz Planck function) depends on only one of the optimizaiton variables
+	* And third, the target function is the product of linear and non-linear optimization problems
+
+	Mathematical consequencies of these features are described in this repository supplementary materials [download pdf](https://manarom.github.io/BandPyrometry.jl/assets/supplementary_v_0_0_1.pdf) in more details.
+
+	In `BandPyrometry.jl` , the real surface thermal emission is approximated as a product of Planck function (ideal surface thermal emission) and linear (with respect to the optimization variables e.g. polynomial coefficients) approximation of spectral emissivity.	
+
+	In this notebook, the "measured" thermal emission spectrum is calculated as the same model  as the `BandPyrometryPoint.jl` internal representation, further this spectrum is fitted using optimization tools provided by **`Optimization.jl`** package, some random noise can be added (`optionally`). 
+
+	In `BandPyrometry.jl` the spectral emissivity is approximated as a linear combination of basis functions:
 	"""
 
 # ╔═╡ 5cc20c03-6c6e-4425-b974-242f69fe29be
-L"\epsilon(λ)=\sum_{n=0}^{polynomial \: degree}a_n \cdot \phi_n(λ)"
+L"""
+\begin{gather}
+\epsilon(λ)=\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ) \\
+\lambda - wavelength, \mu m
+\end{gather}
+	"""
 
 # ╔═╡ ba2d0691-aeef-4d0a-808a-0c01a8b49e12
 md"""
-	where ϕₙ is the basis function column vector. For standard basis it is:
+	where ``\phi_n`` is the basis function column vector, e.g. for standard basis it is:
 	"""
 
 # ╔═╡ cbaf05db-3265-4e2d-8ea4-759442f798e0
 L"""
-\mathbf{ \phi_n(λ)  = \begin{bmatrix} λ₁ⁿ  \\ \vdots \\ λ_mⁿ \end{bmatrix}
+\mathbf{ \phi_n(λ)  = \begin{bmatrix} λ₁ⁿ  \\ \vdots \\ λ_{M}ⁿ \end{bmatrix}
 }
 """
 
@@ -58,14 +93,45 @@ md"""
 	"""
 
 # ╔═╡ 478c8bb8-aa3c-4afe-b787-4924525858fa
-L"\mathbf{ 
-	I_{real\:surface} (\lambda,T) =I_{blackbody}(\lambda,T) \cdot  \epsilon(λ)=I_{blackbody}(\lambda,T) \cdot \sum_{n=0}^{polynomial \: 		degree}a_n \cdot \phi_n(λ)
-	}"
+L"""
+	\begin{gather}
+	\mathbf{ 
+	I_{real\:surface} (\lambda,T) =I_{blackbody}(\lambda,T) \cdot  \epsilon(λ)=I_{blackbody}(\lambda,T) \cdot \sum_{n=0}^{N-1}a_n \cdot \phi_n(λ)
+	} \\
+	T-temperature,K
+	\end{gather}
+		"""
 
+
+# ╔═╡ 0831fddd-d2db-4ada-b293-00848d3673fb
+md"Now, the optimization problem can be formulated:"
+
+# ╔═╡ 4accbaec-4e08-43d3-8f36-2217b9394e86
+L"""
+	\begin{gather}
+
+	\vec{x}^*=argmin\{F\} \\
+	F=\sum_{i=1}^{M}[y_i - I_{blackbody}(\lambda_i,T) \cdot (\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ_i))]^2
+	\end{gather}
+
+	"""
+
+# ╔═╡ c47637c6-b243-4d8b-8234-40c68608939c
+md"where ``\vec{x}^*`` is the local minimum"
+
+# ╔═╡ d55793f5-45ff-4968-b2e1-8b846de8b91f
+md"""
+	To solve this optimization problem `BandPyrometry.jl` package provides functions to evaluate the discrepancy function ``F``, ``\nabla F`` and ``\nabla^2F`` which are needed to solve the optimization problem using zero, first or second order optimization algorithms. To approximate the emissivity package  uses several polynomial bases:
+	* Standard basis (from [`Polynomials.jl`](https://juliamath.github.io/Polynomials.jl/stable/) package)
+	* Chebyshev basis (from [`Polynomials.jl`](https://juliamath.github.io/Polynomials.jl/stable/) package)
+	* Legendre polynomials (from [`LegendrePolynoials.jl`](https://jishnub.github.io/LegendrePolynomials.jl/stable/) package)
+	* Trigonometric basis: ``\phi_n(λ) = sin(\pi \cdot n \lambda)``  for odd n, and  ``\phi_n(λ) = cos(\pi \cdot n \lambda)`` for even n
+	"""
 
 # ╔═╡ 38300c92-e5e6-4d5e-a394-aa1a47cfd757
 md"""
-	##### Measured spectrum generation
+	## `BandPyrometry.jl` testing
+	##### "Measured" emissivity generation
 	"""
 
 # ╔═╡ 8a54d856-2298-4225-81ac-23bf66f35136
@@ -87,10 +153,10 @@ end)
 λ = collect(range(lam_region[1],lam_region[2],length=50));
 
 # ╔═╡ 278c2da0-b396-493e-bdcd-fc2a539780b6
-md"select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(BandPyrometry.supported_polynomial_types)))))"
+md"Select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(BandPyrometry.supported_polynomial_types)))))"
 
 # ╔═╡ d90da478-40b3-4677-82b9-fbfd79a72ef0
-md"""Set the "measured" spectrum coefficients:"""
+md"""Set the "measured" spectrum emissivity approximation coefficients:"""
 
 # ╔═╡ 22eab67b-868a-44fd-9d40-69234f1ecb43
 @bind  a confirm(PlutoUI.combine() do Child
@@ -117,11 +183,28 @@ md"""Set the "measured" spectrum coefficients:"""
 end)
 
 # ╔═╡ 8ef42759-fb53-41af-904e-8916924415fa
-md"polynomial degree = $(@bind poly_degree confirm(Select(0:4,default=2)))"
+md"Set polynomial degree : $(@bind poly_degree confirm(Select(0:4,default=2))) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
+
+# ╔═╡ e2e28426-d9a3-4746-95b5-607114f16d18
+md"""
+	The approximation of spectral emissivity in a spectral band is implemented  using 	`VanderMatrix` structure. This objects stores all basis functions ``\phi_n(λ)``  in its field `:v` , the input independent variable vector ``\lambda`` is stored in normalized (in order to fit withing the range of -1...1) form, it also stores all data needed to return the original  ``\lambda`` vector:
+	$(@doc BandPyrometry.VanderMatrix)
+
+	"""
 
 # ╔═╡ 533e4f6f-c66f-4cf5-a82e-3d821fab918e
 # VanderMatrix contains basis vectors of spectral emissivity approximation
 VVV= BandPyrometry.Vander(λ,poly_degree,poly_type=poly_type);
+
+# ╔═╡ a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
+md"""
+The following two figures show:
+
+1)basis vectors for selected polynomial (columns of `VanderMatrix.v`): ``V``
+
+2)the resulting emissivity, calculated as a product of `VanderMatrix` and the vector of emissivity approximation polynomial: ``\vec{\epsilon}= \begin{bmatrix} \vec{\phi_1} , \dots,  \vec{\phi_n} \end{bmatrix}\cdot\vec{a} = V\cdot\vec{a}``
+
+"""
 
 # ╔═╡ d17a5db7-0125-48b5-9016-76da6d72c673
 begin
@@ -143,6 +226,39 @@ begin
 	ylabel!("ϵ")
 	p_em
 end
+
+# ╔═╡ aaf115ba-f7be-4553-a090-e04bd5902714
+md"""
+	`VanderMatrix` type can  be used to fit (in a least-square sence) a data with the help `polyfit` function:
+
+	$(@doc BandPyrometry.polyfit)
+
+	"""
+
+# ╔═╡ da6d5178-c083-4baa-91c3-e62f735bf808
+md"""
+To check the `polyfit` function we can load spectrum located in the repository using `JDXreader.jl`. This file provides method `read_jdx_file` $(@doc JDXreader.read_jdx_file)
+"""
+
+# ╔═╡ 111122e9-1260-4f00-aba6-0fdf6cf04c4e
+begin 
+	rt_emissivity_data = JDXreader.read_jdx_file("real_surface_emissivity.txt") # loading file, actually this file is two-column data with no headers, but this is ok
+	interpolated_values = linear_interpolation(rt_emissivity_data.x,rt_emissivity_data.y,extrapolation_bc = Interpolations.Flat())(λ) # interpolating data at λ points
+	Vander_test = BandPyrometry.Vander(λ,poly_degree,MatrixType = Matrix{Float64}) # creating new matrix 
+	(a_fit_check,fitted_value,goodness_of_fit) = BandPyrometry.polyfit(Vander_test,λ,interpolated_values)# fitting polynomial coefficients
+	plot(rt_emissivity_data.x,rt_emissivity_data.y,label = "real surface spectral emissivity example")
+	scatter!(λ,fitted_value, label="fitted values")
+end
+
+# ╔═╡ 623759b4-1c53-4390-87cc-9a79f5ae541e
+md"Goodness of fit: $(goodness_of_fit)"
+
+# ╔═╡ 80dacea5-ea46-479f-b0d8-da9a9cf41aa2
+md"""
+
+### Generating the "measured" spectral intensity:
+
+"""
 
 # ╔═╡ 6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 md"""
@@ -1963,15 +2079,19 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╟─30743a02-c643-4bdc-837e-b97299f9520a
-# ╠═1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-# ╠═255e0485-a280-4142-82dd-d76d0d3d0cca
-# ╠═15a5265e-61bc-440d-9a7d-ff10773b78d8
+# ╟─1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
+# ╟─255e0485-a280-4142-82dd-d76d0d3d0cca
+# ╟─15a5265e-61bc-440d-9a7d-ff10773b78d8
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
 # ╟─cbaf05db-3265-4e2d-8ea4-759442f798e0
 # ╟─c2b82e9d-cae8-465c-bca0-160599e06102
 # ╟─478c8bb8-aa3c-4afe-b787-4924525858fa
+# ╟─0831fddd-d2db-4ada-b293-00848d3673fb
+# ╟─4accbaec-4e08-43d3-8f36-2217b9394e86
+# ╟─c47637c6-b243-4d8b-8234-40c68608939c
+# ╟─d55793f5-45ff-4968-b2e1-8b846de8b91f
 # ╟─38300c92-e5e6-4d5e-a394-aa1a47cfd757
 # ╟─8a54d856-2298-4225-81ac-23bf66f35136
 # ╟─6f17606c-e52e-4913-87f6-56190d209308
@@ -1979,10 +2099,17 @@ version = "1.4.1+1"
 # ╟─278c2da0-b396-493e-bdcd-fc2a539780b6
 # ╟─d90da478-40b3-4677-82b9-fbfd79a72ef0
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
-# ╠═8ef42759-fb53-41af-904e-8916924415fa
-# ╠═533e4f6f-c66f-4cf5-a82e-3d821fab918e
+# ╟─8ef42759-fb53-41af-904e-8916924415fa
+# ╟─e2e28426-d9a3-4746-95b5-607114f16d18
+# ╟─533e4f6f-c66f-4cf5-a82e-3d821fab918e
+# ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
+# ╟─aaf115ba-f7be-4553-a090-e04bd5902714
+# ╟─da6d5178-c083-4baa-91c3-e62f735bf808
+# ╠═111122e9-1260-4f00-aba6-0fdf6cf04c4e
+# ╟─623759b4-1c53-4390-87cc-9a79f5ae541e
+# ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2
 # ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 # ╟─36c655f8-141b-4472-96d7-01c8fd1f1515
 # ╟─321172de-dcf6-4f51-ab31-edb37b8c3983
