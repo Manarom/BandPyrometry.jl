@@ -16,7 +16,7 @@ module BandPyrometry
     include("Pyrometers.jl") 
     
 
-    export Planck, #Planck function module 
+    export Planck, # Planck function module 
             JDXreader,#JCAMP files reader
             BandPyrometryPoint,# type for least-square fitting 
             EmPoint, # type for BB temperature fitting
