@@ -74,7 +74,7 @@ It is interesting that, unlike the blackbody, the real surface thermal emission 
 
 The following figure show the impact of spectral emissivity on the real surface thermal emission intensity.
 
-In `Planck.jl` module there are several functions to calculate the blackbody thermal emission spectra, more detailed documentaion is available at [link](https://manarom.github.io/BandPyrometry.jl/planck/)
+In [Planck.jl](https://manarom.github.io/BandPyrometry.jl/planck/) module there are several functions to calculate the blackbody thermal emission spectra
 """
 
 # ╔═╡ f22d22b6-5d98-4cc4-998f-a53e92809618
@@ -121,7 +121,15 @@ md"""
 #### I.II. Partial radiation pyrometry
 _______________________
 
-As far as the `blackbody` thermal radiation energy strongly depends on temperature, it can be used to mesaure the temperature of real surface. This is the general idea of pyrometry: **measure intensity to get temperature**. As far a the intensity is a directional quantity, pyrometer needs collimating optics (telescope). Pyrometers work in several soectral    There are a lot of various pyrometry techniques. But most  According to the previous section it is clear that 
+As far as the `blackbody` thermal radiation energy strongly depends on temperature, it can be used to measure the temperature of a real surface. This is the general idea of partial radiation pyrometry: Measure the intensity to get the temperature. As far as the intensity is a directional quantity, a pyrometer needs collimating optics (a telescope). As it was shown previously, the real surface emissivity often varies sufficiently with wavelength, and at the same time, partial radiation pyrometers assume constant emissivity. Thus, for industrial purposes, it is useful to have several pyrometers, each with a relatively narrow spectral band. In the spectral range of a partial radiation pyrometer, emissivity should not vary significantly to make the assumption of constant emissivity relevant.
+
+Module [Pyrometers.jl](https://manarom.github.io/BandPyrometry.jl/pyrometers/) provides several function to work with `virtual` partial radiation pyrometers. The list of supported pyrometers\
+
+Type|Wavelength
+
+$(Pyrometers.pyrometers_types)
+
+There are a lot of various pyrometry techniques. But most  According to the previous section it is clear that 
 
 """
 
@@ -2189,16 +2197,16 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╟─30743a02-c643-4bdc-837e-b97299f9520a
-# ╠═1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-# ╠═255e0485-a280-4142-82dd-d76d0d3d0cca
+# ╟─1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
+# ╟─255e0485-a280-4142-82dd-d76d0d3d0cca
 # ╟─15a5265e-61bc-440d-9a7d-ff10773b78d8
 # ╟─d442014a-20e6-4be4-ac7f-f13de329dec5
 # ╟─f22d22b6-5d98-4cc4-998f-a53e92809618
 # ╟─27b3c586-9eb0-4a51-b9ca-a9c0379fccdf
 # ╟─7cc110e9-7655-4dfc-b1e0-ab3905866425
-# ╟─4d6337aa-cfc7-4154-a395-5aa53e23d01a
-# ╟─03d76e64-ebf4-432b-b9be-d4cb26275f55
-# ╠═8a066ee5-80e9-462f-9a61-15851468aa63
+# ╠═4d6337aa-cfc7-4154-a395-5aa53e23d01a
+# ╠═03d76e64-ebf4-432b-b9be-d4cb26275f55
+# ╟─8a066ee5-80e9-462f-9a61-15851468aa63
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
@@ -2208,8 +2216,8 @@ version = "1.4.1+1"
 # ╟─0831fddd-d2db-4ada-b293-00848d3673fb
 # ╟─4accbaec-4e08-43d3-8f36-2217b9394e86
 # ╟─c47637c6-b243-4d8b-8234-40c68608939c
-# ╠═d55793f5-45ff-4968-b2e1-8b846de8b91f
-# ╠═38300c92-e5e6-4d5e-a394-aa1a47cfd757
+# ╟─d55793f5-45ff-4968-b2e1-8b846de8b91f
+# ╟─38300c92-e5e6-4d5e-a394-aa1a47cfd757
 # ╟─e2e28426-d9a3-4746-95b5-607114f16d18
 # ╟─78be3dd0-974b-4438-965d-433ddbdb7c6e
 # ╟─533e4f6f-c66f-4cf5-a82e-3d821fab918e
@@ -2227,7 +2235,7 @@ version = "1.4.1+1"
 # ╟─2b0a2047-948f-4f6f-a833-6287860fbf5e
 # ╟─da6d5178-c083-4baa-91c3-e62f735bf808
 # ╟─c125cb3b-0aec-4db2-bbb3-f280304e0e88
-# ╠═111122e9-1260-4f00-aba6-0fdf6cf04c4e
+# ╟─111122e9-1260-4f00-aba6-0fdf6cf04c4e
 # ╟─623759b4-1c53-4390-87cc-9a79f5ae541e
 # ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2
 # ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
