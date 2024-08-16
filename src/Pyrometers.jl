@@ -2,7 +2,7 @@
 module Pyrometers
     using   Optimization,
             OptimizationOptimJL,
-            LinearAlgebra
+            LinearAlgebra 
     import  ..Planck
     # "pyrometer type" => wavelength region in microns
     const pyrometers_types = Dict(
@@ -27,11 +27,35 @@ module Pyrometers
     Input:
         type - pyrometer type, must be member of pyrometers_types 
 """
-Pyrometer(type::String) = begin
+        Pyrometer(type::String) = begin
             haskey(pyrometers_types,type) ?  new(type,
                                                 pyrometers_types[type],
                                                 Ref(0.0)) : error("There is no such pyrometer type")
         end
+    end
+    """
+    measure(p::Pyrometer,i::Float64)
+
+    Calculates the "measured" from "mesaured" intensity by fitting the Planck function.
+    The intensity units should be consistent with Planck.ibb(λ,T) function return,
+    it should be in [W/m²⋅sr⋅μm]
+    Input:
+        p - pyrometer object
+        i - measured intensity in [W/m²⋅sr⋅μm]
+            returns temperature "measured" by this pyrometer  
+"""
+    function measure(p::Pyrometer,i::Float64)
+        tup = (p,i)
+        if length(p.λ)==1 # single wavelength pyrometer
+            fun = OptimizationFunction((t,tup)-> norm(Planck.ibb(tup[1].λ[1],t[]) - tup[2]))
+        else# narrow band pyrometer
+            fun = OptimizationFunction((t,tup)-> norm(Planck.band_power(t[],λₗ=tup[1].λ[1],λᵣ=tup[1].λ[2]) - tup[2]))
+        end
+        prob = OptimizationProblem(
+                fun, #fun
+                [600.0],#starting temperature
+                tup)
+        return solve(prob,NelderMead()).u[]   
     end
     """
     Base.isless(p1::Pyrometer,p2::Pyrometer)

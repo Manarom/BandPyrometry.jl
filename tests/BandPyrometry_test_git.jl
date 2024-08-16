@@ -17,10 +17,10 @@ end
 # ╔═╡ 1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
 using Plots, StaticArrays, MKL,LinearAlgebra, Optimization,
     OptimizationOptimJL, 
-    Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings, Revise,Printf
+    Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings, Revise,Printf, NumericalIntegration
 
 # ╔═╡ 15a5265e-61bc-440d-9a7d-ff10773b78d8
-using Main.BandPyrometry
+using Main.BandPyrometry #this line returns not defined error on the first Pluto run (probably, because of the Pluto running all "using"'s before the cells) just re-run this cell manually
 
 # ╔═╡ 30743a02-c643-4bdc-837e-b97299f9520a
 md"""
@@ -28,6 +28,7 @@ md"""
 
 ##### Package **`BandPyrometry.jl`** contains methods to obtain the real surface's temperature from its thermal emission spectrum using multiwavelenght or band-pyrometry method. 
 ____________________
+### Installation
 
 To run this notebook, you need:
 1) Install `julia` language itself from its official [download page](https://julialang.org/downloads) 
@@ -38,7 +39,7 @@ Pkg.add("Pluto")
 using Pluto
 Pluto.run()
 ```
-The last line will launch the Pluto startign page in your browser 
+The last line will launch the Pluto starting page in your default browser 
 3) Copy the entire GitHub [repository](https://github.com/Manarom/BandPyrometry.jl.git) to your local folder
 4) Open this notebook file `BandPyrometry_test_git.jl` in `Pluto` by providing the full path to the *"Open a notebook"* text field on `Pluto`'s starting page. As far as `Pluto` has its own package manager, it will automatically install all necessary dependancies, which are marked in `using` cell of this file . 
 
@@ -47,9 +48,87 @@ The last line will launch the Pluto startign page in your browser
 # ╔═╡ 255e0485-a280-4142-82dd-d76d0d3d0cca
 includet(joinpath("../src","BandPyrometry.jl"))
 
+# ╔═╡ d442014a-20e6-4be4-ac7f-f13de329dec5
+md"""
+## Part I. Introduction
+
+
+#### I.I. The `blackbody` vs `real surface` thermal emission 
+_______________________
+
+All heated bodies emit thermal radiation. According to Planck's law, the spectrum of ideal emitter (called the *blackbody*) is governed solaly by its temperature. The blackbody spectral intensity can be calculated as follows \
+
+
+``I_{blackbody}(\lambda , T) =  \frac{C_1}{\lambda ^5} \cdot \frac{1}{e^{\frac{C_2}{\lambda T } } - 1}``, \
+
+where ``C_1`` = $(Planck.C₁), ``W \cdot μm/m² \cdot sr`` and ``C_2`` = $(Planck.C₂), ``μm \cdot K`` , ``\lambda`` - wavelength in ``\mu m``, ``T`` - temperature in Kelvins
+
+A real surfaces thermal emission intensity is lower than the one of the blackbody. Quantitatively the rate of real surface thermal emission is characterized by its directional spectral emissivity.
+
+``I_{real\ \ surface}(\lambda , T, \vec{\Omega} ) = \epsilon (\lambda, T,\vec{\Omega}) \cdot  I_{blackbody}(\lambda , T)``, \
+
+here  ``\vec{\Omega}`` stays for direction. \
+
+
+It is interesting that, unlike the blackbody, the real surface thermal emission (in general) depends  on the direction of radiation. Therefore, the most general characteristic for thermal radiation of a real surface is the `directional spectral emissivity`.
+
+The following figure show the impact of spectral emissivity on the real surface thermal emission intensity.
+
+In `Planck.jl` module there are several functions to calculate the blackbody thermal emission spectra, more detailed documentaion is available at [link](https://manarom.github.io/BandPyrometry.jl/planck/)
+"""
+
+# ╔═╡ f22d22b6-5d98-4cc4-998f-a53e92809618
+@bind  T_BB PlutoUI.combine() do Child
+	md"""
+	Blackbody temperatures: \
+	T₁ = $(
+		Child(Slider(-273.0:1:2500,default=300,show_value = true))
+	) ``^o C`` \
+	T₂ = $(
+		Child(Slider(-273.0:1:2500,default=900,show_value = true))
+	)  ``^o C`` 
+	"""
+end
+
+# ╔═╡ 27b3c586-9eb0-4a51-b9ca-a9c0379fccdf
+@bind  λ_BB PlutoUI.combine() do Child
+	md"""
+	Blackbody spectral range, ``\mu m`` : \
+	``\lambda_{left}`` = $(
+		Child(Slider(0.1:0.1:50,default=0.1,show_value = true))
+	)   -- 
+	 $(
+		Child(Slider(0.1:0.1:50,default=25.0,show_value = true))
+	)  ``\lambda_{right}`` 
+	"""
+end
+
+# ╔═╡ 7cc110e9-7655-4dfc-b1e0-ab3905866425
+@bind  scales_BB PlutoUI.combine() do Child
+	md"""
+	Scales : \
+	xscale = $(
+		Child(Select([:identity,:ln,:log10]))
+	)   yscale  
+	 $(
+		Child(Select([:identity,:ln,:log10]))
+	)   
+	"""
+end
+
+# ╔═╡ 8a066ee5-80e9-462f-9a61-15851468aa63
+md"""
+#### I.II. Partial radiation pyrometry
+_______________________
+
+As far as the `blackbody` thermal radiation energy strongly depends on temperature, it can be used to mesaure the temperature of real surface. This is the general idea of pyrometry: **measure intensity to get temperature**. As far a the intensity is a directional quantity, pyrometer needs collimating optics (telescope). Pyrometers work in several soectral    There are a lot of various pyrometry techniques. But most  According to the previous section it is clear that 
+
+"""
+
 # ╔═╡ 824a6af1-3f70-4de0-8a94-6c63663a546a
 md"""
-	## Introduction
+	#### I.III. Multiwavelength pyrometry
+	_______________________
 
 	Unlike classical partial radiation pyrometry, which requires setting a constant emissivity in some relatively narrow wavelength region, the **multiwavelength pyrometry** allows one to obtain the temperature of a surface without knowing the emissivity. More about multiwavelength pyrometry can be found e.g. in [Multi-spectral pyrometry—a review](https://iopscience.iop.org/article/10.1088/1361-6501/aa7b4b) 
 
@@ -70,10 +149,7 @@ md"""
 
 # ╔═╡ 5cc20c03-6c6e-4425-b974-242f69fe29be
 L"""
-\begin{gather}
-\epsilon(λ)=\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ) \\
-\lambda - wavelength, \mu m
-\end{gather}
+\epsilon(λ)=\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ)
 	"""
 
 # ╔═╡ ba2d0691-aeef-4d0a-808a-0c01a8b49e12
@@ -94,12 +170,9 @@ md"""
 
 # ╔═╡ 478c8bb8-aa3c-4afe-b787-4924525858fa
 L"""
-	\begin{gather}
 	\mathbf{ 
 	I_{real\:surface} (\lambda,T) =I_{blackbody}(\lambda,T) \cdot  \epsilon(λ)=I_{blackbody}(\lambda,T) \cdot \sum_{n=0}^{N-1}a_n \cdot \phi_n(λ)
-	} \\
-	T-temperature,K
-	\end{gather}
+	} 
 		"""
 
 
@@ -130,12 +203,22 @@ md"""
 
 # ╔═╡ 38300c92-e5e6-4d5e-a394-aa1a47cfd757
 md"""
-	## `BandPyrometry.jl` testing
-	##### "Measured" emissivity generation
+	## Part II. `BandPyrometry.jl` testing
+	#### "Measured" emissivity generation
 	"""
 
+# ╔═╡ e2e28426-d9a3-4746-95b5-607114f16d18
+md"""
+	The approximation of spectral emissivity in a spectral band is implemented  using 	`VanderMatrix` structure. This objects stores all basis functions ``\phi_n(λ)``  in its field `:v` , the input independent variable vector ``\lambda`` is stored in normalized (in order to fit withing the range of -1...1) form, it also stores all data needed to return the original  ``\lambda`` vector (show docs)$(@bind show_vander_docs CheckBox(default=false)):
+	
+
+	"""
+
+# ╔═╡ 78be3dd0-974b-4438-965d-433ddbdb7c6e
+show_vander_docs ? @doc(BandPyrometry.VanderMatrix) : nothing
+
 # ╔═╡ 8a54d856-2298-4225-81ac-23bf66f35136
-md"Set the fitting spectral region:"
+md"Measured spectrum fitting region:"
 
 # ╔═╡ 6f17606c-e52e-4913-87f6-56190d209308
 @bind  lam_region confirm(PlutoUI.combine() do Child
@@ -185,13 +268,6 @@ end)
 # ╔═╡ 8ef42759-fb53-41af-904e-8916924415fa
 md"Set polynomial degree : $(@bind poly_degree confirm(Select(0:4,default=2))) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
 
-# ╔═╡ e2e28426-d9a3-4746-95b5-607114f16d18
-md"""
-	The approximation of spectral emissivity in a spectral band is implemented  using 	`VanderMatrix` structure. This objects stores all basis functions ``\phi_n(λ)``  in its field `:v` , the input independent variable vector ``\lambda`` is stored in normalized (in order to fit withing the range of -1...1) form, it also stores all data needed to return the original  ``\lambda`` vector:
-	$(@doc BandPyrometry.VanderMatrix)
-
-	"""
-
 # ╔═╡ 533e4f6f-c66f-4cf5-a82e-3d821fab918e
 # VanderMatrix contains basis vectors of spectral emissivity approximation
 VVV= BandPyrometry.Vander(λ,poly_degree,poly_type=poly_type);
@@ -229,25 +305,51 @@ end
 
 # ╔═╡ aaf115ba-f7be-4553-a090-e04bd5902714
 md"""
-	`VanderMatrix` type can  be used to fit (in a least-square sence) a data with the help `polyfit` function:
-
-	$(@doc BandPyrometry.polyfit)
-
+	`VanderMatrix` type can  be used to fit (in a least-square sence) a data with the help `polyfit` function (show docs) $(@bind show_polyfit_docs CheckBox(default=false)):
 	"""
+
+# ╔═╡ 2b0a2047-948f-4f6f-a833-6287860fbf5e
+show_polyfit_docs ? @doc(BandPyrometry.polyfit) : nothing 
 
 # ╔═╡ da6d5178-c083-4baa-91c3-e62f735bf808
 md"""
-To check the `polyfit` function we can load spectrum located in the repository using `JDXreader.jl`. This file provides method `read_jdx_file` $(@doc JDXreader.read_jdx_file)
+To check the `polyfit` function we can load spectrum located in the repository using `JDXreader.jl`. This file provides method `read_jdx_file` (show docs) $(@bind show_jdx_reader_docs CheckBox(default=false)): 
 """
+
+# ╔═╡ c125cb3b-0aec-4db2-bbb3-f280304e0e88
+show_jdx_reader_docs ? @doc(JDXreader.read_jdx_file) : nothing
 
 # ╔═╡ 111122e9-1260-4f00-aba6-0fdf6cf04c4e
 begin 
 	rt_emissivity_data = JDXreader.read_jdx_file("real_surface_emissivity.txt") # loading file, actually this file is two-column data with no headers, but this is ok
-	interpolated_values = linear_interpolation(rt_emissivity_data.x,rt_emissivity_data.y,extrapolation_bc = Interpolations.Flat())(λ) # interpolating data at λ points
+	rt_emissivity_interpolation = linear_interpolation(rt_emissivity_data.x,rt_emissivity_data.y,extrapolation_bc = Interpolations.Flat())
+	interpolated_values =rt_emissivity_interpolation(λ) # interpolating data at λ points
 	Vander_test = BandPyrometry.Vander(λ,poly_degree,MatrixType = Matrix{Float64}) # creating new matrix 
 	(a_fit_check,fitted_value,goodness_of_fit) = BandPyrometry.polyfit(Vander_test,λ,interpolated_values)# fitting polynomial coefficients
 	plot(rt_emissivity_data.x,rt_emissivity_data.y,label = "real surface spectral emissivity example")
 	scatter!(λ,fitted_value, label="fitted values")
+end
+
+# ╔═╡ 4d6337aa-cfc7-4154-a395-5aa53e23d01a
+begin 
+	T₁ = T_BB[1] + Planck.Tₖ # converting to Kelvins
+	T₂ = T_BB[2] + Planck.Tₖ # converting to Kelvins
+	λ_bb = collect(range(λ_BB...,length=500));
+	ibb1 = Planck.ibb.(λ_bb,T₁ );ibb2 =  Planck.ibb.(λ_bb,T₂);
+	p_bb = plot(λ_bb,ibb1,label="blackbody T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
+	plot!(λ_bb,ibb2,label="blackbody T=$(T₂),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
+	plot!(λ_bb,ibb1.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2)	
+	plot!(λ_bb,ibb2.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₂),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2)
+	xlabel!("Wavelength, μm")
+	ylabel!("Spectral intensity, W/m²⋅sr⋅μm")
+end
+
+# ╔═╡ 03d76e64-ebf4-432b-b9be-d4cb26275f55
+begin 
+	e_real_BB = rt_emissivity_interpolation(λ_bb) # this spectral emissivity was measured up to 18 μm, thus for higher wavelengths it uses flat extrapolation
+	plot(λ_bb, e_real_BB, label=nothing, linewidth=3.0)
+	title!("Real (measured) surface spectral emissivity")
+	xlabel!("Wavelength, μm");ylabel!("Spectral emissivity (ϵ)")
 end
 
 # ╔═╡ 623759b4-1c53-4390-87cc-9a79f5ae541e
@@ -366,6 +468,7 @@ LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MKL = "33e6dc65-8f57-5167-99aa-e5a354878fb2"
+NumericalIntegration = "e7bfaba1-d571-5449-8927-abc22e82249b"
 Optimization = "7f7a1694-90dd-40f0-9382-eb1efda571ba"
 OptimizationOptimJL = "36348300-93cb-4f02-beb5-3c3902f8871e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
@@ -380,6 +483,7 @@ Interpolations = "~0.15.1"
 LaTeXStrings = "~1.3.1"
 LegendrePolynomials = "~0.4.4"
 MKL = "~0.7.0"
+NumericalIntegration = "~0.2.0"
 Optimization = "~3.26.3"
 OptimizationOptimJL = "~0.3.2"
 Plots = "~1.40.4"
@@ -395,7 +499,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "a86fea3462cbd65cc2e3f0fcc451cb86adb5a1d6"
+project_hash = "ce3715c25ac0b6943d4f3c66245e43335f7b3933"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "ae44a0c3d68a420d4ac0fa1f7e0c034ccecb6dc5"
@@ -1216,6 +1320,12 @@ version = "1.0.2"
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
+
+[[deps.NumericalIntegration]]
+deps = ["InteractiveUtils", "LinearAlgebra", "Logging", "Test"]
+git-tree-sha1 = "71a5bf35469ec57e1bfdeec7dbb5757e51949bbb"
+uuid = "e7bfaba1-d571-5449-8927-abc22e82249b"
+version = "0.2.0"
 
 [[deps.OffsetArrays]]
 git-tree-sha1 = "1a27764e945a152f7ca7efa04de513d473e9542e"
@@ -2079,9 +2189,16 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╟─30743a02-c643-4bdc-837e-b97299f9520a
-# ╟─1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-# ╟─255e0485-a280-4142-82dd-d76d0d3d0cca
+# ╠═1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
+# ╠═255e0485-a280-4142-82dd-d76d0d3d0cca
 # ╟─15a5265e-61bc-440d-9a7d-ff10773b78d8
+# ╟─d442014a-20e6-4be4-ac7f-f13de329dec5
+# ╟─f22d22b6-5d98-4cc4-998f-a53e92809618
+# ╟─27b3c586-9eb0-4a51-b9ca-a9c0379fccdf
+# ╟─7cc110e9-7655-4dfc-b1e0-ab3905866425
+# ╟─4d6337aa-cfc7-4154-a395-5aa53e23d01a
+# ╟─03d76e64-ebf4-432b-b9be-d4cb26275f55
+# ╠═8a066ee5-80e9-462f-9a61-15851468aa63
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
@@ -2091,22 +2208,25 @@ version = "1.4.1+1"
 # ╟─0831fddd-d2db-4ada-b293-00848d3673fb
 # ╟─4accbaec-4e08-43d3-8f36-2217b9394e86
 # ╟─c47637c6-b243-4d8b-8234-40c68608939c
-# ╟─d55793f5-45ff-4968-b2e1-8b846de8b91f
-# ╟─38300c92-e5e6-4d5e-a394-aa1a47cfd757
+# ╠═d55793f5-45ff-4968-b2e1-8b846de8b91f
+# ╠═38300c92-e5e6-4d5e-a394-aa1a47cfd757
+# ╟─e2e28426-d9a3-4746-95b5-607114f16d18
+# ╟─78be3dd0-974b-4438-965d-433ddbdb7c6e
+# ╟─533e4f6f-c66f-4cf5-a82e-3d821fab918e
+# ╟─3b93945b-1718-40af-bb24-8c5080361069
 # ╟─8a54d856-2298-4225-81ac-23bf66f35136
 # ╟─6f17606c-e52e-4913-87f6-56190d209308
-# ╟─3b93945b-1718-40af-bb24-8c5080361069
 # ╟─278c2da0-b396-493e-bdcd-fc2a539780b6
 # ╟─d90da478-40b3-4677-82b9-fbfd79a72ef0
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
 # ╟─8ef42759-fb53-41af-904e-8916924415fa
-# ╟─e2e28426-d9a3-4746-95b5-607114f16d18
-# ╟─533e4f6f-c66f-4cf5-a82e-3d821fab918e
 # ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
-# ╟─aaf115ba-f7be-4553-a090-e04bd5902714
+# ╠═aaf115ba-f7be-4553-a090-e04bd5902714
+# ╟─2b0a2047-948f-4f6f-a833-6287860fbf5e
 # ╟─da6d5178-c083-4baa-91c3-e62f735bf808
+# ╟─c125cb3b-0aec-4db2-bbb3-f280304e0e88
 # ╠═111122e9-1260-4f00-aba6-0fdf6cf04c4e
 # ╟─623759b4-1c53-4390-87cc-9a79f5ae541e
 # ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2

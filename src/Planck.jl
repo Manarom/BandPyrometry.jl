@@ -64,7 +64,7 @@ end
 """
     ibb(λ,T)
 
-    Blackbody intensity , [W/m2-sr-mkm]
+    Blackbody intensity , [W/m²⋅sr⋅μm]
     Ibb = (λ⁻⁵)* C₁/(eᵃ¹-1) , where a₁=C₂/(λ*T)
     Input:
         λ - wavelength in μm
