@@ -17,7 +17,7 @@ end
 # ╔═╡ 1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
 using Plots, StaticArrays, MKL,LinearAlgebra, Optimization,
     OptimizationOptimJL, 
-    Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings, Revise,Printf, NumericalIntegration
+    Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings, Revise,Printf, NumericalIntegration,PrettyTables
 
 # ╔═╡ 15a5265e-61bc-440d-9a7d-ff10773b78d8
 using Main.BandPyrometry #this line returns not defined error on the first Pluto run (probably, because of the Pluto running all "using"'s before the cells) just re-run this cell manually
@@ -77,19 +77,6 @@ The following figure show the impact of spectral emissivity on the real surface 
 In [Planck.jl](https://manarom.github.io/BandPyrometry.jl/planck/) module there are several functions to calculate the blackbody thermal emission spectra
 """
 
-# ╔═╡ f22d22b6-5d98-4cc4-998f-a53e92809618
-@bind  T_BB PlutoUI.combine() do Child
-	md"""
-	Blackbody temperatures: \
-	T₁ = $(
-		Child(Slider(-273.0:1:2500,default=300,show_value = true))
-	) ``^o C`` \
-	T₂ = $(
-		Child(Slider(-273.0:1:2500,default=900,show_value = true))
-	)  ``^o C`` 
-	"""
-end
-
 # ╔═╡ 27b3c586-9eb0-4a51-b9ca-a9c0379fccdf
 @bind  λ_BB PlutoUI.combine() do Child
 	md"""
@@ -100,6 +87,19 @@ end
 	 $(
 		Child(Slider(0.1:0.1:50,default=25.0,show_value = true))
 	)  ``\lambda_{right}`` 
+	"""
+end
+
+# ╔═╡ f22d22b6-5d98-4cc4-998f-a53e92809618
+@bind  T_BB PlutoUI.combine() do Child
+	md"""
+	Blackbody temperatures: \
+	T₁ = $(
+		Child(Slider(-273.0:1:2500,default=300,show_value = true))
+	) ``^o C`` \
+	T₂ = $(
+		Child(Slider(-273.0:1:2500,default=900,show_value = true))
+	)  ``^o C`` 
 	"""
 end
 
@@ -121,17 +121,27 @@ md"""
 #### I.II. Partial radiation pyrometry
 _______________________
 
-As far as the `blackbody` thermal radiation energy strongly depends on temperature, it can be used to measure the temperature of a real surface. This is the general idea of partial radiation pyrometry: Measure the intensity to get the temperature. As far as the intensity is a directional quantity, a pyrometer needs collimating optics (a telescope). As it was shown previously, the real surface emissivity often varies sufficiently with wavelength, and at the same time, partial radiation pyrometers assume constant emissivity. Thus, for industrial purposes, it is useful to have several pyrometers, each with a relatively narrow spectral band. In the spectral range of a partial radiation pyrometer, emissivity should not vary significantly to make the assumption of constant emissivity relevant.
+As far as the `blackbody` thermal radiation energy strongly depends on temperature, this quantity can be used to measure the temperature of a real surface. This is the general idea of partial radiation pyrometry: **Measure the intensity to get the temperature**. As far as the intensity is a directional quantity, a pyrometer needs collimating optics (a telescope). As it was shown previously, the real surface emissivity often varies sufficiently with wavelength, and at the same time, partial radiation pyrometers assume constant emissivity. Thus, for industrial purposes, it is useful to have several pyrometers, each working within a relatively narrow spectral band. In the spectral range of a partial radiation pyrometer, emissivity should not vary significantly to make the assumption of constant emissivity relevant.
 
-Module [Pyrometers.jl](https://manarom.github.io/BandPyrometry.jl/pyrometers/) provides several function to work with `virtual` partial radiation pyrometers. The list of supported pyrometers\
-
-Type|Wavelength
-
-$(Pyrometers.pyrometers_types)
-
-There are a lot of various pyrometry techniques. But most  According to the previous section it is clear that 
+Module [Pyrometers.jl](https://manarom.github.io/BandPyrometry.jl/pyrometers/) provides several function to work with `virtual` partial radiation pyrometers. The list of supported pyrometers:
 
 """
+
+# ╔═╡ e2a9aa39-2490-4681-89d3-a01f058f6feb
+pretty_table(HTML,Pyrometers.pyrometers_types,standalone=false,top_left_str="Table of different `virtual` pyrometers types provided by Pyrometers.jl and corresponding wavelength regions",wrap_table_in_div=true,row_labels=["λₗ","λᵣ" ])
+
+
+# ╔═╡ 0c577374-3cd4-4c24-85bb-f2967c938c78
+pyrometers_vector = Pyrometers.produce_pyrometers();# returns a vector of all supported pyrometers
+
+# ╔═╡ 9b08b767-7e8f-4483-9f2f-226022ce10e4
+md"""
+	It is interesting to look how various pyrometers (with their emissivity set to one) see the temperature of a real surface. The following figure shows 
+	"""
+
+# ╔═╡ 667f7c30-56e0-461f-b35b-c924007eb9f2
+begin 
+end
 
 # ╔═╡ 824a6af1-3f70-4de0-8a94-6c63663a546a
 md"""
@@ -360,6 +370,22 @@ begin
 	xlabel!("Wavelength, μm");ylabel!("Spectral emissivity (ϵ)")
 end
 
+# ╔═╡ c69acbf6-94fb-4ac3-8d56-d1f9dda11440
+begin
+	real_i = ibb1.*rt_emissivity_interpolation(λ_bb)
+	plot_pyrometers = plot(λ_bb,real_i,label="Actual: T=$(round(T₁))", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
+	real_i_interp = linear_interpolation(λ_bb,real_i)
+	for ppp in pyrometers_vector
+		l_cur = length(ppp.λ)>1 ? ppp.λ : [ppp.λ[]-0.1,ppp.λ[]+0.1 ]
+		measure_intensity =  length(ppp.λ)>1 ? NumericalIntegration.integrate(ppp.λ,real_i_interp(ppp.λ)) : real_i_interp(ppp.λ[1])
+		measured_temp = round(Pyrometers.measure(ppp,measure_intensity,T_starting= T₁))
+		plot!(l_cur,real_i_interp(l_cur),fillrange=0, fillalpha=0.5,label=ppp.type*"- ($(ppp.λ)) :T="*string(measured_temp))
+	end
+	xlabel!("Wavelnegth , μm")
+	ylabel!("Thermal radiation intensity")
+	plot_pyrometers
+end
+
 # ╔═╡ 623759b4-1c53-4390-87cc-9a79f5ae541e
 md"Goodness of fit: $(goodness_of_fit)"
 
@@ -482,6 +508,7 @@ OptimizationOptimJL = "36348300-93cb-4f02-beb5-3c3902f8871e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
@@ -497,6 +524,7 @@ OptimizationOptimJL = "~0.3.2"
 Plots = "~1.40.4"
 PlutoUI = "~0.7.59"
 Polynomials = "~4.0.11"
+PrettyTables = "~2.3.2"
 Revise = "~3.5.18"
 StaticArrays = "~1.9.6"
 """
@@ -507,7 +535,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "ce3715c25ac0b6943d4f3c66245e43335f7b3933"
+project_hash = "c783af5cacc2c502be11379c082d7abc8fd6834f"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "ae44a0c3d68a420d4ac0fa1f7e0c034ccecb6dc5"
@@ -740,6 +768,11 @@ version = "1.5.5"
 git-tree-sha1 = "439e35b0b36e2e5881738abc8857bd92ad6ff9a8"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.6.3"
+
+[[deps.Crayons]]
+git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
+uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
+version = "4.1.1"
 
 [[deps.DataAPI]]
 git-tree-sha1 = "abe83f3a2f1b857aac70ef8b269080af17764bbe"
@@ -1547,6 +1580,12 @@ git-tree-sha1 = "9306f6085165d270f7e3db02af26a400d580f5c6"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.4.3"
 
+[[deps.PrettyTables]]
+deps = ["Crayons", "LaTeXStrings", "Markdown", "PrecompileTools", "Printf", "Reexport", "StringManipulation", "Tables"]
+git-tree-sha1 = "66b20dd35966a748321d3b2537c4584cf40387c7"
+uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
+version = "2.3.2"
+
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -1779,6 +1818,12 @@ deps = ["DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunctions", "Missin
 git-tree-sha1 = "5cf7606d6cef84b543b483848d4ae08ad9832b21"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 version = "0.34.3"
+
+[[deps.StringManipulation]]
+deps = ["PrecompileTools"]
+git-tree-sha1 = "a04cabe79c5f01f4d723cc6704070ada0b9d46d5"
+uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
+version = "0.3.4"
 
 [[deps.SuiteSparse]]
 deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
@@ -2197,7 +2242,7 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╟─30743a02-c643-4bdc-837e-b97299f9520a
-# ╟─1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
+# ╠═1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
 # ╟─255e0485-a280-4142-82dd-d76d0d3d0cca
 # ╟─15a5265e-61bc-440d-9a7d-ff10773b78d8
 # ╟─d442014a-20e6-4be4-ac7f-f13de329dec5
@@ -2207,6 +2252,11 @@ version = "1.4.1+1"
 # ╟─4d6337aa-cfc7-4154-a395-5aa53e23d01a
 # ╟─03d76e64-ebf4-432b-b9be-d4cb26275f55
 # ╟─8a066ee5-80e9-462f-9a61-15851468aa63
+# ╟─e2a9aa39-2490-4681-89d3-a01f058f6feb
+# ╟─0c577374-3cd4-4c24-85bb-f2967c938c78
+# ╟─9b08b767-7e8f-4483-9f2f-226022ce10e4
+# ╠═c69acbf6-94fb-4ac3-8d56-d1f9dda11440
+# ╠═667f7c30-56e0-461f-b35b-c924007eb9f2
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
@@ -2231,7 +2281,7 @@ version = "1.4.1+1"
 # ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
-# ╠═aaf115ba-f7be-4553-a090-e04bd5902714
+# ╟─aaf115ba-f7be-4553-a090-e04bd5902714
 # ╟─2b0a2047-948f-4f6f-a833-6287860fbf5e
 # ╟─da6d5178-c083-4baa-91c3-e62f735bf808
 # ╟─c125cb3b-0aec-4db2-bbb3-f280304e0e88
@@ -2255,9 +2305,9 @@ version = "1.4.1+1"
 # ╟─ebc0b228-01c8-42e4-9388-8194be1dd669
 # ╟─5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
 # ╟─e9b7169f-0d75-44bb-8505-ccfde1bdce98
-# ╠═68b4b548-0a96-4f67-baef-921bda3ff0a5
+# ╟─68b4b548-0a96-4f67-baef-921bda3ff0a5
 # ╟─c947d126-092b-4b92-ab56-373d5a387908
-# ╠═fead76f5-c0b5-4fcb-a39e-c97ded034653
+# ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
 # ╠═3f1e1a4c-48bf-44fa-a146-020dde04d2ff
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

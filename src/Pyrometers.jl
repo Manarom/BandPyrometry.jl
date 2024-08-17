@@ -30,7 +30,7 @@ module Pyrometers
         Pyrometer(type::String) = begin
             haskey(pyrometers_types,type) ?  new(type,
                                                 pyrometers_types[type],
-                                                Ref(0.0)) : error("There is no such pyrometer type")
+                                                Ref(1.0)) : error("There is no such pyrometer type")
         end
     end
     """
@@ -43,17 +43,19 @@ module Pyrometers
         p - pyrometer object
         i - measured intensity in [W/m²⋅sr⋅μm]
             returns temperature "measured" by this pyrometer  
+        (optional)
+        T_starting  - starting temperature value
 """
-    function measure(p::Pyrometer,i::Float64)
+    function measure(p::Pyrometer,i::Float64;T_starting::Float64=600.0)
         tup = (p,i)
         if length(p.λ)==1 # single wavelength pyrometer
-            fun = OptimizationFunction((t,tup)-> norm(Planck.ibb(tup[1].λ[1],t[]) - tup[2]))
+            fun = OptimizationFunction((t,tup)-> norm(tup[1].ϵ[]*Planck.ibb(tup[1].λ[1],t[]) - tup[2]))
         else# narrow band pyrometer
-            fun = OptimizationFunction((t,tup)-> norm(Planck.band_power(t[],λₗ=tup[1].λ[1],λᵣ=tup[1].λ[2]) - tup[2]))
+            fun = OptimizationFunction((t,tup)-> norm(tup[1].ϵ[]*Planck.band_power(t[],λₗ=tup[1].λ[1],λᵣ=tup[1].λ[2]) - tup[2]))
         end
         prob = OptimizationProblem(
                 fun, #fun
-                [600.0],#starting temperature
+                [T_starting],#starting temperature
                 tup)
         return solve(prob,NelderMead()).u[]   
     end
