@@ -63,7 +63,7 @@ All heated bodies emit thermal radiation. According to Planck's law, the spectru
 
 where ``C_1`` = $(Planck.C₁), ``W \cdot μm/m² \cdot sr`` and ``C_2`` = $(Planck.C₂), ``μm \cdot K`` , ``\lambda`` - wavelength in ``\mu m``, ``T`` - temperature in Kelvins
 
-A real surfaces thermal emission intensity is lower than the one of the blackbody. Quantitatively the rate of real surface thermal emission is characterized by its directional spectral emissivity.
+A real surfaces thermal emission intensity is lower than the one of the blackbody. The quantitative difference between the thermal radiation of a real surface and the blackbody is characterized by directional spectral emissivity (``\epsilon (\lambda, T,\vec{\Omega})``):
 
 ``I_{real\ \ surface}(\lambda , T, \vec{\Omega} ) = \epsilon (\lambda, T,\vec{\Omega}) \cdot  I_{blackbody}(\lambda , T)``, \
 
@@ -121,27 +121,33 @@ md"""
 #### I.II. Partial radiation pyrometry
 _______________________
 
-As far as the `blackbody` thermal radiation energy strongly depends on temperature, this quantity can be used to measure the temperature of a real surface. This is the general idea of partial radiation pyrometry: **Measure the intensity to get the temperature**. As far as the intensity is a directional quantity, a pyrometer needs collimating optics (a telescope). As it was shown previously, the real surface emissivity often varies sufficiently with wavelength, and at the same time, partial radiation pyrometers assume constant emissivity. Thus, for industrial purposes, it is useful to have several pyrometers, each working within a relatively narrow spectral band. In the spectral range of a partial radiation pyrometer, emissivity should not vary significantly to make the assumption of constant emissivity relevant.
+As far as the `blackbody` thermal radiation energy strongly depends on temperature, this quantity can be used to measure the temperature of a real surface. This is the general idea of partial radiation pyrometry: **measure the intensity to get the temperature**. As far as the intensity is a directional quantity, a pyrometer needs collimating optics (a telescope).The real surfaces emissivity often varies sufficiently with the wavelength, at the same time, partial radiation pyrometers assume constant emissivity. Thus, for industrial purposes, it is useful to have several pyrometers, each working within a relatively narrow spectral band. In the spectral range of a partial radiation pyrometer, emissivity should not vary significantly to make the assumption of constant emissivity relevant.
 
-Module [Pyrometers.jl](https://manarom.github.io/BandPyrometry.jl/pyrometers/) provides several function to work with `virtual` partial radiation pyrometers. The list of supported pyrometers:
-
+Module [Pyrometers.jl](https://manarom.github.io/BandPyrometry.jl/pyrometers/) provides several function to work with `virtual` partial radiation pyrometers.
 """
 
 # ╔═╡ e2a9aa39-2490-4681-89d3-a01f058f6feb
-pretty_table(HTML,Pyrometers.pyrometers_types,standalone=false,top_left_str="Table of different `virtual` pyrometers types provided by Pyrometers.jl and corresponding wavelength regions",wrap_table_in_div=true,row_labels=["λₗ","λᵣ" ])
+pretty_table(HTML,Pyrometers.pyrometers_types,standalone=false,top_left_str="Table of different `virtual pyrometer` types and corresponding wavelength regions",wrap_table_in_div=true,row_labels=["λₗ","λᵣ" ])
 
 
 # ╔═╡ 0c577374-3cd4-4c24-85bb-f2967c938c78
-pyrometers_vector = Pyrometers.produce_pyrometers();# returns a vector of all supported pyrometers
+pyrometers_vector = sort(Pyrometers.produce_pyrometers());# returns a vector of all supported pyrometers
 
 # ╔═╡ 9b08b767-7e8f-4483-9f2f-226022ce10e4
 md"""
-	It is interesting to look how various pyrometers (with their emissivity set to one) see the temperature of a real surface. The following figure shows 
+	It is interesting to look how various pyrometers (with their emissivity set to one) `measure` the temperature of a real surface. The following figure shows the real surface thermal emission intensity and several common pyrometers types working regions. In the legend their `measured` temperature is shown. The `mesured` temperature for each pyrometer type is obtained by fitting the blackbody power to the real surface power both integrated over pyrometer's working spectral range.  
 	"""
 
+# ╔═╡ 712828a7-fb54-42e6-95fc-233243190f59
+md"Real surface temperature $(@bind T_pyr Slider(range(10,3000,1000),default=1000,show_value=true) ) "
+
 # ╔═╡ 667f7c30-56e0-461f-b35b-c924007eb9f2
-begin 
-end
+md"""
+For this particular material the type -`F` pyrometer readings are closer to the real temperature, because of the real surface emissivity being closer to unity for this pyrometer's spectral region. 
+"""
+
+# ╔═╡ 0df0712c-b598-43b7-a7d3-972c7d797416
+
 
 # ╔═╡ 824a6af1-3f70-4de0-8a94-6c63663a546a
 md"""
@@ -372,17 +378,25 @@ end
 
 # ╔═╡ c69acbf6-94fb-4ac3-8d56-d1f9dda11440
 begin
-	real_i = ibb1.*rt_emissivity_interpolation(λ_bb)
-	plot_pyrometers = plot(λ_bb,real_i,label="Actual: T=$(round(T₁))", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
-	real_i_interp = linear_interpolation(λ_bb,real_i)
-	for ppp in pyrometers_vector
-		l_cur = length(ppp.λ)>1 ? ppp.λ : [ppp.λ[]-0.1,ppp.λ[]+0.1 ]
-		measure_intensity =  length(ppp.λ)>1 ? NumericalIntegration.integrate(ppp.λ,real_i_interp(ppp.λ)) : real_i_interp(ppp.λ[1])
-		measured_temp = round(Pyrometers.measure(ppp,measure_intensity,T_starting= T₁))
-		plot!(l_cur,real_i_interp(l_cur),fillrange=0, fillalpha=0.5,label=ppp.type*"- ($(ppp.λ)) :T="*string(measured_temp))
-	end
+	λ_pyr = collect(range(0.1,15,1000))
+	real_i = Planck.ibb.(λ_pyr,T_pyr).*rt_emissivity_interpolation(λ_pyr)
+	plot_pyrometers = plot(λ_pyr,real_i,label="Actual: T=$(round(T_pyr))", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3,legend=:best)
+	real_i_interp = linear_interpolation(λ_pyr,real_i)
 	xlabel!("Wavelnegth , μm")
 	ylabel!("Thermal radiation intensity")
+	plot!(twinx(),λ_pyr,rt_emissivity_interpolation(λ_pyr),linewidth=4,linecolor=:red,label=nothing,alpha=0.3)
+	ylabel!("Real surface spectral emissivity")
+	max_val = maximum(real_i)
+	t_em_unity = Vector{Float64}(undef,length(pyrometers_vector))
+	t_em_ecttual = Vector{Float64}(undef,length(pyrometers_vector))
+	for ppp in pyrometers_vector# iterating over virtual pyrometers vector
+		l_cur = length(ppp.λ)>1 ? ppp.λ : [ppp.λ[]-0.2,ppp.λ[]+0.2 ]
+		λ_pyr_interp = collect(range(l_cur...,length=30))
+		measure_intensity =  length(ppp.λ)>1 ? NumericalIntegration.integrate(λ_pyr_interp,real_i_interp(λ_pyr_interp)) : real_i_interp(ppp.λ[1])
+		measured_temp = round(Pyrometers.measure(ppp,measure_intensity,T_starting= T_pyr))
+		region_flag = 
+		plot!(l_cur,[max_val,max_val],fillrange=0, fillalpha=0.5,label=ppp.type*"- ($(ppp.λ)) :T="*string(measured_temp))
+	end
 	plot_pyrometers
 end
 
@@ -2255,8 +2269,10 @@ version = "1.4.1+1"
 # ╟─e2a9aa39-2490-4681-89d3-a01f058f6feb
 # ╟─0c577374-3cd4-4c24-85bb-f2967c938c78
 # ╟─9b08b767-7e8f-4483-9f2f-226022ce10e4
-# ╟─c69acbf6-94fb-4ac3-8d56-d1f9dda11440
-# ╠═667f7c30-56e0-461f-b35b-c924007eb9f2
+# ╟─712828a7-fb54-42e6-95fc-233243190f59
+# ╠═c69acbf6-94fb-4ac3-8d56-d1f9dda11440
+# ╟─667f7c30-56e0-461f-b35b-c924007eb9f2
+# ╠═0df0712c-b598-43b7-a7d3-972c7d797416
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
