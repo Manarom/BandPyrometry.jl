@@ -46,7 +46,10 @@ The last line will launch the Pluto starting page in your default browser
 """
 
 # ╔═╡ 255e0485-a280-4142-82dd-d76d0d3d0cca
-includet(joinpath("../src","BandPyrometry.jl"))
+includet(joinpath("../src","BandPyrometry.jl")) # the package file is includet using Revise methods, thus the code of the main file can be modified
+
+# ╔═╡ 171409eb-22b5-4bc5-a8e2-eac0932a24f3
+PlutoUI.TableOfContents(indent=true, depth=4, aside=true)
 
 # ╔═╡ d442014a-20e6-4be4-ac7f-f13de329dec5
 md"""
@@ -61,20 +64,21 @@ All heated bodies emit thermal radiation. According to Planck's law, the spectru
 
 ``I_{blackbody}(\lambda , T) =  \frac{C_1}{\lambda ^5} \cdot \frac{1}{e^{\frac{C_2}{\lambda T } } - 1}``, \
 
+
 where ``C_1`` = $(Planck.C₁), ``W \cdot μm/m² \cdot sr`` and ``C_2`` = $(Planck.C₂), ``μm \cdot K`` , ``\lambda`` - wavelength in ``\mu m``, ``T`` - temperature in Kelvins
 
-A real surfaces thermal emission intensity is lower than the one of the blackbody. The quantitative difference between the thermal radiation of a real surface and the blackbody is characterized by directional spectral emissivity (``\epsilon (\lambda, T,\vec{\Omega})``):
+A real surface thermal emission intensity is lower than the one of the blackbody. The fraction of blackbody thermal radiation intensity emitted by a real surface is characterized by directional spectral emissivity ``\epsilon (\lambda, T,\vec{\Omega})``:
 
 ``I_{real\ \ surface}(\lambda , T, \vec{\Omega} ) = \epsilon (\lambda, T,\vec{\Omega}) \cdot  I_{blackbody}(\lambda , T)``, \
+
 
 here  ``\vec{\Omega}`` stays for direction. \
 
 
 It is interesting that, unlike the blackbody, the real surface thermal emission (in general) depends  on the direction of radiation. Therefore, the most general characteristic for thermal radiation of a real surface is the `directional spectral emissivity`.
 
+In [Planck.jl](https://manarom.github.io/BandPyrometry.jl/planck/) module there are several functions to calculate the blackbody thermal emission spectra (and various derivatives, integrals etc.).
 The following figure show the impact of spectral emissivity on the real surface thermal emission intensity.
-
-In [Planck.jl](https://manarom.github.io/BandPyrometry.jl/planck/) module there are several functions to calculate the blackbody thermal emission spectra
 """
 
 # ╔═╡ 27b3c586-9eb0-4a51-b9ca-a9c0379fccdf
@@ -121,17 +125,14 @@ md"""
 #### I.II. Partial radiation pyrometry
 _______________________
 
-As far as the `blackbody` thermal radiation energy strongly depends on temperature, this quantity can be used to measure the temperature of a real surface. This is the general idea of partial radiation pyrometry: **measure the intensity to get the temperature**. As far as the intensity is a directional quantity, a pyrometer needs collimating optics (a telescope).The real surfaces emissivity often varies sufficiently with the wavelength, at the same time, partial radiation pyrometers assume constant emissivity. Thus, for industrial purposes, it is useful to have several pyrometers, each working within a relatively narrow spectral band. In the spectral range of a partial radiation pyrometer, emissivity should not vary significantly to make the assumption of constant emissivity relevant.
+As far as the `blackbody` thermal radiation energy strongly depends on temperature, this quantity can be used to measure the temperature of a real surface. This is the general idea of partial radiation pyrometry: **measure intensity to get the temperature**. As far as the intensity is a directional quantity, a pyrometer needs collimating optics (a telescope).The real surfaces emissivity often varies sufficiently with the wavelength, at the same time, partial radiation pyrometers assume constant emissivity (so-called `grey`-band approximation). Thus, for industrial purposes, it is useful to have several pyrometers, each working within a relatively narrow spectral band. In the spectral range of a partial radiation pyrometer, emissivity should not vary significantly to make the assumption of constant emissivity relevant.
 
-Module [Pyrometers.jl](https://manarom.github.io/BandPyrometry.jl/pyrometers/) provides several function to work with `virtual` partial radiation pyrometers.
+One of BandPyrometry.jl modules  [Pyrometers.jl](https://manarom.github.io/BandPyrometry.jl/pyrometers/) provides several function to work with `virtual` partial radiation pyrometers.
 """
 
 # ╔═╡ e2a9aa39-2490-4681-89d3-a01f058f6feb
-pretty_table(HTML,Pyrometers.pyrometers_types,standalone=false,top_left_str="Table of different `virtual pyrometer` types and corresponding wavelength regions",wrap_table_in_div=true,row_labels=["λₗ","λᵣ" ])
+pretty_table(HTML,Pyrometers.pyrometers_types,standalone=false,top_left_str="Table of different `virtual pyrometer` types provied by `Pyrometers.jl` and corresponding wavelength regions",wrap_table_in_div=true,row_labels=["λₗ","λᵣ" ])
 
-
-# ╔═╡ 0c577374-3cd4-4c24-85bb-f2967c938c78
-pyrometers_vector = sort(Pyrometers.produce_pyrometers());# returns a vector of all supported pyrometers
 
 # ╔═╡ 9b08b767-7e8f-4483-9f2f-226022ce10e4
 md"""
@@ -143,11 +144,8 @@ md"Real surface temperature $(@bind T_pyr Slider(range(10,3000,1000),default=100
 
 # ╔═╡ 667f7c30-56e0-461f-b35b-c924007eb9f2
 md"""
-For this particular material the type -`F` pyrometer readings are closer to the real temperature, because of the real surface emissivity being closer to unity for this pyrometer's spectral region. 
+For this particular material the type -`F` pyrometer readings are closer to the real temperature, because of the real surface emissivity being closer to unity for this pyrometer's spectral region. All results are summarized in the following table.
 """
-
-# ╔═╡ 0df0712c-b598-43b7-a7d3-972c7d797416
-
 
 # ╔═╡ 824a6af1-3f70-4de0-8a94-6c63663a546a
 md"""
@@ -165,8 +163,6 @@ md"""
 	Mathematical consequencies of these features are described in this repository supplementary materials [download pdf](https://manarom.github.io/BandPyrometry.jl/assets/supplementary_v_0_0_1.pdf) in more details.
 
 	In `BandPyrometry.jl` , the real surface thermal emission is approximated as a product of Planck function (ideal surface thermal emission) and linear (with respect to the optimization variables e.g. polynomial coefficients) approximation of spectral emissivity.	
-
-	In this notebook, the "measured" thermal emission spectrum is calculated as the same model  as the `BandPyrometryPoint.jl` internal representation, further this spectrum is fitted using optimization tools provided by **`Optimization.jl`** package, some random noise can be added (`optionally`). 
 
 	In `BandPyrometry.jl` the spectral emissivity is approximated as a linear combination of basis functions:
 	"""
@@ -207,39 +203,154 @@ md"Now, the optimization problem can be formulated:"
 L"""
 	\begin{gather}
 
-	\vec{x}^*=argmin\{F\} \\
-	F=\sum_{i=1}^{M}[y_i - I_{blackbody}(\lambda_i,T) \cdot (\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ_i))]^2
-	\end{gather}
+	\vec{x}^*=argmin\{F(\vec{x})\} \\
+
+	F(\vec{x})=\sum_{i=1}^{M}[y_i - I_{blackbody}(\lambda_i,T) \cdot (\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ_i))]^2 \\
+
+	\vec{x} = [\vec{a},T]^t
+	\end{gather} 
 
 	"""
 
 # ╔═╡ c47637c6-b243-4d8b-8234-40c68608939c
-md"where ``\vec{x}^*`` is the local minimum"
+md"where ``\vec{a}`` is the column vector of emissivity approximation (  ``[]^t`` stays for transposition), ``\vec{x}^*`` is the local minimum"
 
 # ╔═╡ d55793f5-45ff-4968-b2e1-8b846de8b91f
 md"""
-	To solve this optimization problem `BandPyrometry.jl` package provides functions to evaluate the discrepancy function ``F``, ``\nabla F`` and ``\nabla^2F`` which are needed to solve the optimization problem using zero, first or second order optimization algorithms. To approximate the emissivity package  uses several polynomial bases:
-	* Standard basis (from [`Polynomials.jl`](https://juliamath.github.io/Polynomials.jl/stable/) package)
-	* Chebyshev basis (from [`Polynomials.jl`](https://juliamath.github.io/Polynomials.jl/stable/) package)
-	* Legendre polynomials (from [`LegendrePolynoials.jl`](https://jishnub.github.io/LegendrePolynomials.jl/stable/) package)
-	* Trigonometric basis: ``\phi_n(λ) = sin(\pi \cdot n \lambda)``  for odd n, and  ``\phi_n(λ) = cos(\pi \cdot n \lambda)`` for even n
+
+	To solve this optimization problem `BandPyrometry.jl` package provides functions to evaluate the discrepancy function ``F``, ``\nabla F`` and ``\nabla^2F`` which are needed to solve the optimization problem using zero, first or second order optimization algorithms. It also has special type to work with the emissivity linear approximation.
 	"""
+
+# ╔═╡ da6d5178-c083-4baa-91c3-e62f735bf808
+md"""
+#### I.IV. Emissivity approximation functions
+_______________________
+
+To approximate the emissivity `BandPyrometry.jl`  uses several polynomial bases:
+
+* Standard basis (from [`Polynomials.jl`](https://juliamath.github.io/Polynomials.jl/stable/) package)
+* Chebyshev basis (from [`Polynomials.jl`](https://juliamath.github.io/Polynomials.jl/stable/) package)
+* Legendre polynomials (from [`LegendrePolynoials.jl`](https://jishnub.github.io/LegendrePolynomials.jl/stable/) package)
+* Trigonometric basis: ``\phi_n(λ) = sin(\pi \cdot n \lambda)``  for odd n, and  ``\phi_n(λ) = cos(\pi \cdot n \lambda)`` for even n
+
+All basis vectors are stored in a structure called `VanderMatrix`, this type: 
+
+1. Stores basis vectors for selected polynomial type and degreee  - columns of matrix ``V``: ``V= \begin{bmatrix} \vec{\phi_1} , \dots,  \vec{\phi_n} \end{bmatrix}``
+
+2. The resulting emissivity can be calculated as a product of `VanderMatrix` and the vector of emissivity approximation polynomial coefficients vector: ``\vec{\epsilon}=V\cdot\vec{a}``
+
+Independent variable vector ``\lambda`` is stored in normalized (in order to fit withing the range of -1...1) form, `VanderMatrix` also stores all data needed to return the original  ``\lambda`` vector. Matrix ``V`` can  be used to fit (in a least-square sense) by solving the overdetermined system of equations: ``\vec{a}= V^{\dagger} \cdot \vec{\epsilon}``, where  []^{\dagger} means pseudo-inverse. The package implements this in  `polyfit` function (show docs) $(@bind show_polyfit_docs CheckBox(default=false)). 
+"""
+
+# ╔═╡ ae970ce5-fc5d-40d8-9f08-5dce0f99a509
+show_polyfit_docs ? @doc(BandPyrometry.polyfit) : nothing
+
+# ╔═╡ 529b07d7-e622-4816-8de9-e31581ea96a6
+@bind  λ_fit_vand confirm(PlutoUI.combine() do Child
+	md"""
+	Emissivity fitting spectral range, ``\mu m`` : \
+	``\lambda_{left}`` = $(
+		Child(Slider(0.1:0.1:16,default=4.0,show_value = true))
+	)   -- 
+	 $(
+		Child(Slider(0.1:0.1:16,default=8.0,show_value = true))
+	)  ``\lambda_{right}`` 
+	"""
+end)
+
+# ╔═╡ ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
+md"Select the polynomial type = $(@bind em_approx_poly_type Select(collect(keys(BandPyrometry.supported_polynomial_types))))"
+
+# ╔═╡ 988274c4-ad6a-42df-aead-5f40e0000998
+md"Set polynomial degree : $(@bind poly_fit_degree Select(0:10,default=3)) (the polynomial degree = numer of basis functions - 1, thus, zero order polynomial is an all-units vector)"
+
+# ╔═╡ 111122e9-1260-4f00-aba6-0fdf6cf04c4e
+begin 
+	λ_fit_vec = collect(range(λ_fit_vand...,length=30)) 
+	rt_emissivity_data = JDXreader.read_jdx_file("real_surface_emissivity.txt") # loading file, actually this file is two-column data with no headers, but this is ok
+	rt_emissivity_interpolation = linear_interpolation(rt_emissivity_data.x,rt_emissivity_data.y,extrapolation_bc = Interpolations.Flat())
+	interpolated_values =rt_emissivity_interpolation(λ_fit_vec) # interpolating data at λ points
+	Vander_test = BandPyrometry.Vander(λ_fit_vec,poly_fit_degree,MatrixType = Matrix{Float64},poly_type=em_approx_poly_type) # creating new matrix 
+	(a_fit_check,fitted_value,goodness_of_fit) = BandPyrometry.polyfit(Vander_test,λ_fit_vec,interpolated_values)# fitting polynomial coefficients
+	plot(rt_emissivity_data.x,rt_emissivity_data.y,label = "ϵ real")
+	scatter!(λ_fit_vec,fitted_value, label="ϵ fitted")
+	xlabel!("Wavelength, μm")
+	ylabel!("Emissivity")
+end
+
+# ╔═╡ 4d6337aa-cfc7-4154-a395-5aa53e23d01a
+begin 
+	T₁ = T_BB[1] + Planck.Tₖ # converting to Kelvins
+	T₂ = T_BB[2] + Planck.Tₖ # converting to Kelvins
+	λ_bb = collect(range(λ_BB...,length=500));
+	ibb1 = Planck.ibb.(λ_bb,T₁ );ibb2 =  Planck.ibb.(λ_bb,T₂);
+	p_bb = plot(λ_bb,ibb1,label="blackbody T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
+	plot!(λ_bb,ibb2,label="blackbody T=$(T₂),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
+	plot!(λ_bb,ibb1.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2)	
+	plot!(λ_bb,ibb2.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₂),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2)
+	xlabel!("Wavelength, μm")
+	ylabel!("Spectral intensity, W/m²⋅sr⋅μm")
+end
+
+# ╔═╡ 03d76e64-ebf4-432b-b9be-d4cb26275f55
+begin 
+	e_real_BB = rt_emissivity_interpolation(λ_bb) # this spectral emissivity was measured up to 18 μm, thus for higher wavelengths it uses flat extrapolation
+	plot(λ_bb, e_real_BB, label=nothing, linewidth=3.0)
+	title!("Real (measured) surface spectral emissivity")
+	xlabel!("Wavelength, μm");ylabel!("Spectral emissivity (ϵ)")
+end
+
+# ╔═╡ c69acbf6-94fb-4ac3-8d56-d1f9dda11440
+begin
+	λ_pyr = collect(range(0.1,18,1000))
+	pyrometers_vector = sort(Pyrometers.produce_pyrometers());# returns a vector of all supported pyrometers 
+	real_i = Planck.ibb.(λ_pyr,T_pyr).*rt_emissivity_interpolation(λ_pyr)
+	plot_pyrometers = plot(λ_pyr,real_i,label="Actual: T=$(round(T_pyr))", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3,legend=:best)
+	real_i_interp = linear_interpolation(λ_pyr,real_i)
+	xlabel!("Wavelnegth , μm")
+	ylabel!("Thermal radiation intensity")
+	plot!(twinx(),λ_pyr,rt_emissivity_interpolation(λ_pyr),linewidth=4,linecolor=:red,label=nothing,alpha=0.3)
+	ylabel!("Real surface spectral emissivity")
+	max_val = maximum(real_i)
+	t_em_unity = Vector{Float64}(undef,length(pyrometers_vector))
+	t_em_acttual = Vector{Float64}(undef,length(pyrometers_vector))
+	for (j,ppp) in enumerate(pyrometers_vector)# iterating over virtual pyrometers vector
+		is_wo_wavelength_pyrometer = length(ppp.λ)>1 
+		l_cur = is_wo_wavelength_pyrometer ? ppp.λ : [ppp.λ[]-0.2,ppp.λ[]+0.2 ]
+		λ_pyr_interp = collect(range(l_cur...,length=30))
+		measure_intensity =  is_wo_wavelength_pyrometer ? NumericalIntegration.integrate(λ_pyr_interp,real_i_interp(λ_pyr_interp)) : real_i_interp(ppp.λ[1])
+		measured_temp = round(Pyrometers.measure(ppp,measure_intensity,T_starting= T_pyr))
+		region_flag = 
+		plot!(l_cur,[max_val,max_val],fillrange=0, fillalpha=0.5,label=ppp.type*"- ($(ppp.λ)) :T="*string(measured_temp))
+		t_em_unity[j] = measured_temp # remember value of temperature with unit emissivity
+		ppp.ϵ[] =measure_intensity/(is_wo_wavelength_pyrometer ? Planck.band_power(T_pyr,λₗ=l_cur[1],λᵣ=l_cur[2]) : Planck.ibb(ppp.λ[],T_pyr)   ) # calcaulting the average emissivity wthin the pyrometers spectral band (or at fixed wavelength)
+		 t_em_acttual[j] =  round(Pyrometers.measure(ppp,measure_intensity,T_starting= T_pyr))
+		 
+	end
+	plot_pyrometers
+end
+
+# ╔═╡ 2d12b1a7-9474-44dc-8a39-e13bf451928e
+begin # creating output table
+	data = Matrix{Any}(undef,length(pyrometers_vector),5)
+	e_grey = [p.ϵ[] for p in pyrometers_vector]
+ 	data[:,3:end] .= hcat(t_em_unity,e_grey, t_em_acttual)
+	data[:,1] .= [p.type for p in pyrometers_vector]
+	data[:,2] .= [string(p.λ) for p in pyrometers_vector]
+	pretty_table(HTML,data,header = ["type","λ region,μm","T₀ (ϵ=1),K","grey-ϵ", "T₁ (grey-ϵ),K"],top_left_str="Table of temperatures `measured` by different pyrometers with the spectral emissivity settled to unity (T₀) and to the calculated grey-ϵ (T₁) the real temperature is Tᵣ=$(T_pyr)",)
+end
+
+# ╔═╡ efbc4a5f-8853-47b1-8842-c77b060d2de7
+pretty_table(HTML,hcat(["a$(i)" for i in 0:1:poly_fit_degree],a_fit_check),header=["","Polynomial coefficients"],top_left_str="Table of the coefficients of emissivity linear approximation in the band from $(λ_fit_vand[1]) to $(λ_fit_vand[2]) μm using $(em_approx_poly_type) bases type,  the goodness of fit = $(goodness_of_fit)" )
 
 # ╔═╡ 38300c92-e5e6-4d5e-a394-aa1a47cfd757
 md"""
 	## Part II. `BandPyrometry.jl` testing
-	#### "Measured" emissivity generation
+
+	In this notebook, the "measured" thermal emission spectrum is calculated as the same model  as the `BandPyrometryPoint.jl` internal representation, further this spectrum is fitted using optimization tools provided by **`Optimization.jl`** package, some random noise can be added (`optionally`). 
+
+	#### II.I. "Measured" emissivity generation
 	"""
-
-# ╔═╡ e2e28426-d9a3-4746-95b5-607114f16d18
-md"""
-	The approximation of spectral emissivity in a spectral band is implemented  using 	`VanderMatrix` structure. This objects stores all basis functions ``\phi_n(λ)``  in its field `:v` , the input independent variable vector ``\lambda`` is stored in normalized (in order to fit withing the range of -1...1) form, it also stores all data needed to return the original  ``\lambda`` vector (show docs)$(@bind show_vander_docs CheckBox(default=false)):
-	
-
-	"""
-
-# ╔═╡ 78be3dd0-974b-4438-965d-433ddbdb7c6e
-show_vander_docs ? @doc(BandPyrometry.VanderMatrix) : nothing
 
 # ╔═╡ 8a54d856-2298-4225-81ac-23bf66f35136
 md"Measured spectrum fitting region:"
@@ -256,7 +367,7 @@ md"Measured spectrum fitting region:"
 	"""
 end)
 
-# ╔═╡ 3b93945b-1718-40af-bb24-8c5080361069
+# ╔═╡ 78edb9ca-0d47-4503-8c86-175cf9cfeeba
 λ = collect(range(lam_region[1],lam_region[2],length=50));
 
 # ╔═╡ 278c2da0-b396-493e-bdcd-fc2a539780b6
@@ -292,10 +403,6 @@ end)
 # ╔═╡ 8ef42759-fb53-41af-904e-8916924415fa
 md"Set polynomial degree : $(@bind poly_degree confirm(Select(0:4,default=2))) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
 
-# ╔═╡ 533e4f6f-c66f-4cf5-a82e-3d821fab918e
-# VanderMatrix contains basis vectors of spectral emissivity approximation
-VVV= BandPyrometry.Vander(λ,poly_degree,poly_type=poly_type);
-
 # ╔═╡ a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 md"""
 The following two figures show:
@@ -308,6 +415,7 @@ The following two figures show:
 
 # ╔═╡ d17a5db7-0125-48b5-9016-76da6d72c673
 begin
+	VVV= BandPyrometry.Vander(λ,poly_degree,poly_type=poly_type);
 	p_mode = plot(VVV.xi,VVV.v[:,1], label="n= "*string(0),linewidth=3)
 	for (i,V) in enumerate(eachcol(VVV.v[:,2:end]))
 		plot!(VVV.xi,V, label="n= "*string(i),linewidth=3)
@@ -327,87 +435,9 @@ begin
 	p_em
 end
 
-# ╔═╡ aaf115ba-f7be-4553-a090-e04bd5902714
-md"""
-	`VanderMatrix` type can  be used to fit (in a least-square sence) a data with the help `polyfit` function (show docs) $(@bind show_polyfit_docs CheckBox(default=false)):
-	"""
-
-# ╔═╡ 2b0a2047-948f-4f6f-a833-6287860fbf5e
-show_polyfit_docs ? @doc(BandPyrometry.polyfit) : nothing 
-
-# ╔═╡ da6d5178-c083-4baa-91c3-e62f735bf808
-md"""
-To check the `polyfit` function we can load spectrum located in the repository using `JDXreader.jl`. This file provides method `read_jdx_file` (show docs) $(@bind show_jdx_reader_docs CheckBox(default=false)): 
-"""
-
-# ╔═╡ c125cb3b-0aec-4db2-bbb3-f280304e0e88
-show_jdx_reader_docs ? @doc(JDXreader.read_jdx_file) : nothing
-
-# ╔═╡ 111122e9-1260-4f00-aba6-0fdf6cf04c4e
-begin 
-	rt_emissivity_data = JDXreader.read_jdx_file("real_surface_emissivity.txt") # loading file, actually this file is two-column data with no headers, but this is ok
-	rt_emissivity_interpolation = linear_interpolation(rt_emissivity_data.x,rt_emissivity_data.y,extrapolation_bc = Interpolations.Flat())
-	interpolated_values =rt_emissivity_interpolation(λ) # interpolating data at λ points
-	Vander_test = BandPyrometry.Vander(λ,poly_degree,MatrixType = Matrix{Float64}) # creating new matrix 
-	(a_fit_check,fitted_value,goodness_of_fit) = BandPyrometry.polyfit(Vander_test,λ,interpolated_values)# fitting polynomial coefficients
-	plot(rt_emissivity_data.x,rt_emissivity_data.y,label = "real surface spectral emissivity example")
-	scatter!(λ,fitted_value, label="fitted values")
-end
-
-# ╔═╡ 4d6337aa-cfc7-4154-a395-5aa53e23d01a
-begin 
-	T₁ = T_BB[1] + Planck.Tₖ # converting to Kelvins
-	T₂ = T_BB[2] + Planck.Tₖ # converting to Kelvins
-	λ_bb = collect(range(λ_BB...,length=500));
-	ibb1 = Planck.ibb.(λ_bb,T₁ );ibb2 =  Planck.ibb.(λ_bb,T₂);
-	p_bb = plot(λ_bb,ibb1,label="blackbody T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
-	plot!(λ_bb,ibb2,label="blackbody T=$(T₂),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
-	plot!(λ_bb,ibb1.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2)	
-	plot!(λ_bb,ibb2.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₂),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2)
-	xlabel!("Wavelength, μm")
-	ylabel!("Spectral intensity, W/m²⋅sr⋅μm")
-end
-
-# ╔═╡ 03d76e64-ebf4-432b-b9be-d4cb26275f55
-begin 
-	e_real_BB = rt_emissivity_interpolation(λ_bb) # this spectral emissivity was measured up to 18 μm, thus for higher wavelengths it uses flat extrapolation
-	plot(λ_bb, e_real_BB, label=nothing, linewidth=3.0)
-	title!("Real (measured) surface spectral emissivity")
-	xlabel!("Wavelength, μm");ylabel!("Spectral emissivity (ϵ)")
-end
-
-# ╔═╡ c69acbf6-94fb-4ac3-8d56-d1f9dda11440
-begin
-	λ_pyr = collect(range(0.1,15,1000))
-	real_i = Planck.ibb.(λ_pyr,T_pyr).*rt_emissivity_interpolation(λ_pyr)
-	plot_pyrometers = plot(λ_pyr,real_i,label="Actual: T=$(round(T_pyr))", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3,legend=:best)
-	real_i_interp = linear_interpolation(λ_pyr,real_i)
-	xlabel!("Wavelnegth , μm")
-	ylabel!("Thermal radiation intensity")
-	plot!(twinx(),λ_pyr,rt_emissivity_interpolation(λ_pyr),linewidth=4,linecolor=:red,label=nothing,alpha=0.3)
-	ylabel!("Real surface spectral emissivity")
-	max_val = maximum(real_i)
-	t_em_unity = Vector{Float64}(undef,length(pyrometers_vector))
-	t_em_ecttual = Vector{Float64}(undef,length(pyrometers_vector))
-	for ppp in pyrometers_vector# iterating over virtual pyrometers vector
-		l_cur = length(ppp.λ)>1 ? ppp.λ : [ppp.λ[]-0.2,ppp.λ[]+0.2 ]
-		λ_pyr_interp = collect(range(l_cur...,length=30))
-		measure_intensity =  length(ppp.λ)>1 ? NumericalIntegration.integrate(λ_pyr_interp,real_i_interp(λ_pyr_interp)) : real_i_interp(ppp.λ[1])
-		measured_temp = round(Pyrometers.measure(ppp,measure_intensity,T_starting= T_pyr))
-		region_flag = 
-		plot!(l_cur,[max_val,max_val],fillrange=0, fillalpha=0.5,label=ppp.type*"- ($(ppp.λ)) :T="*string(measured_temp))
-	end
-	plot_pyrometers
-end
-
-# ╔═╡ 623759b4-1c53-4390-87cc-9a79f5ae541e
-md"Goodness of fit: $(goodness_of_fit)"
-
 # ╔═╡ 80dacea5-ea46-479f-b0d8-da9a9cf41aa2
 md"""
-
-### Generating the "measured" spectral intensity:
-
+#### II.II. Generating the "measured" spectral intensity
 """
 
 # ╔═╡ 6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
@@ -435,6 +465,11 @@ begin
 	ϵ_data= VVV*x_data[1:end-1]# "measured" spectrum emissivity 
 	I_data = Ib.*ϵ_data .+ noise_amplitude*Ib.*(0.5 .-rand(length(λ)))# adding noise to the "measured" spectrum
 end;
+
+# ╔═╡ 9016369d-bc8b-4907-bdb2-f4e81c444d30
+md"""
+#### II.III. Solving the optimization problem
+"""
 
 # ╔═╡ c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 md"""Choose the optimization method $(@bind optim_type confirm(Select(["NelderMead","BFGS","GradientDescent", "LBFGS","NewtonTrustRegion","ParticleSwarm","Newton","IPNewton" ])))"""
@@ -2256,9 +2291,10 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╟─30743a02-c643-4bdc-837e-b97299f9520a
-# ╠═1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
+# ╟─1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
 # ╟─255e0485-a280-4142-82dd-d76d0d3d0cca
 # ╟─15a5265e-61bc-440d-9a7d-ff10773b78d8
+# ╟─171409eb-22b5-4bc5-a8e2-eac0932a24f3
 # ╟─d442014a-20e6-4be4-ac7f-f13de329dec5
 # ╟─27b3c586-9eb0-4a51-b9ca-a9c0379fccdf
 # ╟─f22d22b6-5d98-4cc4-998f-a53e92809618
@@ -2267,12 +2303,11 @@ version = "1.4.1+1"
 # ╟─03d76e64-ebf4-432b-b9be-d4cb26275f55
 # ╟─8a066ee5-80e9-462f-9a61-15851468aa63
 # ╟─e2a9aa39-2490-4681-89d3-a01f058f6feb
-# ╟─0c577374-3cd4-4c24-85bb-f2967c938c78
 # ╟─9b08b767-7e8f-4483-9f2f-226022ce10e4
 # ╟─712828a7-fb54-42e6-95fc-233243190f59
-# ╠═c69acbf6-94fb-4ac3-8d56-d1f9dda11440
+# ╟─c69acbf6-94fb-4ac3-8d56-d1f9dda11440
 # ╟─667f7c30-56e0-461f-b35b-c924007eb9f2
-# ╠═0df0712c-b598-43b7-a7d3-972c7d797416
+# ╟─2d12b1a7-9474-44dc-8a39-e13bf451928e
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
@@ -2283,13 +2318,17 @@ version = "1.4.1+1"
 # ╟─4accbaec-4e08-43d3-8f36-2217b9394e86
 # ╟─c47637c6-b243-4d8b-8234-40c68608939c
 # ╟─d55793f5-45ff-4968-b2e1-8b846de8b91f
+# ╟─da6d5178-c083-4baa-91c3-e62f735bf808
+# ╟─ae970ce5-fc5d-40d8-9f08-5dce0f99a509
+# ╟─529b07d7-e622-4816-8de9-e31581ea96a6
+# ╟─ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
+# ╟─988274c4-ad6a-42df-aead-5f40e0000998
+# ╟─111122e9-1260-4f00-aba6-0fdf6cf04c4e
+# ╟─efbc4a5f-8853-47b1-8842-c77b060d2de7
 # ╟─38300c92-e5e6-4d5e-a394-aa1a47cfd757
-# ╟─e2e28426-d9a3-4746-95b5-607114f16d18
-# ╟─78be3dd0-974b-4438-965d-433ddbdb7c6e
-# ╟─533e4f6f-c66f-4cf5-a82e-3d821fab918e
-# ╟─3b93945b-1718-40af-bb24-8c5080361069
 # ╟─8a54d856-2298-4225-81ac-23bf66f35136
 # ╟─6f17606c-e52e-4913-87f6-56190d209308
+# ╟─78edb9ca-0d47-4503-8c86-175cf9cfeeba
 # ╟─278c2da0-b396-493e-bdcd-fc2a539780b6
 # ╟─d90da478-40b3-4677-82b9-fbfd79a72ef0
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
@@ -2297,12 +2336,6 @@ version = "1.4.1+1"
 # ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
-# ╟─aaf115ba-f7be-4553-a090-e04bd5902714
-# ╟─2b0a2047-948f-4f6f-a833-6287860fbf5e
-# ╟─da6d5178-c083-4baa-91c3-e62f735bf808
-# ╟─c125cb3b-0aec-4db2-bbb3-f280304e0e88
-# ╟─111122e9-1260-4f00-aba6-0fdf6cf04c4e
-# ╟─623759b4-1c53-4390-87cc-9a79f5ae541e
 # ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2
 # ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 # ╟─36c655f8-141b-4472-96d7-01c8fd1f1515
@@ -2310,6 +2343,7 @@ version = "1.4.1+1"
 # ╟─c4df3ad4-9f1a-414c-b02c-8161f007ccd5
 # ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
 # ╟─3b4308dc-da18-43ab-9f50-2c8bc05acb78
+# ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
 # ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
@@ -2324,6 +2358,6 @@ version = "1.4.1+1"
 # ╟─68b4b548-0a96-4f67-baef-921bda3ff0a5
 # ╟─c947d126-092b-4b92-ab56-373d5a387908
 # ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
-# ╠═3f1e1a4c-48bf-44fa-a146-020dde04d2ff
+# ╟─3f1e1a4c-48bf-44fa-a146-020dde04d2ff
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
