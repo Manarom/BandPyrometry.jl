@@ -48,7 +48,7 @@ includet(joinpath("../src","BandPyrometry.jl")) # the package file is includet u
 import .BandPyrometry.Planck as PL
 
 # ╔═╡ 6f5a8d02-d519-47c4-bdcd-7e52bf92098c
-import .BandPyrometry as BP
+import Main.BandPyrometry as BP
 
 # ╔═╡ 9e047346-b39e-4179-8f8a-bb1188941606
 md"""
@@ -2746,7 +2746,7 @@ version = "1.4.1+1"
 # ╟─88dd837e-bb77-4ec4-87d8-1134b0f741ce
 # ╟─ede76282-d27a-41a2-ac92-101c26129346
 # ╟─6cc50dda-bb5c-4138-a520-973e8dae3df0
-# ╠═8c13923d-612b-44d5-8046-bf4aa4bc175e
+# ╟─8c13923d-612b-44d5-8046-bf4aa4bc175e
 # ╟─1bbc82eb-16e3-47a2-814a-0a69bd803c75
 # ╟─7a4e3653-ee72-404c-a849-0e4c389b65f5
 # ╟─8b70cb0a-ce22-4b11-bb75-4240b2b2b36b
