@@ -1,6 +1,7 @@
 push!(LOAD_PATH,"../src/")
 include("../src/BandPyrometry.jl")
 using Documenter,.BandPyrometry
+mathengine = Documenter.MathJax3()
 makedocs(
         sitename = "BandPyrometry.jl",
         highlightsig = false,
