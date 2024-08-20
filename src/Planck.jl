@@ -511,7 +511,20 @@ function power(T)
 
     In-place filling the tuple of (bb intensity, its first ,and second ) derivatives with 
     respect to temperature
-
+    d²Ibb/dT² = C₁*(eᵃ¹/(eᵃ¹-1)²)*(C₂/(λ⁶*T³))*[(C₂/(λ*T))*(2*eᵃ¹/(eᵃ¹-1)-1)-2]
+    d²Ibb/dT² = C₁*(eᵃ¹/(eᵃ¹-1)²)*(a₁/(λ⁵*T²))*[a₁*(2*eᵃ¹/(eᵃ¹-1) -1)-2]
+    a₁=C₂/(λ*T)
+    a₂ = 1/(eᵃ¹-1)   #  1/expm1(a1)
+    a₃ = eᵃ¹/(eᵃ¹-1) #  exp(a)/expm1(a)
+    d²Ibb/dT² = C₁*a₂*a₃*(a₁/(λ⁵*T²))*[a₁*(2*a₃ - 1))-2]
+        as far as 
+            Ibb = (λ⁻⁵)* C₁*a₂
+        and 
+            dIbb/dT = C₁*a₃*a₂*a₁*(1/(λ⁵*T)) = a₃*a₁*Ibb/T 
+        hense
+            d²Ibb/dT² = C₁*a₂*a₃*a₁*(1/(λ⁵*T²))*[a₁*(2*a₃ - 1))-2] 
+                = [a₃*a₁*Ibb/T^2]*[a₁*(2*a₃ - 1))-2] 
+                 = [(dIbb/dT)/T]*[a₁*(2*a₃ - 1))-2] 
     Input:
         input_tuple, [Nx0 vector or nothing,Nx0 vector or nothing, Nx0 vector or nothing]
         λ - wavelength, μm, [Nx0]
@@ -524,7 +537,7 @@ function power(T)
         #for (iii,l) in enumerate(λ) 
         for (iii,l) in enumerate(λ) 
             _a₁₂₃!(l,T) #this function mutates global variable
-            input_tuple[1][iii] = C₁*a[2]*(l^-5)
+            input_tuple[1][iii] = C₁*a[2]*(l^-5)   
             input_tuple[2][iii] = a[1]*a[3]*input_tuple[1][iii]/T #a[1]*a[2]*a[3]*C₁/(T*l^5)
             input_tuple[3][iii] = (a[1]*(2a[3]-1.0) -2.0)*input_tuple[2][iii]/T# = [(dIbb/dT)/T]*[a₁*(2*a₃ - 1))-2] 
         end
@@ -571,22 +584,61 @@ function power(T)
                 _a₁₂₃!(l,t) 
                 input_tuple[1][iii,jjj] = C₁*a[2]*(l^-5)
                 input_tuple[2][iii,jjj] = a[1]*a[3]*input_tuple[1][iii,jjj]/t #a[1]*a[2]*a[3]*C₁/(T*l^5)
-                input_tuple[3][iii,jjj] = (a[1]*(2a[3]-1.0) -2.0)*input_tuple[2][iii,jjj]/t^2#(a[1]*(2a[3]-1)-2)*a[1]*a[2]*a[3]*C₁/((T^3)*l^5)
+                input_tuple[3][iii,jjj] = (a[1]*(2a[3]-1.0) -2.0)*input_tuple[2][iii,jjj]/t#(a[1]*(2a[3]-1)-2)*a[1]*a[2]*a[3]*C₁/((T^3)*l^5)
             end
         end
         return input_tuple
     end
-    function Dₜibb(λ::AbstractVector,T::AbstractVector)
+    """
+    Dₜibb(λ::AbstractVector,T::AbstractVector)
+
+    Calculates tuple of (Ibb,dIbb/dT,d²Ibb/dT²) calculated according to:
+    d²Ibb/dT² = C₁*(eᵃ¹/(eᵃ¹-1)²)*(C₂/(λ⁶*T³))*[(C₂/(λ*T))*(2*eᵃ¹/(eᵃ¹-1)-1)-2]
+    d²Ibb/dT² = C₁*(eᵃ¹/(eᵃ¹-1)²)*(a₁/(λ⁵*T²))*[a₁*(2*eᵃ¹/(eᵃ¹-1) -1)-2]
+    a₁=C₂/(λ*T)
+    a₂ = 1/(eᵃ¹-1)   #  1/expm1(a1)
+    a₃ = eᵃ¹/(eᵃ¹-1) #  exp(a)/expm1(a)
+    d²Ibb/dT² = C₁*a₂*a₃*(a₁/(λ⁵*T²))*[a₁*(2*a₃ - 1))-2]
+        as far as 
+            Ibb = (λ⁻⁵)* C₁*a₂
+        and 
+            dIbb/dT = C₁*a₃*a₂*a₁*(1/(λ⁵*T)) = a₃*a₁*Ibb/T 
+        hense
+            d²Ibb/dT² = C₁*a₂*a₃*a₁*(1/(λ⁵*T²))*[a₁*(2*a₃ - 1))-2] 
+                = [a₃*a₁*Ibb/T^2]*[a₁*(2*a₃ - 1))-2] 
+                 = [(dIbb/dT)/T]*[a₁*(2*a₃ - 1))-2] 
+    Input:
+        λ - wavelength region, μm
+        T - temperature, Kelvins
+    Returns:
+        (Ibb,dIbb/dT,d²Ibb/dT²)
+"""
+function Dₜibb(λ::AbstractVector,T::AbstractVector)
         # returns spectral intencity and its first and second derivatives with respect to the temperature
         i = fill(0.0,length(λ), length(T))
         d1i = fill(0.0,length(λ), length(T))
         d2i = fill(0.0,length(λ), length(T))
+        
+    #=d²Ibb/dT² = C₁*(eᵃ¹/(eᵃ¹-1)²)*(C₂/(λ⁶*T³))*[(C₂/(λ*T))*(2*eᵃ¹/(eᵃ¹-1)-1)-2]
+    d²Ibb/dT² = C₁*(eᵃ¹/(eᵃ¹-1)²)*(a₁/(λ⁵*T²))*[a₁*(2*eᵃ¹/(eᵃ¹-1) -1)-2]
+    a₁=C₂/(λ*T)
+    a₂ = 1/(eᵃ¹-1)   #  1/expm1(a1)
+    a₃ = eᵃ¹/(eᵃ¹-1) #  exp(a)/expm1(a)
+    d²Ibb/dT² = C₁*a₂*a₃*(a₁/(λ⁵*T²))*[a₁*(2*a₃ - 1))-2]
+        as far as 
+            Ibb = (λ⁻⁵)* C₁*a₂
+        and 
+            dIbb/dT = C₁*a₃*a₂*a₁*(1/(λ⁵*T)) = a₃*a₁*Ibb/T 
+        hense
+            d²Ibb/dT² = C₁*a₂*a₃*a₁*(1/(λ⁵*T²))*[a₁*(2*a₃ - 1))-2] 
+                = [a₃*a₁*Ibb/T^2]*[a₁*(2*a₃ - 1))-2] 
+                 = [(dIbb/dT)/T]*[a₁*(2*a₃ - 1))-2] =#
         for (jjj,t) in enumerate(T)
             for (iii,l) in enumerate(λ) 
-                _a₁₂₃!(l,t);
+                _a₁₂₃!(l,t)
                 i[iii,jjj] = C₁*a[2]*(l^-5)
                 d1i[iii,jjj] = a[1]*a[3]*i[iii,jjj]/t #a[1]*a[2]*a[3]*C₁/(T*l^5)
-                d2i[iii,jjj] = (a[1]*(2a[3]-1.0) -2.0)*d1i[iii,jjj]/(t^2)#(a[1]*(2a[3]-1)-2)*a[1]*a[2]*a[3]*C₁/((T^3)*l^5)
+                d2i[iii,jjj] = (a[1]*(2a[3]-1.0) -2.0)*d1i[iii,jjj]/t#(a[1]*(2a[3]-1)-2)*a[1]*a[2]*a[3]*C₁/((T^3)*l^5)
             end
         end
         return (i,d1i,d2i)

@@ -21,7 +21,10 @@ Optimization,
 OptimizationOptimJL,BenchmarkTools, 
 LinearAlgebra, Interpolations,Printf,
 MKL,LinearAlgebra, LegendrePolynomials, 
-Polynomials, ForwardDiff,Revise, LaTeXStrings
+Polynomials, ForwardDiff,Revise, LaTeXStrings, PrettyTables
+
+# ╔═╡ 16039ccb-7cb1-4f44-be4a-03fdb0d08873
+using Main.BandPyrometry #this line returns not defined error on the first Pluto run (probably, because of the Pluto running all "using"'s before the cells) just re-run this cell manually
 
 # ╔═╡ 500f0cb0-bf70-11ee-19a8-35930e422cab
 md"""
@@ -38,16 +41,8 @@ md"""
 
 """
 
-# ╔═╡ aba2d996-2cea-4484-81d7-b33d56d525e4
-# ENTER HERE PATH TO THE FOLDER WITH BandPyrometry.jl 
-# This folder should also contain Planck.jl, JDXreader.jl, Pyrometers.jl
-cur_dir = "../src";
-
 # ╔═╡ 77e9ee5b-b7f5-4216-8745-ca0286ab9024
-includet(joinpath(cur_dir,"BandPyrometry.jl"))
-
-# ╔═╡ 96d04c68-8734-4d4c-9a18-b3eb0b48583d
-names(BandPyrometry)
+includet(joinpath("../src","BandPyrometry.jl")) # the package file is includet using Revise methods, thus the code of the main file can be modified
 
 # ╔═╡ 27ca1398-96ab-4d24-9c6d-63e02da49a94
 import .BandPyrometry.Planck as PL
@@ -87,16 +82,13 @@ md"wavelength region right boundary λᵣ = $(@bind lam_right confirm(Slider(0.1
 end
 
 # ╔═╡ 536278e5-8cb7-4787-9018-b862f0adfc07
-T = map((X)->+(X,PL.Tₖ),collect(T_values) ); # convert all temperatures to Kelvin
+T = [+(t,PL.Tₖ) for t in T_values]; # convert all temperatures to Kelvin
 
 # ╔═╡ baf332fc-a805-4981-b569-70324a879a99
 lam = range(lam_left,lam_right,length=100); # full region (as far as EmPoint uses StaticArrays, the length of lam range should not be too high)
 
-# ╔═╡ 0713ba68-9c5d-464a-ad38-ea05d5239511
-md" fraction of total power within spectral range $(lam_left) ... $(lam_right):"
-
-# ╔═╡ d8924882-d84c-417b-a4ec-9be6a32d992a
-@. "for T="*string(T)*" : "*string(PL.∫ibbₗ.(T,λₗ = lam_left,λᵣ=lam_right))
+# ╔═╡ b3d56970-6fe3-4834-89df-c931c07269c9
+pretty_table(HTML,hcat(T,PL.∫ibbₗ.(T,λₗ = lam_left,λᵣ=lam_right)), header = ["Temperature", "Fractional power"], top_left_str="Table of fraction of total power within spectral range $(lam_left) ... $(lam_right)")
 
 # ╔═╡ 3de53f57-ca6f-433c-b3b7-5a59250895e9
 @bind p_func Select([("blackbody intensity","I", PL.ibb),("first derivative with λ","dI/dλ", PL.∇ₗibb), ("first derivative with T","dI/dT", PL.∇ₜibb),("second derivative with T","d²I/dT²", PL.∇²ₜibb),("second derivative  with λ","d²I/dλ²", PL.∇²ₗibb) ])
@@ -121,16 +113,16 @@ end
 # ╔═╡ 3a16c8c8-17d9-4c36-9bc1-99a081a32c33
 md"""
 ### BB temperature fitting using Planck module and EmPoint type from BandPyrometry module
+_________
+
 Least square discrepancy:\
-r(T)= ∑(I(λᵢ,T)-I(λᵢ,Tᵣₑₐₗ))²\
-I(λᵢ,Tᵣₑₐₗ) - BB spectrum
+``r(T)=\sum_{i}(I_{bb}(\lambda_i, T) -I_{bb}(\lambda_i, T_{real}))^2 ``
+
+``I_{bb}(\lambda, T)``  is the blackbody spectrum
 """
 
 # ╔═╡ 05c7a161-4346-4464-b41f-66ca7b3e149d
-md" BB temperature to  fit (Celsius)  $(@bind Ttrue confirm(Slider(0.0:10:2500,default=500,show_value = true)))"
-
-# ╔═╡ f1968bb1-dc06-47a9-939f-4b76215c9bfe
-Ttr=Ttrue+PL.Tₖ; # converting Celsius to Kelvins
+md" Blackbody real temperature ``T_{real}``  to be  fitted (Celsius)  $(@bind Ttr confirm(Slider(0.0:10:2500,default=500,show_value = true)))"
 
 # ╔═╡ a0b68a76-8eb0-43af-927a-2ffc1abcea98
 # "Measured" BB spectrum for temperature Ttr
@@ -152,47 +144,42 @@ function grad_fun!(G,T,l)
 	PL.ibb!(Ib,l,amat)
 	∇I = copy(l)
 	PL.∇ₜibb!(∇I,T[end],amat,Ib)
-	G[1] = -dot(∇I,(Imeas -Ib));
+	G[1] = -dot(∇I,(Imeas -Ib))
+end;
+
+# ╔═╡ f3013bb6-eab2-4256-b244-ac3cd272cc42
+# Hessian direct implementation	
+function hess_fun!(H,T,l) 
+	(i1,i2,i3) = PL.Dₜibb(l,T)# returns planck,first and second derivatives
+	H[1] = -dot(i3,Imeas .-i1) + dot(i2,i2);
 end;
 
 # ╔═╡ 9bc6c540-53c8-4a4d-9194-629d9e0277ca
-md" Set temperature to calculate the dicrepancy value $@bind Ttry Slider(0.0:0.1:2500,default=500.0,show_value = true)"
+md" Set the value of ``T_{try}`` to calculate ``r(T_{try}),\nabla_T r(T_{try}),\nabla_T^2 r(T_{try}) `` manually (Celsius) $@bind Ttry Slider(0.0:0.1:2500,default=500.0,show_value = true)"
 
-# ╔═╡ 0f93061c-5c62-427d-b1fb-0f9b8066a786
-" discrepancy value direct calculation $(residual_func(Ttry+PL.Tₖ,lam))"
+# ╔═╡ fad07c97-14ee-4df8-9914-72309fa55d24
+begin
+	TtryK = Ttry+PL.Tₖ
+	discr_values = [0.0,0.0,"-"]
+	grad_values  = [0.0,0.0,0.0]
+	hess_values = [0.0,0.0,0.0]
+	lam_vec = collect(lam)
+	discr_values[1] = residual_func(TtryK,lam_vec) # direct discrepancy calculation
+	discr_values[2] =BP.disc([TtryK],em_point) # calculating the discrepancy inside  the EmPoint
 
-# ╔═╡ ec4494d0-61e4-4afa-a135-5a6a3e71ba84
-" discrepancy value em_point $( BP.disc([Ttry+PL.Tₖ],em_point) ) "
-
-# ╔═╡ eb4e98ae-8891-4d54-9581-ffd54e925e17
-begin 
+	#calculating first order derivatives
+	grad_fun!(view(grad_values,1),TtryK,lam_vec) # direct calculation of the gradient 
 	G = [0.0]
-	grad_fun!(G,Ttry+PL.Tₖ,collect(lam)) 
-	md" direct gradient calculation $(G[end])"
-end
-
-# ╔═╡ 28429534-2221-44ce-8e75-0c6146e137e6
-function grad_fun2!(G,T,l) # this version uses tuple-version of bb radiation from Planck module
-	(i1,i2) = PL.Dₜibb(l,T); #∇ₜibb!(y,λ::Vector,T::Vector)
-	G[1] = dot(i2,(i1 - PL.ibb.(l,Ttr)))
-end;
-
-# ╔═╡ 66263f0a-3921-478e-813b-29c33f3d557e
-begin 
-	BP.grad!(G,Ttry+PL.Tₖ,em_point)
-	md" gradient calculation using EmPoint $(G[end])"
-	
-end
-
-# ╔═╡ f3879d0d-45b0-4820-8153-19859d235ef1
-begin 
-	grad_fun2!(G,[Ttry+PL.Tₖ],collect(lam)) 
-	md" direct gradient calculation 2nd version $(G[end])"
-end
-
-# ╔═╡ 2ba39927-635d-4054-ad28-cff311199263
-begin 
-	ForwardDiff.derivative(x->residual_func(x,collect(lam)),Ttry+PL.Tₖ)
+	BP.grad!(G,[TtryK],em_point) # EmPoint calculation of the gradient
+	grad_values[2] = G[]
+	auto_fo_der(t) =  ForwardDiff.derivative(x->residual_func(x,lam_vec),t)
+	grad_values[3] = auto_fo_der(TtryK)
+	# calculating second order derivatives
+	hess_values[3] = ForwardDiff.derivative(auto_fo_der, TtryK) #using autodiff
+	hess_fun!(view(hess_values,1),[TtryK],lam_vec)
+	BP.hess!(G,[TtryK],em_point) # EmPoint calculation of the second order derivative
+	hess_values[2] =G[]
+	pretty_table(HTML,hcat(["Direct","EmPoint", "AutoDiff"],discr_values,grad_values,hess_values),header = ["calculated using:","discrepancy", "gradient", "hessian"],top_left_str= "Table of discrepancy and its derivatives values, calculated for T=$(TtryK),K" )
 end
 
 # ╔═╡ 439c48f9-69e7-46bc-8c42-f53ad5456772
@@ -201,7 +188,7 @@ begin
 	bm_res = Base.RefValue{BenchmarkTools.Trial}();# stores current benchmark test results
 	t1= Ref(0.0)
 	t2 = Ref(0.0)
-end;
+end;# rerun this cel 
 
 # ╔═╡ e7d5617b-1da9-4b96-bd7a-0490e8e4ceca
 md"""
@@ -209,7 +196,8 @@ md"""
 	"""
 
 # ╔═╡ c7caa7f6-fae1-4e07-aae8-a11312d74f09
-@bind zero_order_method Select([("NelderMead",NelderMead),("ParticleSwarm",ParticleSwarm)])
+md"""Zero order optimizer $(@bind zero_order_method Select([("NelderMead",NelderMead),("ParticleSwarm",ParticleSwarm)]))
+"""
 
 # ╔═╡ e04ad4d7-c26a-4753-baa8-921121c27f08
 if is_zero_order_run
@@ -246,10 +234,11 @@ end
 # ╔═╡ 8c13923d-612b-44d5-8046-bf4aa4bc175e
 if is_zero_order_run&&is_zero_order_out
 	begin
-		p0 = plot(lam,Imeas, label="Measured spectrum Treal=$(Ttr)")
+		plot(lam,Imeas, label="Measured spectrum Treal=$(Ttr)")
 		plot!(lam, PL.ibb(lam, sol_zo.u[]),label="Direct solution T=$(sol_zo.u[])")
-		plot!(lam, PL.ibb(lam, em_sol_zo.u[]),label="EmPoint solution T=$(em_sol_zo.u[])")
-		p0
+		scatter!(lam, PL.ibb(lam, em_sol_zo.u[]),label="EmPoint solution T=$(em_sol_zo.u[])")
+		xlabel!("Wavelength, μm")
+		ylabel!("Blackbody intensity, a.u.")
 	end
 end
 
@@ -277,7 +266,7 @@ end
 # ╔═╡ f80f2317-c3b1-4d06-b030-fcbb565ddd82
 if is_zero_order_run && is_zero_order_bench
 	benchmark_measures[zero_order_method[1]]=(t_direct=t1[],t_emPoint=t2[])
-end
+end;
 
 # ╔═╡ 59af65c0-1520-4a8e-9f51-69c1446a723b
 md"""
@@ -321,8 +310,9 @@ if is_first_order_run&&is_first_order_out
 		p1 = plot(lam,Imeas, label="Measured spectrum Treal=$(Ttr)")
 		title!("First order method $(first_order_method[1])")
 		plot!(lam, PL.ibb(lam, sol_fo.u[]),label="Direct solution T=$(sol_fo.u[])")
-		plot!(lam, PL.ibb(lam, em_sol_fo.u[]),label="EmPoint solution T=$(em_sol_fo.u[])")
-		p1
+		scatter!(lam, PL.ibb(lam, em_sol_fo.u[]),label="EmPoint solution T=$(em_sol_fo.u[])")
+		xlabel!("Wavelength, μm")
+		ylabel!("Blackbody intensity, a.u.")
 	end
 end
 
@@ -350,7 +340,7 @@ end
 # ╔═╡ 7b32578c-de60-47fa-ae3f-628bb1c887ba
 if is_first_order_run&&is_first_order_bench
 	benchmark_measures[first_order_method[1]]=(t_direct=t1[],t_emPoint=t2[])
-end
+end;
 
 # ╔═╡ 95d1107f-07c5-4c31-904a-1471cb51ad33
 md"""
@@ -360,18 +350,11 @@ md"""
 # ╔═╡ 631a1822-5bf0-4713-b048-a17b93bfa66e
 @bind second_order_method Select([("Newton",Newton), ("NewtonTrustRegion",NewtonTrustRegion)])
 
-# ╔═╡ 773f5479-a7de-4a81-b513-0545913b37bd
-# Hessian direct implementation	
-function hess_fun!(H,T,l) 
-	(i1,i2,i3) = PL.Dₜibb(l,T);
-	i1 -=PL.ibb.(l,Ttr);
-	H[1] = dot(2*i3,i1) + dot(2*i2,i2); 
-end
-
 # ╔═╡ ae12d403-1149-426e-ab13-5afc5e5615d9
 if is_second_order_run
 	begin 
-		prob_so= OptimizationProblem(OptimizationFunction(residual_func,grad=grad_fun!,hess=hess_fun!), [235.0],collect(lam)); #optimization problem in terms of primitive implementation ,lb=[20.0],ub=[2500.0]
+		prob_so= OptimizationProblem(OptimizationFunction(residual_func,
+			grad=grad_fun!,hess=hess_fun!), [235.0],collect(lam)); #optimization problem in terms of primitive implementation ,lb=[20.0],ub=[2500.0]
 		sol_so = solve(prob_so,  second_order_method[2]());
 		# optimization problem with Empoint implementation
 		em_point_so = BP.EmPoint(copy(Imeas), collect(lam));# emissivity point 
@@ -402,8 +385,9 @@ if is_second_order_run&&is_second_order_out
 		p2 = plot(lam,Imeas, label="Measured spectrum Treal=$(Ttr)")
 		title!("First order method $(second_order_method[1])")
 		plot!(lam, PL.ibb(lam, sol_so.u[]),label="Direct solution T=$(sol_so.u[])")
-		plot!(lam, PL.ibb(lam, em_sol_so.u[]),label="EmPoint solution T=$(em_sol_so.u[])")
-		p2
+		scatter!(lam, PL.ibb(lam, em_sol_so.u[]),label="EmPoint solution T=$(em_sol_so.u[])")
+		xlabel!("Wavelength, μm")
+		ylabel!("Blackbody intensity, a.u.")
 	end
 end
 
@@ -431,20 +415,29 @@ end
 # ╔═╡ 3cd039d3-3926-4889-a743-a8b908bf1796
 if is_second_order_run&&is_second_order_bench
 	benchmark_measures[second_order_method[1]]=(t_direct=t1[],t_emPoint=t2[])
-end
-
-# ╔═╡ c758524b-04f3-4699-8594-cb65fe30f7a4
-#L"\begin{bmatrix} Ttr=%$(Ttr) & %$(em_point.Tib[]) \\ %$(2) & %$(3) \end{bmatrix}"
+end;
 
 # ╔═╡ 8cfa738e-05cc-4d86-b40c-86442d14b4b1
 if is_zero_order_bench || is_first_order_bench || is_second_order_bench
-	benchmark_measures
+	t_dir_vec = [ b[2].t_direct/1e6 for b in benchmark_measures]
+	t_em_vec = [ b[2].t_emPoint/1e6 for b in benchmark_measures]
+	optims_vec = collect(keys(benchmark_measures))
+	pretty_table(HTML,hcat(optims_vec,t_dir_vec,t_em_vec),header = ["Optimizer", "time Direct, ms", "time EmPoint, ms"])
 end
+
+# ╔═╡ c200b8df-3580-4cb5-9da4-bf5e2113bccb
+md"Select benchmarks to compare"
+
+# ╔═╡ f9d71607-f558-4f90-b5a0-b4c445c97f2e
+@bind plot_data_selector  confirm(MultiSelect(collect(keys(benchmark_measures))))
 
 # ╔═╡ a5565a17-6572-4946-8147-7a9c7ca203f2
 md"""
 	Load jdx file? $(@bind is_jdx_loaded confirm(CheckBox()))
 	"""
+
+# ╔═╡ 92b7b55f-b50a-48cf-8d6e-0a95ae7b2465
+md"This figure show measured spectrum loaded using JDXreader"
 
 # ╔═╡ 3f4d5d0e-8f35-4f57-8b0f-2aae19b2f7be
 if is_jdx_loaded
@@ -452,7 +445,7 @@ begin
 	filedir = joinpath(pwd(),"JCAM_test_file.txt")
 	if isfile(filedir)
 		xydata = BandPyrometry.JDXreader.read_jdx_file(filedir);
-		pj = plot(xydata.x,xydata.y)
+		pj = plot(xydata.x,xydata.y,label = nothing)
 		xlabel!(xydata.headers["XUNITS"])
 		ylabel!(xydata.headers["YUNITS"])
 		title!(xydata.headers["DATATYPE"])
@@ -493,11 +486,15 @@ function plot_bencnhmark(benchmark_measures)
 				vs EmPoint type""")
 	temp = [-10 -20; -30 -40 ]
 	plot!(temp, color=[b_c r_c], label=["Direct" "EmPoint"],linewidth=25)
+	ylabel!("Soluion time, ms")
 	return ppp
-end
+end;
 
 # ╔═╡ 6f7497ac-d157-4ed5-8ed8-2a80f267efad
-plot_bencnhmark(benchmark_measures)
+begin 
+	selected_benchs = Dict(zip(plot_data_selector,[benchmark_measures[k] for k in plot_data_selector])) 
+	plot_bencnhmark(selected_benchs)
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -514,6 +511,7 @@ OptimizationOptimJL = "36348300-93cb-4f02-beb5-3c3902f8871e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
@@ -530,6 +528,7 @@ OptimizationOptimJL = "~0.3.2"
 Plots = "~1.40.5"
 PlutoUI = "~0.7.59"
 Polynomials = "~4.0.11"
+PrettyTables = "~2.3.2"
 Revise = "~3.5.18"
 StaticArrays = "~1.9.7"
 """
@@ -540,7 +539,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "5118835a0d9112f64f7f6fc48d491017c5c702b7"
+project_hash = "2f3b4f9f2fe2ff35e7ab72e55992a1cdd4f92558"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "6778bcc27496dae5723ff37ee30af451db8b35fe"
@@ -827,6 +826,11 @@ weakdeps = ["IntervalSets", "StaticArrays"]
 git-tree-sha1 = "439e35b0b36e2e5881738abc8857bd92ad6ff9a8"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.6.3"
+
+[[deps.Crayons]]
+git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
+uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
+version = "4.1.1"
 
 [[deps.DSP]]
 deps = ["Compat", "FFTW", "IterTools", "LinearAlgebra", "Polynomials", "Random", "Reexport", "SpecialFunctions", "Statistics"]
@@ -1907,6 +1911,12 @@ git-tree-sha1 = "9306f6085165d270f7e3db02af26a400d580f5c6"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.4.3"
 
+[[deps.PrettyTables]]
+deps = ["Crayons", "LaTeXStrings", "Markdown", "PrecompileTools", "Printf", "Reexport", "StringManipulation", "Tables"]
+git-tree-sha1 = "66b20dd35966a748321d3b2537c4584cf40387c7"
+uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
+version = "2.3.2"
+
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -2219,6 +2229,12 @@ weakdeps = ["ChainRulesCore", "InverseFunctions"]
     [deps.StatsFuns.extensions]
     StatsFunsChainRulesCoreExt = "ChainRulesCore"
     StatsFunsInverseFunctionsExt = "InverseFunctions"
+
+[[deps.StringManipulation]]
+deps = ["PrecompileTools"]
+git-tree-sha1 = "a04cabe79c5f01f4d723cc6704070ada0b9d46d5"
+uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
+version = "0.3.4"
 
 [[deps.SuiteSparse]]
 deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
@@ -2696,85 +2712,78 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╟─500f0cb0-bf70-11ee-19a8-35930e422cab
-# ╠═40e2112d-58cc-4650-8c6b-53b23a9fe470
-# ╠═fc6d97d3-3775-42d2-a991-09d875b0dd38
-# ╠═aba2d996-2cea-4484-81d7-b33d56d525e4
-# ╠═77e9ee5b-b7f5-4216-8745-ca0286ab9024
-# ╠═96d04c68-8734-4d4c-9a18-b3eb0b48583d
-# ╠═27ca1398-96ab-4d24-9c6d-63e02da49a94
-# ╠═6f5a8d02-d519-47c4-bdcd-7e52bf92098c
-# ╠═9e047346-b39e-4179-8f8a-bb1188941606
-# ╠═7098ee9a-1dc9-43fb-b554-35d87174fc64
+# ╟─40e2112d-58cc-4650-8c6b-53b23a9fe470
+# ╟─fc6d97d3-3775-42d2-a991-09d875b0dd38
+# ╟─77e9ee5b-b7f5-4216-8745-ca0286ab9024
+# ╟─16039ccb-7cb1-4f44-be4a-03fdb0d08873
+# ╟─27ca1398-96ab-4d24-9c6d-63e02da49a94
+# ╟─6f5a8d02-d519-47c4-bdcd-7e52bf92098c
+# ╟─9e047346-b39e-4179-8f8a-bb1188941606
+# ╟─7098ee9a-1dc9-43fb-b554-35d87174fc64
 # ╟─f1664b05-3dfb-4aa9-8b81-1e3e1ed488c8
 # ╟─323ed168-3ebb-4f9a-bdd9-2db3dace879c
 # ╟─6beb18fe-4e7c-4851-ab94-b5e6336bb8e6
 # ╟─536278e5-8cb7-4787-9018-b862f0adfc07
 # ╟─baf332fc-a805-4981-b569-70324a879a99
-# ╠═0713ba68-9c5d-464a-ad38-ea05d5239511
-# ╟─d8924882-d84c-417b-a4ec-9be6a32d992a
+# ╟─b3d56970-6fe3-4834-89df-c931c07269c9
 # ╟─3de53f57-ca6f-433c-b3b7-5a59250895e9
 # ╟─04261201-2729-4e94-8244-d30ccc22a19d
 # ╟─3a16c8c8-17d9-4c36-9bc1-99a081a32c33
-# ╠═05c7a161-4346-4464-b41f-66ca7b3e149d
-# ╟─f1968bb1-dc06-47a9-939f-4b76215c9bfe
+# ╟─05c7a161-4346-4464-b41f-66ca7b3e149d
 # ╟─a0b68a76-8eb0-43af-927a-2ffc1abcea98
 # ╟─a9214e4c-5467-4cca-81b3-059590b121b7
 # ╟─ae5738ce-9c29-42f3-8b9c-a465c8bf2952
 # ╟─c52a950c-c15e-4188-a5ce-1ba3100d43b9
-# ╠═9bc6c540-53c8-4a4d-9194-629d9e0277ca
-# ╠═0f93061c-5c62-427d-b1fb-0f9b8066a786
-# ╠═ec4494d0-61e4-4afa-a135-5a6a3e71ba84
-# ╟─eb4e98ae-8891-4d54-9581-ffd54e925e17
-# ╟─28429534-2221-44ce-8e75-0c6146e137e6
-# ╟─66263f0a-3921-478e-813b-29c33f3d557e
-# ╠═f3879d0d-45b0-4820-8153-19859d235ef1
-# ╟─2ba39927-635d-4054-ad28-cff311199263
+# ╟─f3013bb6-eab2-4256-b244-ac3cd272cc42
+# ╟─9bc6c540-53c8-4a4d-9194-629d9e0277ca
+# ╟─fad07c97-14ee-4df8-9914-72309fa55d24
 # ╟─439c48f9-69e7-46bc-8c42-f53ad5456772
-# ╠═e7d5617b-1da9-4b96-bd7a-0490e8e4ceca
-# ╠═c7caa7f6-fae1-4e07-aae8-a11312d74f09
+# ╟─e7d5617b-1da9-4b96-bd7a-0490e8e4ceca
+# ╟─c7caa7f6-fae1-4e07-aae8-a11312d74f09
 # ╟─e04ad4d7-c26a-4753-baa8-921121c27f08
-# ╠═dd0b1fbb-c56f-4ac8-8ad8-57d6add2ddcc
-# ╠═ccdce2ef-cbc9-4339-ab8b-7eaab5479c97
+# ╟─dd0b1fbb-c56f-4ac8-8ad8-57d6add2ddcc
+# ╟─ccdce2ef-cbc9-4339-ab8b-7eaab5479c97
 # ╟─88dd837e-bb77-4ec4-87d8-1134b0f741ce
-# ╠═ede76282-d27a-41a2-ac92-101c26129346
-# ╠═6cc50dda-bb5c-4138-a520-973e8dae3df0
+# ╟─ede76282-d27a-41a2-ac92-101c26129346
+# ╟─6cc50dda-bb5c-4138-a520-973e8dae3df0
 # ╠═8c13923d-612b-44d5-8046-bf4aa4bc175e
-# ╠═1bbc82eb-16e3-47a2-814a-0a69bd803c75
-# ╠═7a4e3653-ee72-404c-a849-0e4c389b65f5
-# ╠═8b70cb0a-ce22-4b11-bb75-4240b2b2b36b
-# ╠═f80f2317-c3b1-4d06-b030-fcbb565ddd82
-# ╠═59af65c0-1520-4a8e-9f51-69c1446a723b
-# ╠═e498d53f-ade6-4085-9b3f-5468e8e99721
-# ╠═2ea9247a-e667-447d-8ed1-6100f76876a5
-# ╠═6974f06e-e0a9-48aa-ac4b-3c2b55b13734
-# ╠═ab8d29d4-e221-4223-b5a8-dda4e2a32c0f
-# ╠═608f923e-c327-4252-a245-49ada28cc874
-# ╠═e691fe83-64e9-4b85-a32b-93dc0c669376
-# ╠═6e8ec563-8797-4a40-89bb-c52a3d7802b8
-# ╠═5730698e-7376-4723-829d-f2cc602d072a
-# ╠═c34c44bf-1485-4f7d-8715-16fadc7b79bc
-# ╠═21137cef-18d9-42cb-90d7-f565a1b243eb
-# ╠═d76e765f-ff56-4c7e-b61e-0b49e88f558a
-# ╠═7b32578c-de60-47fa-ae3f-628bb1c887ba
-# ╠═95d1107f-07c5-4c31-904a-1471cb51ad33
-# ╠═631a1822-5bf0-4713-b048-a17b93bfa66e
-# ╠═773f5479-a7de-4a81-b513-0545913b37bd
+# ╟─1bbc82eb-16e3-47a2-814a-0a69bd803c75
+# ╟─7a4e3653-ee72-404c-a849-0e4c389b65f5
+# ╟─8b70cb0a-ce22-4b11-bb75-4240b2b2b36b
+# ╟─f80f2317-c3b1-4d06-b030-fcbb565ddd82
+# ╟─59af65c0-1520-4a8e-9f51-69c1446a723b
+# ╟─e498d53f-ade6-4085-9b3f-5468e8e99721
+# ╟─2ea9247a-e667-447d-8ed1-6100f76876a5
+# ╟─6974f06e-e0a9-48aa-ac4b-3c2b55b13734
+# ╟─ab8d29d4-e221-4223-b5a8-dda4e2a32c0f
+# ╟─608f923e-c327-4252-a245-49ada28cc874
+# ╟─e691fe83-64e9-4b85-a32b-93dc0c669376
+# ╟─6e8ec563-8797-4a40-89bb-c52a3d7802b8
+# ╟─5730698e-7376-4723-829d-f2cc602d072a
+# ╟─c34c44bf-1485-4f7d-8715-16fadc7b79bc
+# ╟─21137cef-18d9-42cb-90d7-f565a1b243eb
+# ╟─d76e765f-ff56-4c7e-b61e-0b49e88f558a
+# ╟─7b32578c-de60-47fa-ae3f-628bb1c887ba
+# ╟─95d1107f-07c5-4c31-904a-1471cb51ad33
+# ╟─631a1822-5bf0-4713-b048-a17b93bfa66e
 # ╟─ae12d403-1149-426e-ab13-5afc5e5615d9
 # ╟─c2071134-3355-4479-a2d7-55d2141bb7ff
 # ╟─d0afa1de-101b-4eea-b4c3-75d2b4bc27d9
 # ╟─70f59af9-f609-4b9b-b23e-606bc3b2efa2
-# ╠═51988df7-5be5-478f-8cda-b4999b32ff6f
+# ╟─51988df7-5be5-478f-8cda-b4999b32ff6f
 # ╟─207929ea-af4a-4d4c-b2d2-59a0dc927ba6
 # ╟─e9ea4596-7d7b-4e87-87d2-88fb40a1b6ad
 # ╟─52894f69-76ab-4045-b70c-67bea0043279
-# ╠═70476796-ae99-490b-a77f-7b609b9e5b5f
+# ╟─70476796-ae99-490b-a77f-7b609b9e5b5f
 # ╟─7e8ef8b5-630b-4150-aa46-d58537906103
-# ╠═3cd039d3-3926-4889-a743-a8b908bf1796
-# ╠═c758524b-04f3-4699-8594-cb65fe30f7a4
+# ╟─3cd039d3-3926-4889-a743-a8b908bf1796
 # ╟─8cfa738e-05cc-4d86-b40c-86442d14b4b1
-# ╠═a5565a17-6572-4946-8147-7a9c7ca203f2
-# ╠═3f4d5d0e-8f35-4f57-8b0f-2aae19b2f7be
-# ╠═6f7497ac-d157-4ed5-8ed8-2a80f267efad
+# ╟─c200b8df-3580-4cb5-9da4-bf5e2113bccb
+# ╟─f9d71607-f558-4f90-b5a0-b4c445c97f2e
+# ╟─6f7497ac-d157-4ed5-8ed8-2a80f267efad
+# ╟─a5565a17-6572-4946-8147-7a9c7ca203f2
+# ╟─92b7b55f-b50a-48cf-8d6e-0a95ae7b2465
+# ╟─3f4d5d0e-8f35-4f57-8b0f-2aae19b2f7be
 # ╟─21d63be3-b945-452b-91d8-63efb3568b95
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
