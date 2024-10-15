@@ -1,6 +1,6 @@
 ## Small package for Spectral-Band / Multi-Wavelength pyrometry
 
-  This package is based on part of the code that was written for laboratory setup for measuring spectral emissivity. The details of the setup itself are described in an article that (I hope) will be published in the near future. 
+  This package is based on part of the code that was written for laboratory setup for measuring spectral emissivity. The details of the setup itself are described in the [article](http://dx.doi.org/10.1007/s00340-024-08331-9), the preprint is also [available](http://dx.doi.org/10.21203/rs.3.rs-4766080/v1)  
   
   This repository codes can be used to process experimentally measured thermal emission spectra of real surfaces, that is, those for which the spectral emissivity depends on the wavelength. In particular, it allows one to calculate the surface temperature of a real object with an unknown emissivity from its thermal radiation intensity (for correct determination of intensity, the measured spectrum should be corrected according to the spectral sensitivity of the receiving system, thats why we need a laboratory setup!). Multiwavelength pyrometry approach is realized in the general module `BandPyrometry.jl`. 
 The package also includes `Planck.jl` module for calculating the blackbody thermal emission intensity (aka Planck function) and its derivatives. 
