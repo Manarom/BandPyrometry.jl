@@ -36,7 +36,7 @@ module Pyrometers
     """
     measure(p::Pyrometer,i::Float64)
 
-    Calculates the "measured" from "mesaured" intensity by fitting the Planck function.
+    Calculates the "measured" temperature from "mesaured" intensity by fitting the Planck function.
     The intensity units should be consistent with Planck.ibb(λ,T) function return,
     it should be in [W/m²⋅sr⋅μm]
     Input:
