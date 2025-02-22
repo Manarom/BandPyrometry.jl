@@ -1,17 +1,19 @@
 ### A Pluto.jl notebook ###
-# v0.19.45
+# v0.20.3
 
 using Markdown
 using InteractiveUtils
 
 # This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
 macro bind(def, element)
+    #! format: off
     quote
         local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
         local el = $(esc(element))
         global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
         el
     end
+    #! format: on
 end
 
 # ╔═╡ fc6d97d3-3775-42d2-a991-09d875b0dd38
@@ -537,7 +539,7 @@ StaticArrays = "~1.9.7"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.0"
+julia_version = "1.10.8"
 manifest_format = "2.0"
 project_hash = "2f3b4f9f2fe2ff35e7ab72e55992a1cdd4f92558"
 
@@ -783,7 +785,7 @@ weakdeps = ["Dates", "LinearAlgebra"]
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.0.5+1"
+version = "1.1.1+0"
 
 [[deps.CompositeTypes]]
 git-tree-sha1 = "bce26c3dab336582805503bed209faab1c279768"
@@ -1694,7 +1696,7 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.23+2"
+version = "0.3.23+4"
 
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -2631,7 +2633,7 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.8.0+1"
+version = "5.11.0+0"
 
 [[deps.libdecor_jll]]
 deps = ["Artifacts", "Dbus_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pango_jll", "Wayland_jll", "xkbcommon_jll"]
@@ -2716,8 +2718,8 @@ version = "1.4.1+1"
 # ╟─fc6d97d3-3775-42d2-a991-09d875b0dd38
 # ╟─77e9ee5b-b7f5-4216-8745-ca0286ab9024
 # ╟─16039ccb-7cb1-4f44-be4a-03fdb0d08873
-# ╟─27ca1398-96ab-4d24-9c6d-63e02da49a94
-# ╟─6f5a8d02-d519-47c4-bdcd-7e52bf92098c
+# ╠═27ca1398-96ab-4d24-9c6d-63e02da49a94
+# ╠═6f5a8d02-d519-47c4-bdcd-7e52bf92098c
 # ╟─9e047346-b39e-4179-8f8a-bb1188941606
 # ╟─7098ee9a-1dc9-43fb-b554-35d87174fc64
 # ╟─f1664b05-3dfb-4aa9-8b81-1e3e1ed488c8
@@ -2737,7 +2739,7 @@ version = "1.4.1+1"
 # ╟─f3013bb6-eab2-4256-b244-ac3cd272cc42
 # ╟─9bc6c540-53c8-4a4d-9194-629d9e0277ca
 # ╟─fad07c97-14ee-4df8-9914-72309fa55d24
-# ╟─439c48f9-69e7-46bc-8c42-f53ad5456772
+# ╠═439c48f9-69e7-46bc-8c42-f53ad5456772
 # ╟─e7d5617b-1da9-4b96-bd7a-0490e8e4ceca
 # ╟─c7caa7f6-fae1-4e07-aae8-a11312d74f09
 # ╟─e04ad4d7-c26a-4753-baa8-921121c27f08
@@ -2779,11 +2781,11 @@ version = "1.4.1+1"
 # ╟─3cd039d3-3926-4889-a743-a8b908bf1796
 # ╟─8cfa738e-05cc-4d86-b40c-86442d14b4b1
 # ╟─c200b8df-3580-4cb5-9da4-bf5e2113bccb
-# ╟─f9d71607-f558-4f90-b5a0-b4c445c97f2e
+# ╠═f9d71607-f558-4f90-b5a0-b4c445c97f2e
 # ╟─6f7497ac-d157-4ed5-8ed8-2a80f267efad
 # ╟─a5565a17-6572-4946-8147-7a9c7ca203f2
 # ╟─92b7b55f-b50a-48cf-8d6e-0a95ae7b2465
-# ╟─3f4d5d0e-8f35-4f57-8b0f-2aae19b2f7be
+# ╠═3f4d5d0e-8f35-4f57-8b0f-2aae19b2f7be
 # ╟─21d63be3-b945-452b-91d8-63efb3568b95
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
