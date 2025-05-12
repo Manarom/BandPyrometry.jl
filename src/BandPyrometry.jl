@@ -6,7 +6,7 @@ module BandPyrometry
     OptimizationOptimJL, 
     Interpolations,
     StaticArrays, #,
-    Plots,
+    #Plots,
     Polynomials,
     LegendrePolynomials
 
