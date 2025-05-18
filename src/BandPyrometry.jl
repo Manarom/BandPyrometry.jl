@@ -8,16 +8,16 @@ module BandPyrometry
     StaticArrays, #,
     #Plots,
     Polynomials,
-    LegendrePolynomials
+    LegendrePolynomials,
+    PlanckFunctions
 
-    include("Planck.jl") # brings Planck module
+    #include("Planck.jl") # brings Planck module
     include("JDXreader.jl")
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
     include("Pyrometers.jl") 
     
 
-    export Planck, # Planck function module 
-            JDXreader,#JCAMP files reader
+    export  JDXreader,#JCAMP files reader
             BandPyrometryPoint,# type for least-square fitting 
             EmPoint, # type for BB temperature fitting
             fit_T!,# function to fit the BB and real surface temperature
@@ -27,7 +27,6 @@ module BandPyrometry
             em_cons!, # emissivity constraint function (returns maximum and minimum values of the emissivity in the whole spectral range)
             emissivity!, # fills the emissivity
             feval!,jacobian!,hess!,hess_approx!,grad!,residual!,disc
-    using .Planck
     """
     All supported optimizers
     """

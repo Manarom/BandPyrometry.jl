@@ -1,7 +1,10 @@
 
 # module to read JCAMP-DX=4.24 file formats
+
+module JDXreader
 """
-JCAMP file example: \n
+JCAMP file content example: 
+
             ##TITLE=1 
             ##JCAMP-DX=4.24
             ##DATATYPE=INFRARED SPECTRUM
@@ -31,15 +34,45 @@ Header lines start with ##
 Data start after headers lines
 
 """
-module JDXreader
-
-    export JDXfile,read!,read_jdx_file
+    JDXreader
+    const default_headers = Dict(
+            "TITLE"=>"NO TITLE",
+            "JCAMP-DX"=>4.24,
+            "DATATYPE"=>"INFRARED SPECTRUM",
+            "DATE"=>"2021/10/17",
+            "TIME"=>"11:30",
+            "XUNITS"=>"1/CM",
+            "YUNITS"=>"TRANSMITTANCE",
+            "XFACTOR"=>1,
+            "YFACTOR"=>0.00699183,
+            "FIRSTX"=>0.0,
+            "LASTX"=>15801.4671743,
+            "FIRSTY"=>11746.3412893072,
+            "MAXX"=>15801.4671743,
+            "MINX"=>0,
+            "MAXY"=>3.75371e+006,
+            "MINY"=>4040.25,
+            "NPOINTS"=>16384.0,
+            "XYDATA"=>"(X++(Y..Y))"
+    )
+    const sym_default_dict = Dict(Symbol(k[1])=>k[2] for k in default_headers)
+    const default_keys = collect(default_headers)
+    export JDXfile,read!,read_jdx_file,write_jdx_file
     #using ..DelimitedFiles
-
+    #function fill_headers_dict(x::Vector{Float64},y::Vector{Float64})
+    #end
+    kwarg_str = join(["$k=$(sym_default_dict[k])" for k in keys(sym_default_dict)], ", ")
+    kwargs_out = join(["$k" for k in keys(sym_default_dict)], ", ")
+    eval( 
+    :(function fill_headers(x::Vector{Float64},y::Vector{Float64}; $(Meta.parse(kwarg_str)))
+        #headers = copy(default_headers)
+        #return (;$(kwargs_out))
+    end)
+    )
     mutable struct JDXfile
         # Main struct, prepares loads file name, parses data and data headers
         file_name::String
-        data_headers::Dict{String,Union{String,Number}}
+        data_headers::Dict{String,Union{String,Float64}}
         x_data::Vector{Float64}
         y_data::Vector{Float64}
         is_violated_flag::Vector{Bool}
@@ -49,7 +82,7 @@ module JDXreader
     """
         JDXfile()=begin
             new("",
-                Dict{String,Union{String,Number}}(),
+                Dict{String,Union{String,Float64}}(),
                 Vector{Float64}(),
                 Vector{Float64}(),
                 Vector{Bool}())
@@ -95,9 +128,9 @@ module JDXreader
             jdx.data_headers[string(splitted_string[1])] = 
                 isnothing(tryparse(Float64,splitted_string[2])) ? string(splitted_string[2]) : parse(Float64,splitted_string[2])
         end
-        if haskey(jdx.data_headers,"NPOINTS")
-            jdx.data_headers["NPOINTS"] = round(Int64, jdx.data_headers["NPOINTS"])
-        end
+        #if haskey(jdx.data_headers,"NPOINTS")
+        #    jdx.data_headers["NPOINTS"] = round(Int64, jdx.data_headers["NPOINTS"])
+        #end
     end
     function addYline!(jdx::JDXfile, current_line::String,number_of_y_point_per_chunk,chunk_index)
         data_intermediate = map((X)->Base.parse(Float64,X), split(current_line))
@@ -112,7 +145,7 @@ module JDXreader
         return data_intermediate[1]
     end
     function generateXvector!(jdx::JDXfile)
-            point_number = jdx.data_headers["NPOINTS"]
+            point_number = round(Int64,jdx.data_headers["NPOINTS"])
             starting_X = haskey(jdx.data_headers,"FIRSTX") ? jdx.data_headers["FIRSTX"] : 0.0
             if haskey(jdx.data_headers,"DELTAX")
                 step_value =  jdx.data_headers["DELTAX"]  
@@ -129,7 +162,7 @@ module JDXreader
     """
     read!(jdx::JDXfile)
 
-    fills precreated JDXfile
+fills precreated JDXfile object
 
 """
 function read!(jdx::JDXfile)
@@ -154,7 +187,7 @@ function read!(jdx::JDXfile)
             parseJDXheaders(jdx,header_lines)
             data_lines_number = total_number_Of_lines - length(header_lines)-1
             if haskey(jdx.data_headers,"NPOINTS") # correct JDX file
-                total_point_number = jdx.data_headers["NPOINTS"]
+                total_point_number = round(Int64,jdx.data_headers["NPOINTS"])
                 generateXvector!(jdx)
                 resize!(jdx.y_data,total_point_number)
                 for i in 2:data_lines_number
