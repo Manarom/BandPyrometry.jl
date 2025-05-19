@@ -2,6 +2,7 @@
 # module to read JCAMP-DX=4.24 file formats
 
 module JDXreader
+using Dates,Interpolations
 """
 JCAMP file content example: 
 
@@ -35,7 +36,7 @@ Data start after headers lines
 
 """
     JDXreader
-    const default_headers = Dict(
+    const default_headers = Dict{String,Union{Float64,String}}(
             "TITLE"=>"NO TITLE",
             "JCAMP-DX"=>4.24,
             "DATATYPE"=>"INFRARED SPECTRUM",
@@ -43,13 +44,13 @@ Data start after headers lines
             "TIME"=>"11:30",
             "XUNITS"=>"1/CM",
             "YUNITS"=>"TRANSMITTANCE",
-            "XFACTOR"=>1,
+            "XFACTOR"=>1.0,
             "YFACTOR"=>0.00699183,
             "FIRSTX"=>0.0,
             "LASTX"=>15801.4671743,
             "FIRSTY"=>11746.3412893072,
             "MAXX"=>15801.4671743,
-            "MINX"=>0,
+            "MINX"=>0.0,
             "MAXY"=>3.75371e+006,
             "MINY"=>4040.25,
             "NPOINTS"=>16384.0,
@@ -58,17 +59,62 @@ Data start after headers lines
     const sym_default_dict = Dict(Symbol(k[1])=>k[2] for k in default_headers)
     const default_keys = collect(default_headers)
     export JDXfile,read!,read_jdx_file,write_jdx_file
-    #using ..DelimitedFiles
-    #function fill_headers_dict(x::Vector{Float64},y::Vector{Float64})
-    #end
-    kwarg_str = join(["$k=$(sym_default_dict[k])" for k in keys(sym_default_dict)], ", ")
-    kwargs_out = join(["$k" for k in keys(sym_default_dict)], ", ")
-    eval( 
-    :(function fill_headers(x::Vector{Float64},y::Vector{Float64}; $(Meta.parse(kwarg_str)))
-        #headers = copy(default_headers)
-        #return (;$(kwargs_out))
-    end)
-    )
+
+    function fill_headers(x::Vector{Float64},y::Vector{Float64}; kwargs...)
+        @assert length(x)==length(y)
+
+        headers = copy(default_headers)
+        for (k,v) in kwargs
+            k_str = string(k)
+            if k_str == "XUNITS"
+                 @assert v=="1/CM" "x-values should be in 1/CM, other units are unsupported"  
+            end
+            headers[k_str] = v 
+        end
+        x_factor = headers["XFACTOR"] 
+        n_points = length(x)
+        if is_linspaced(x)        
+            x_copy = copy(x)
+            x.*=x_factor
+            y_copy = copy(y)
+            if !issorted(x_copy)
+                y_int = sortperm(x)
+                @. x=x[y_int]
+                @. y_copy=y_copy[y_int]
+            else
+                y_int = Vector{Int}(undef,n_points) 
+            end
+        else # if x is not equally spaced we perform linear interpolation
+            x_copy = collect(range(minimum(x),maximum(x),n_points)) 
+            if !issorted(x)
+                y_int = sortperm(x)
+                y_copy = linear_interpolation(x[y_int],y[y_int])(x_copy)
+            else
+                y_int = Vector{Int}(undef,n_points)
+                y_copy = linear_interpolation(x,y)(x_copy)
+            end
+        end
+        y_columns_number = 1
+        cur_date_time = string(now())
+        ind = findfirst("T",cur_date_time)[1]
+        headers["NPOINTS"] = Float64(n_points)
+        headers["DATE"] = cur_date_time[1:ind-1]
+        headers["TIME"] = cur_date_time[ind+1:end]
+        headers["FIRSTX"] = x_copy[begin]
+        headers["FIRSTY"] = y_copy[begin]
+        return (x_copy,y_copy,headers,y_columns_number)
+    end
+    function is_linspaced(x::Vector{T}) where T<:Number
+        if length(x)<=2
+            return true
+        end
+        dx1 = x[2] - x[1]
+        for i in eachindex(x)[2:end-1]
+           dx = x[i+1] - x[i]
+           isapprox(dx,dx1,rtol=1e-8) ? continue : return false
+        end
+        return true
+    end
     mutable struct JDXfile
         # Main struct, prepares loads file name, parses data and data headers
         file_name::String
