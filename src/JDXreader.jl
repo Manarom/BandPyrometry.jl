@@ -2,7 +2,7 @@
 # module to read JCAMP-DX=4.24 file formats
 
 module JDXreader
-using Dates,Interpolations,OrderedCollections
+using Dates,Interpolations,OrderedCollections,Printf
 export JDXfile,read!,read_jdx_file,write_jdx_file
 """
 JCAMP file content example: 
@@ -59,17 +59,25 @@ Data start after headers lines
             "XYDATA"=>"(X++(Y..Y))"
     )
     const xSTR2NUM = Dict("MKM"=>1,"MICROMETERS"=>1,"1/CM"=>2,"NM"=>3,"NANOMETERS"=>3)
-    const xNUM2STR = Dict(1=>"MKM",2=>"1/CM",3=>"NM")
-
+    const xNUM2STR = Dict(1=>"MICROMETERS",2=>"1/CM",3=>"NANOMETERS")
+    const ySTR2NUM = Dict("TRANSMITTANCE"=>1,"T"=>1,"REFLECTANCE"=>2,"R"=>2,
+                                "ABSORBANCE"=>3,"A"=>3,"KUBELKA-MUNK"=>4,"ARBITRARY UNITS"=>5,"A.U."=>5)
+    const yNUM2STR = Dict(1=>"TRANSMITTANCE",2=>"REFLECTANCE",3=>"ABSORBANCE",4=>"KUBELKA-MUNK",5=>"ARBITRARY UNITS") 
     abstract type sUnits{T} end
-
+    struct yUnits{T}<:sUnits{T}
+        yUnits(u::String) = begin
+            return haskey(ySTR2NUM,uppercase(u)) ? new{ySTR2NUM[uppercase(u)]}() : new{5}()
+        end
+    end
     struct xUnits{T} <:sUnits{T}
         xUnits(u::String) = begin
             return haskey(xSTR2NUM,uppercase(u)) ? new{xSTR2NUM[uppercase(u)]}() : error("this x units are not supported, possible units are: "*join(keys(xSTR2NUM),","))
         end
     end
     units(::xUnits{T}) where T = xNUM2STR[T]
+    units(::yUnits{T}) where T = yNUM2STR[T]
     convert!(x::AbstractArray,::sUnits{T},::sUnits{T}) where T = x 
+    
     convert!(x::AbstractArray,::xUnits{1},::xUnits{2}) = @. x = 1e4/x #mkm=>1/cm
     convert!(x::AbstractArray,::xUnits{2},::xUnits{1}) = @. x = 1e4/x #1/cm=>mkm
     convert!(x::AbstractArray,::xUnits{1},::xUnits{3}) = @. x = 1e3*x #mkm=>nm
@@ -78,18 +86,52 @@ Data start after headers lines
     convert!(x::AbstractArray,::xUnits{3},::xUnits{2}) = @. x = 10.0/x #nm=>1/cm
     
 
-
-
+    convert!(x::AbstractArray,::yUnits{1},::yUnits{3}) = @. x=-log10(x) #T->A
+    convert!(x::AbstractArray,::yUnits{3},::yUnits{1}) = @. x=10^(-x)# A->T
+    convert!(x::AbstractArray,::yUnits{2},::yUnits{3}) = @. x=-log10(x)#R->A
+    convert!(x::AbstractArray,::yUnits{3},::yUnits{2}) = @. x=10^(-x) #A->R   
+    convert!(x::AbstractArray,::yUnits{1},::yUnits{4}) = @. x= (1-x^2)/(2*x) #T->K-M
+    convert!(x::AbstractArray,::yUnits{4},::yUnits{1}) = @. x=-x  + sqrt(x^2 + 1)# K-M->T
+    convert!(x::AbstractArray,::yUnits{2},::yUnits{4}) = @. x=(1-x^2)/(2*x)#R->K-M
+    convert!(x::AbstractArray,::yUnits{4},::yUnits{2}) = @. x= -x  + sqrt(x^2 + 1) #K-M->R    
     
-    function write_jdx_file(file_name,x::Vector{Float64},y::Vector{Float64}; kwargs...)
+    xconvert!(x::AbstractArray,input_units::String,output_units::String) = convert!(x,xUnits(input_units),xUnits(output_units))
+    yconvert!(y::AbstractArray,input_units::String,output_units::String) = convert!(y,yUnits(input_units),yUnits(output_units))
+    
+    function write_jdx_file(file_name,x::Vector{Float64},y::Vector{Float64},x_units="1/CM",
+        y_units="TRANSMITTANCE"; kwargs...)
 
-
-
+        (x_copy,_,y_int,headers) = prepare_jdx_data(x,y,x_units,y_units, kwargs...)
+        y_columns_number = round(Int,80/(ndigits(JDXreader.YMAX_INT)+1)) # number of columns of y-data
+        npoints = length(y_int)
+        fmt = Printf.Format(" %d"^y_columns_number)
+        open(file_name,"w", lock = true) do io
+            for (k,v) in headers
+                line = "##"*k*"=$(v)"
+                println(io,line)
+            end
+            counter = 1
+            chunk_index = 1
+            
+            while counter <= npoints
+                start_ind = counter
+                end_ind = counter+y_columns_number-1
+                if end_ind<=npoints
+                    line = Printf.format(fmt,y_int[start_ind:end_ind]...)
+                    println(io,line)
+                else
+                    break
+                end
+                counter = end_ind+1
+            end
+            println(io,"##END")
+        end
     end
     function prepare_jdx_data(x::Vector{Float64},y::Vector{Float64},x_units="1/CM",
-        y_units="TRANSMITTANCE"; kwargs...)
+                                                    y_units="TRANSMITTANCE"; kwargs...)
         @assert length(x)==length(y)
         x_init = copy(x)
+        y_copy = copy(y)
         headers = copy(default_headers)
         for (k,v) in kwargs
             k_str = uppercase(string(k))
@@ -97,13 +139,13 @@ Data start after headers lines
             headers[k_str] = v 
         end
         convert!(x_init, xUnits(x_units), xUnits(headers["XUNITS"]))
-        convert!(y_init, xUnits(y_units), xUnits(headers["YUNITS"]))
+        convert!(y_copy, yUnits(y_units), yUnits(headers["YUNITS"]))
+
         x_factor = headers["XFACTOR"] 
         n_points = length(x_init)
         if is_linspaced(x_init)# checks if all coordinates are equally spaced, if not - performing interpolation
             x_copy   = x_init
             x_copy ./= x_factor
-            y_copy = copy(y)
             if !issorted(x_copy)
                 y_int = sortperm(x)
                 @. x=x[y_int]
@@ -135,9 +177,9 @@ Data start after headers lines
         headers["LASTX"] = headers["MAXX"]
         y_factor = (headers["MAXY"]/YMAX_INT)
         @. y_int = round(Int,y_copy/y_factor) #filling integer values
-        y_columns_number = round(Int,80/(ndigits(JDXreader.YMAX_INT)+1)) # number of columns of y-data
+        
         headers["YFACTOR"] = y_factor
-        return (x_copy,y_copy,y_int,headers,y_columns_number)
+        return (x_copy,y_copy,y_int,headers)
     end
     function is_linspaced(x::Vector{T}) where T<:Number
         if length(x)<=2
