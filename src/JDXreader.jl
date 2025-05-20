@@ -2,7 +2,8 @@
 # module to read JCAMP-DX=4.24 file formats
 
 module JDXreader
-using Dates,Interpolations
+using Dates,Interpolations,OrderedCollections
+export JDXfile,read!,read_jdx_file,write_jdx_file
 """
 JCAMP file content example: 
 
@@ -37,7 +38,7 @@ Data start after headers lines
 """
     JDXreader
     const YMAX_INT = round(Int64,typemax(Int32)/4)-1
-    const default_headers = Dict{String,Union{Float64,String}}(
+    const default_headers = OrderedDict{String,Union{Float64,String}}(
             "TITLE"=>"NO TITLE",
             "JCAMP-DX"=>4.24,
             "DATATYPE"=>"INFRARED SPECTRUM",
@@ -57,26 +58,51 @@ Data start after headers lines
             "NPOINTS"=>16384.0,
             "XYDATA"=>"(X++(Y..Y))"
     )
-    const sym_default_dict = Dict(Symbol(k[1])=>k[2] for k in default_headers)
-    const default_keys = collect(default_headers)
-    export JDXfile,read!,read_jdx_file,write_jdx_file
+    const xSTR2NUM = Dict("MKM"=>1,"MICROMETERS"=>1,"1/CM"=>2,"NM"=>3,"NANOMETERS"=>3)
+    const xNUM2STR = Dict(1=>"MKM",2=>"1/CM",3=>"NM")
 
-    function fill_headers(x::Vector{Float64},y::Vector{Float64}; kwargs...)
+    abstract type sUnits{T} end
+
+    struct xUnits{T} <:sUnits{T}
+        xUnits(u::String) = begin
+            return haskey(xSTR2NUM,uppercase(u)) ? new{xSTR2NUM[uppercase(u)]}() : error("this x units are not supported, possible units are: "*join(keys(xSTR2NUM),","))
+        end
+    end
+    units(::xUnits{T}) where T = xNUM2STR[T]
+    convert!(x::AbstractArray,::sUnits{T},::sUnits{T}) where T = x 
+    convert!(x::AbstractArray,::xUnits{1},::xUnits{2}) = @. x = 1e4/x #mkm=>1/cm
+    convert!(x::AbstractArray,::xUnits{2},::xUnits{1}) = @. x = 1e4/x #1/cm=>mkm
+    convert!(x::AbstractArray,::xUnits{1},::xUnits{3}) = @. x = 1e3*x #mkm=>nm
+    convert!(x::AbstractArray,::xUnits{3},::xUnits{1}) = @. x = 1e-3*x #nm=>mkm
+    convert!(x::AbstractArray,::xUnits{2},::xUnits{3}) = @. x = 1e7/x #1/cm=>nm
+    convert!(x::AbstractArray,::xUnits{3},::xUnits{2}) = @. x = 10.0/x #nm=>1/cm
+    
+
+
+
+    
+    function write_jdx_file(file_name,x::Vector{Float64},y::Vector{Float64}; kwargs...)
+
+
+
+    end
+    function prepare_jdx_data(x::Vector{Float64},y::Vector{Float64},x_units="1/CM",
+        y_units="TRANSMITTANCE"; kwargs...)
         @assert length(x)==length(y)
-
+        x_init = copy(x)
         headers = copy(default_headers)
         for (k,v) in kwargs
-            k_str = string(k)
-            if k_str == "XUNITS"
-                 @assert v=="1/CM" "x-values should be in 1/CM, other units are unsupported"  
-            end
+            k_str = uppercase(string(k))
+            isa(v,String) ? v=uppercase(v) : nothing
             headers[k_str] = v 
         end
+        convert!(x_init, xUnits(x_units), xUnits(headers["XUNITS"]))
+        convert!(y_init, xUnits(y_units), xUnits(headers["YUNITS"]))
         x_factor = headers["XFACTOR"] 
-        n_points = length(x)
-        if is_linspaced(x)# checks if all coordinates are equally spaced        
-            x_copy = copy(x)
-            x./=x_factor
+        n_points = length(x_init)
+        if is_linspaced(x_init)# checks if all coordinates are equally spaced, if not - performing interpolation
+            x_copy   = x_init
+            x_copy ./= x_factor
             y_copy = copy(y)
             if !issorted(x_copy)
                 y_int = sortperm(x)
@@ -86,7 +112,7 @@ Data start after headers lines
                 y_int = Vector{Int}(undef,n_points) 
             end
         else # if x is not equally spaced we perform linear interpolation
-            x_copy = collect(range(minimum(x),maximum(x),n_points)) 
+            x_copy = collect(range(minimum(x_init),maximum(x_init),n_points)) 
             if !issorted(x)
                 y_int = sortperm(x)
                 y_copy = linear_interpolation(x[y_int],y[y_int])(x_copy)
@@ -96,7 +122,6 @@ Data start after headers lines
             end
             x_copy./=x_factor
         end
-        y_columns_number = 1
         cur_date_time = string(now())
         ind = findfirst("T",cur_date_time)[1]
         headers["NPOINTS"] = Float64(n_points)
@@ -109,7 +134,8 @@ Data start after headers lines
         headers["FIRSTX"] = headers["MINX"]
         headers["LASTX"] = headers["MAXX"]
         y_factor = (headers["MAXY"]/YMAX_INT)
-        @. y_int = round(Int,y_copy/y_factor)
+        @. y_int = round(Int,y_copy/y_factor) #filling integer values
+        y_columns_number = round(Int,80/(ndigits(JDXreader.YMAX_INT)+1)) # number of columns of y-data
         headers["YFACTOR"] = y_factor
         return (x_copy,y_copy,y_int,headers,y_columns_number)
     end
@@ -268,4 +294,6 @@ function read!(jdx::JDXfile)
                 y=jdx.y_data, 
                 headers=jdx.data_headers)
     end
+    
+
 end

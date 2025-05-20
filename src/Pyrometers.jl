@@ -3,7 +3,7 @@ module Pyrometers
     using   Optimization,
             OptimizationOptimJL,
             LinearAlgebra 
-    import  ..Planck
+    import  PlanckFunctions as Planck
     # "pyrometer type" => wavelength region in microns
     const pyrometers_types = Dict(
                     "P"=> [2.0, 2.6],
@@ -14,7 +14,7 @@ module Pyrometers
                     "F"=>[7.9],
                     "K"=>[8.0, 9.0],
                     "B"=> [9.1,14.0]
-                    );
+    )
 
     struct Pyrometer # this type supports methods for radiative pyrometers
         type::String
