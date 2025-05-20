@@ -36,6 +36,7 @@ Data start after headers lines
 
 """
     JDXreader
+    const YMAX_INT = round(Int64,typemax(Int32)/4)-1
     const default_headers = Dict{String,Union{Float64,String}}(
             "TITLE"=>"NO TITLE",
             "JCAMP-DX"=>4.24,
@@ -73,9 +74,9 @@ Data start after headers lines
         end
         x_factor = headers["XFACTOR"] 
         n_points = length(x)
-        if is_linspaced(x)        
+        if is_linspaced(x)# checks if all coordinates are equally spaced        
             x_copy = copy(x)
-            x.*=x_factor
+            x./=x_factor
             y_copy = copy(y)
             if !issorted(x_copy)
                 y_int = sortperm(x)
@@ -93,6 +94,7 @@ Data start after headers lines
                 y_int = Vector{Int}(undef,n_points)
                 y_copy = linear_interpolation(x,y)(x_copy)
             end
+            x_copy./=x_factor
         end
         y_columns_number = 1
         cur_date_time = string(now())
@@ -102,7 +104,14 @@ Data start after headers lines
         headers["TIME"] = cur_date_time[ind+1:end]
         headers["FIRSTX"] = x_copy[begin]
         headers["FIRSTY"] = y_copy[begin]
-        return (x_copy,y_copy,headers,y_columns_number)
+        (headers["MINY"],headers["MAXY"]) = extrema(y_copy)
+        (headers["MINX"],headers["MAXX"]) = extrema(x_copy)
+        headers["FIRSTX"] = headers["MINX"]
+        headers["LASTX"] = headers["MAXX"]
+        y_factor = (headers["MAXY"]/YMAX_INT)
+        @. y_int = round(Int,y_copy/y_factor)
+        headers["YFACTOR"] = y_factor
+        return (x_copy,y_copy,y_int,headers,y_columns_number)
     end
     function is_linspaced(x::Vector{T}) where T<:Number
         if length(x)<=2
