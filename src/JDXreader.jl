@@ -90,9 +90,9 @@ Data start after headers lines
     convert!(x::AbstractArray,::yUnits{3},::yUnits{1}) = @. x=10^(-x)# A->T
     convert!(x::AbstractArray,::yUnits{2},::yUnits{3}) = @. x=-log10(x)#R->A
     convert!(x::AbstractArray,::yUnits{3},::yUnits{2}) = @. x=10^(-x) #A->R   
-    convert!(x::AbstractArray,::yUnits{1},::yUnits{4}) = @. x= (1-x^2)/(2*x) #T->K-M
+    convert!(x::AbstractArray,::yUnits{1},::yUnits{4}) = @. x= (1 - x^2)/(2*x) #T->K-M
     convert!(x::AbstractArray,::yUnits{4},::yUnits{1}) = @. x=-x  + sqrt(x^2 + 1)# K-M->T
-    convert!(x::AbstractArray,::yUnits{2},::yUnits{4}) = @. x=(1-x^2)/(2*x)#R->K-M
+    convert!(x::AbstractArray,::yUnits{2},::yUnits{4}) = @. x=(1 - x^2)/(2*x)#R->K-M
     convert!(x::AbstractArray,::yUnits{4},::yUnits{2}) = @. x= -x  + sqrt(x^2 + 1) #K-M->R    
     
     xconvert!(x::AbstractArray,input_units::String,output_units::String) = convert!(x,xUnits(input_units),xUnits(output_units))
@@ -111,18 +111,20 @@ Data start after headers lines
                 println(io,line)
             end
             counter = 1
-            chunk_index = 1
-            
+            line_index = 1
             while counter <= npoints
                 start_ind = counter
                 end_ind = counter+y_columns_number-1
                 if end_ind<=npoints
                     line = Printf.format(fmt,y_int[start_ind:end_ind]...)
-                    println(io,line)
+                    x_str = @sprintf("%.8f",x[line_index])
+                    remained_length = 88 - strlength(line)
+                    println(io,x_str[1:remained_length]*line)
                 else
                     break
                 end
                 counter = end_ind+1
+                line_index+=line_index
             end
             println(io,"##END")
         end
@@ -187,7 +189,7 @@ Data start after headers lines
         end
         dx1 = x[2] - x[1]
         for i in eachindex(x)[2:end-1]
-           dx = x[i+1] - x[i]
+           dx = x[i + 1] - x[i]
            isapprox(dx,dx1,rtol=1e-8) ? continue : return false
         end
         return true
