@@ -2,9 +2,13 @@
 module Pyrometers
     using   Optimization,
             OptimizationOptimJL,
-            LinearAlgebra 
+            LinearAlgebra,
+            StaticArrays 
     import  PlanckFunctions as Planck
-    # "pyrometer type" => wavelength region in microns
+    """
+    Default pyrometers types 
+
+    """
     const pyrometers_types = Dict(
                     "P"=> [2.0, 2.6],
                     "M"=> [3.4], 
@@ -16,9 +20,9 @@ module Pyrometers
                     "B"=> [9.1,14.0]
     )
 
-    struct Pyrometer # this type supports methods for radiative pyrometers
+    struct Pyrometer{N} # this type supports methods for radiative pyrometers
         type::String
-        λ::Vector{Float64}
+        λ::SVector{N,Float64}
         ϵ::Base.RefValue{Float64}
         """
     Pyrometer(type::String)
@@ -30,14 +34,17 @@ module Pyrometers
         Pyrometer(type::String) = begin
             haskey(pyrometers_types,type) ?  new(type,
                                                 pyrometers_types[type],
-                                                Ref(1.0)) : error("There is no such pyrometer type")
+                                                Ref(1.0)) : error("Unknown pyrometer type")
+        end
+        Pyrometer(;type::String,λ::Vector{Float64},ϵ::Float64) = begin
+            new(type,)
         end
     end
     """
     measure(p::Pyrometer,i::Float64)
 
     Calculates the "measured" temperature from "mesaured" intensity by fitting the Planck function.
-    The intensity units should be consistent with Planck.ibb(λ,T) function return,
+    The intensity units should be consistent with PlanckFunctions.ibb(λ,T) function,
     it should be in [W/m²⋅sr⋅μm]
     Input:
         p - pyrometer object
@@ -78,7 +85,7 @@ function wavelength_number()
     """
     full_wavelength_range()
 
-    Creates the wavelengths vector covered by the pyrometers_types 
+    Creates the wavelengths vector covered by default pyrometers see [`pyrometers_types`](@ref) 
 """
 function full_wavelength_range()
         #sz = mapreduce(x->length(x),+,pyrometers_types)
@@ -157,7 +164,7 @@ function fit_ϵ(p::Vector{Pyrometer},Treal::Float64,Tmeasured::Vector{Float64})
         Treal - real temperature of the surface, Kelvins
         Tmeasured - temperature measured by the pyrometer, Kelvins
 """
-function fit_ϵ(p::Pyrometer,Tmeasured::Float64,Treal::Float64)
+function fit_ϵ(p::Pyrometer,Tmeasured::Float64,Treal::Float64;optimizer = NelderMead())
         # fits the emssivity of the pyrometer
         # Tmeasured - is the temperature measured by the pyrometer 
         # Treal  - is the real temperature of the surface
@@ -177,7 +184,7 @@ function fit_ϵ(p::Pyrometer,Tmeasured::Float64,Treal::Float64)
            (p,Tmeasured,Treal),
            lb=[0.00],
            ub=[1.0])
-        res = solve(prob,NelderMead())
+        res = solve(prob,optimizer)
         set_emissivity(p,res.u[1])
         return p.ϵ[]
     end

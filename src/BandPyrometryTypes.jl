@@ -317,8 +317,9 @@ struct BandPyrometryPoint{Lx1,Px1,LxP,PxP,LxPm1}
                         polynomial_type::String="stand",
                         I_sur::AbstractVector=[])
 
-    Constructor for band pyrometry fitting, λ - wavelength vector, 
-        initial_x - starting optimization variables 
+    Constructor for band pyrometry fitting, 
+        λ - wavelength vector, 
+        initial_x - starting optimization vector 
         polynomial_type - type of polynomial for emissivity approximation
 """
 BandPyrometryPoint(measured_Intensity::AbstractVector,

@@ -5,20 +5,16 @@ module BandPyrometry
     Optimization,
     OptimizationOptimJL, 
     Interpolations,
-    StaticArrays, #,
-    #Plots,
+    StaticArrays, 
     Polynomials,
-    LegendrePolynomials,
-    PlanckFunctions
-
-    #include("Planck.jl") # brings Planck module
-    include("JDXreader.jl")
+    LegendrePolynomials
+    
+    import PlanckFunctions as Planck
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
     include("Pyrometers.jl") 
     
 
-    export  JDXreader,#JCAMP files reader
-            BandPyrometryPoint,# type for least-square fitting 
+    export  BandPyrometryPoint,# type for least-square fitting 
             EmPoint, # type for BB temperature fitting
             fit_T!,# function to fit the BB and real surface temperature
             Pyrometers, # pyrometers module
