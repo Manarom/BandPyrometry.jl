@@ -2,12 +2,6 @@
 <p>The static version (with no interactive elements) of Pluto notebook with <b>BandPyrometry.jl</b> usage and main ideas description is available at: <a href="../bandpyrometry_test_git.html">bandpyrometry_test_git.html</a>,
 pdf version is available at:<a href="../assets/bandpyrometry_test_git.pdf">bandpyrometry_test_git.pdf</a>
 .</p
-
-
-
-<p>The static version of <b>Planck.jl</b> testing Pluto notebook is available at :<a href="../planck_test_git.html">planck_test_git.html</a>,
-pdf version is available at:<a href="../assets/planck_test_git.pdf">planck_test_git.pdf</a>
-.</p
 ```
 
 
