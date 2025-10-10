@@ -2,4 +2,4 @@ docs/Project.toml
 docs/Manifest.toml
 .vscode
 src/debug_script.jl
-
+/notebooks/*_backup*

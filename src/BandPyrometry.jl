@@ -5,13 +5,11 @@ module BandPyrometry
     Optimization,
     OptimizationOptimJL, 
     Interpolations,
-    StaticArrays, 
-    Polynomials,
-    LegendrePolynomials
+    StaticArrays
     
     import PlanckFunctions as Planck
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
-    include("Pyrometers.jl") 
+    #include("Pyrometers.jl") 
     
 
     export  BandPyrometryPoint,# type for least-square fitting 
@@ -49,11 +47,12 @@ module BandPyrometry
     """
     optimizer_switch(name::String;is_constraint::Bool=false,
                 is_lagrange_constraint::Bool=false)
-    Returns the appropriate optimizer constructor
-    Input:
-        name - the name of th eoptimizer, 
-        is_constraint - is box constraint problem formulation, 
-        is_lagrange_constraint - use Lagrange constraints (supported only by IPNewton)
+
+Returns the appropriate optimizer constructor
+Input:
+    name - the name of th eoptimizer, 
+    is_constraint - is box constraint problem formulation, 
+    is_lagrange_constraint - use Lagrange constraints (supported only by IPNewton)
 """
     function optimizer_switch(name::String;is_constraint::Bool=false,
                 is_lagrange_constraint::Bool=false)
@@ -74,7 +73,7 @@ module BandPyrometry
     """
     box_constraints(bp::BandPyrometryPoint)
 
-    Evaluates box-constraint of the problem
+Evaluates box-constraint of the problem
 """
     function box_constraints(bp::BandPyrometryPoint) 
         # method calculates box constraints 
@@ -89,14 +88,19 @@ module BandPyrometry
     end
     
     """
-        In-place filling of two-elemnt vector of [minimum,maximum] emissivity in the whole 
-        wavelength range  
-        This function is used in the constraints
-        Inputs:
-            constraint_value - (modified)  two-element vector to be modified in-place
-            x - optimization variables vector, x=[a1...an,T], where a1...an - emissivity approximations coefficients, T  - temperature 
-            bp - (modified) 
-    """
+    em_cons!(constraint_value::AbstractArray,
+                            x::AbstractVector, 
+                            bp::BandPyrometryPoint)
+
+
+In-place filling of two-elemnt vector of [minimum,maximum] emissivity in the whole 
+wavelength range  
+This function is used in the constraints
+Inputs:
+    constraint_value - (modified)  two-element vector to be modified in-place
+    x - optimization variables vector, x=[a1...an,T], where a1...an - emissivity approximations coefficients, T  - temperature 
+    bp - (modified) 
+"""
     function em_cons!(constraint_value::AbstractArray,
                             x::AbstractVector, 
                             bp::BandPyrometryPoint)
@@ -110,11 +114,11 @@ module BandPyrometry
     emissivity!(bp::BandPyrometryPoint,x::AbstractVector)
 
 
-    Fills emissivity for the current BandPyrometry point
-    Input:
-        bp - (modified) current spectral band pytometry point
-        x - optimization variables vector, x=[a1...an,T],
-        where a1...an - emissivity approximations coefficients, T  - temperature   
+Fills emissivity for the current BandPyrometry point
+Input:
+    bp - (modified) current spectral band pytometry point
+    x - optimization variables vector, x=[a1...an,T],
+    where a1...an - emissivity approximations coefficients, T  - temperature   
 """
     function emissivity!(bp::BandPyrometryPoint,x::AbstractVector)
         a = @view x[1:end-1] #emissivity approximation variables
@@ -124,11 +128,12 @@ module BandPyrometry
     """
     feval!(bp::BandPyrometryPoint,x::AbstractVector)
 
-    Fills both the emissivity and the thermal emission spectrum for the current BandPyrometry point
-    Input:
-        bp - (modified) current spectral band pytometry point
-        x - optimization variables vector, x=[a1...an,T],
-        where a1...an - emissivity approximations coefficients, T  - temperature
+Fills both the emissivity and the thermal emission spectrum for the current BandPyrometry point
+
+Input:
+    bp - (modified) current spectral band pytometry point
+    x - optimization variables vector, x=[a1...an,T],
+    where a1...an - emissivity approximations coefficients, T  - temperature
 """
     function feval!(bp::BandPyrometryPoint,x::AbstractVector)
         # evaluates residual vector
@@ -147,12 +152,13 @@ module BandPyrometry
     """
     residual!(bp::BandPyrometryPoint,x::AbstractVector)
 
-    Fills emissivity, thermal emission spectrum
-    and evaluates the residuals vector for the current BandPyrometry point
-    Input:
-        bp - (modified) current spectral band pytometry point
-        x - optimization variables vector, x=[a1...an,T],
-        where a1...an - emissivity approximations coefficients, T  - temperature    
+Fills emissivity, thermal emission spectrum and evaluates the residuals vector 
+for the current BandPyrometry point
+
+Input:
+    bp - (modified) current spectral band pytometry point
+    x - optimization variables vector, x=[a1...an,T],
+    where a1...an - emissivity approximations coefficients, T  - temperature    
 """
     function residual!(bp::BandPyrometryPoint,x::AbstractVector)
         feval!(bp,x)   # feval! calculates function value only if current x is not the same as 
@@ -164,12 +170,12 @@ module BandPyrometry
     """
     disc(x::AbstractVector,bp::BandPyrometryPoint)
 
-    Fills emissivity, thermal emission spectrum,evaluates the residuals vector
-    and calculates its norm for the current BandPyrometry point
-    Input:
-        x - optimization variables vector, x=[a1...an,T],
-        where a1...an - emissivity approximations coefficients, T  - temperature 
-        bp - (modified) current spectral band pytometry point
+Fills emissivity, thermal emission spectrum,evaluates the residuals vector
+and calculates its norm for the current BandPyrometry point
+Input:
+    x - optimization variables vector, x=[a1...an,T],
+    where a1...an - emissivity approximations coefficients, T  - temperature 
+    bp - (modified) current spectral band pytometry point
 """
     function  disc(x::AbstractVector,bp::BandPyrometryPoint)
         residual!(bp,x)
@@ -179,11 +185,11 @@ module BandPyrometry
 """
     jacobian!(x::AbstractVector,bp::BandPyrometryPoint)
 
-    Fills the Jacobian matrix for current bandpyrometry point
-    Input:
-        x - optimization variables vector, x=[a1...an,T],
-        where a1...an - emissivity approximations coefficients, T  - temperature
-        bp - (modified, stores Jacobian internally) current spectral band pytometry point 
+Fills the Jacobian matrix for current bandpyrometry point
+Input:
+    x - optimization variables vector, x=[a1...an,T],
+    where a1...an - emissivity approximations coefficients, T  - temperature
+    bp - (modified, stores Jacobian internally) current spectral band pytometry point 
 """
 function jacobian!(x::AbstractVector,bp::BandPyrometryPoint) # evaluates Planck function
         ∇!(x[end],bp.e_p) # refresh Planck function first derivative
@@ -200,13 +206,13 @@ function jacobian!(x::AbstractVector,bp::BandPyrometryPoint) # evaluates Planck 
     """
     grad!(g::AbstractVector,x::AbstractVector,bp::BandPyrometryPoint)
 
-    In-place filling of the gradient vector of BandPyrometryPoint at point x
-    Input:
-        x - optimization variables vector, x=[a1...an,T],
-        where a1...an - emissivity approximations coefficients, T  - temperature
-        bp - (modified, recalculates residual vector and Jacobian if the 
-        currently stored value was obtaibed for another optimization variables array)
-        current spectral band pytometry point     
+In-place filling of the gradient vector of BandPyrometryPoint at point x
+Input:
+    x - optimization variables vector, x=[a1...an,T],
+    where a1...an - emissivity approximations coefficients, T  - temperature
+    bp - (modified, recalculates residual vector and Jacobian if the 
+    currently stored value was obtaibed for another optimization variables array)
+    current spectral band pytometry point     
 """
     function grad!(g::AbstractVector,x::AbstractVector,bp::BandPyrometryPoint)
         residual!(bp,x)
@@ -218,15 +224,16 @@ function jacobian!(x::AbstractVector,bp::BandPyrometryPoint) # evaluates Planck 
     """
     hess_approx!(ha, x::AbstractVector,bp::BandPyrometryPoint)
 
-    In-place filling of the approximate hessian (Hₐ = Jᵀ*J (J - Jacobian)) 
-    of BandPyrometryPoint at point vector x, approximate Hessian can be used 
-    in optimization methods to approximate the full Hessian (e.g. in Gauss-Newton
-    or Levenberg-Marquardt methods)
-    Input:
-        ha - Hessian matrix to be filled in-place
-        x - optimization variables vector, x=[a1...an,T],
-        where a1...an - emissivity approximations coefficients, T  - temperature
-        bp - (modified) current spectral band pytometry point     
+In-place filling of the approximate hessian (Hₐ = Jᵀ*J (J - Jacobian)) 
+of BandPyrometryPoint at point vector x, approximate Hessian can be used 
+in optimization methods to approximate the full Hessian (e.g. in Gauss-Newton
+or Levenberg-Marquardt methods)
+
+Input:
+    ha - Hessian matrix to be filled in-place
+    x - optimization variables vector, x=[a1...an,T],
+    where a1...an - emissivity approximations coefficients, T  - temperature
+    bp - (modified) current spectral band pytometry point     
 """
 function hess_approx!(ha, x::AbstractVector,bp::BandPyrometryPoint)
         # calculates approximate hessian which is Hₐ = Jᵀ*J (J - Jacobian)
@@ -242,12 +249,12 @@ function hess_approx!(ha, x::AbstractVector,bp::BandPyrometryPoint)
     """
     hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
     
-    In-place filling of the whole hessian matrix for BandPyrometryPoint at point x
-    Input:
-        ha - Hessian matrix to be filled in-place
-        x - optimization variables vector, x=[a1...an,T],
-        where a1...an - emissivity approximations coefficients, T  - temperature
-        bp - (modified) current spectral band pytometry point      
+In-place filling of the whole hessian matrix for BandPyrometryPoint at point x
+Input:
+    ha - Hessian matrix to be filled in-place
+    x - optimization variables vector, x=[a1...an,T],
+    where a1...an - emissivity approximations coefficients, T  - temperature
+    bp - (modified) current spectral band pytometry point      
 """
 function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
         if x!=bp.x_hess_vec
@@ -297,8 +304,8 @@ function feval!(e::EmPoint,t::Float64) # fills planck spectrum
 """
     residual!(e::EmPoint,t::Float64)
 
-    Evaluates the residual vector between calculated and measured bb thermal 
-    emission intensity spectrum
+Evaluates the residual vector between calculated and measured bb thermal 
+emission intensity spectrum
 """
 function residual!(e::EmPoint,t::Float64)
         feval!(e,t)
@@ -313,11 +320,11 @@ function residual!(e::EmPoint,t::Float64)
     """
     disc(T,e::EmPoint)
 
-    Evaluates the least-square discrepancy between measured and calculates spectra
-    Input:
-        x - optimization variables vector, x=[a1...an,T],
-        where a1...an - emissivity approximations coefficients, T  - temperature 
-        e - (modified) current bb thermal emission point 
+Evaluates the least-square discrepancy between measured and calculates spectra
+Input:
+    x - optimization variables vector, x=[a1...an,T],
+    where a1...an - emissivity approximations coefficients, T  - temperature 
+    e - (modified) current bb thermal emission point 
 """
 function  disc(T,e::EmPoint)
         residual!(e,T)# fills residuals
@@ -329,10 +336,10 @@ function  disc(T,e::EmPoint)
     """
     ∇!(t::Float64,e::EmPoint)
 
-    Fills the first derivative of Planck function 
-    Input:
-        T  - temperature 
-        e - (modified) current bb thermal emission point   
+Fills the first derivative of Planck function 
+Input:
+    T  - temperature 
+    e - (modified) current bb thermal emission point   
 """
 function ∇!(t::Float64,e::EmPoint) # evaluates Planck function first derivative
         feval!(e,t)# refreshes amat and Ib
@@ -346,11 +353,11 @@ function ∇!(t::Float64,e::EmPoint) # evaluates Planck function first derivativ
     """
     grad!(g::AbstractVector,t::Float64 ,e::EmPoint)
 
-    In-place filling of the gradient of least-square problem of bb thermal emission spectrum fitting 
-    Input:
-        g - gradient vector to be filled
-        t  - temperature 
-        e - (modified) current bb thermal emission ppoint 
+In-place filling of the gradient of least-square problem of bb thermal emission spectrum fitting 
+Input:
+    g - gradient vector to be filled
+    t  - temperature 
+    e - (modified) current bb thermal emission ppoint 
 """
 function grad!(g::AbstractVector,t::Float64 ,e::EmPoint)
         ∇!(t,e)
@@ -367,10 +374,10 @@ function grad!(g::AbstractVector,t::Float64 ,e::EmPoint)
     """
     ∇²!(t::Float64,e::EmPoint)
 
-    Fills the second derivative of Planck function 
-        Input:
-            T  - temperature 
-            e - (modified) current bb thermal emission point  
+Fills the second derivative of Planck function 
+    Input:
+        T  - temperature 
+        e - (modified) current bb thermal emission point  
 """
 function ∇²!(t::Float64,e::EmPoint)
         ∇!(t,e)# refreshes amat and Planck gradient
@@ -384,11 +391,11 @@ function ∇²!(t::Float64,e::EmPoint)
     """
     hess!(h,t::Float64,e::EmPoint)
 
-    In-place filling of least-square problem hessian matrix 
-        Input:
-            h - hessian 
-            T - temperature 
-            e - (modified) current bb thermal emission point  
+In-place filling of least-square problem hessian matrix 
+    Input:
+        h - hessian 
+        T - temperature 
+        e - (modified) current bb thermal emission point  
 """
 function hess!(h,t::Float64,e::EmPoint) # calculates hessian of a simple Planck function fitting
         ∇²!(t,e)
@@ -403,22 +410,23 @@ function hess!(h,t::Float64,e::EmPoint) # calculates hessian of a simple Planck 
         optimizer_name="Default",is_constraint::Bool=false,
         is_lagrange_constraint::Bool=false)
     
-        Input:
-            point - (modified) real suraface (BandPyrometryPoint) of blackbody thermal emission object
-            (optional)
-            optimizer_name - the name of optimizer must be the key of optim_dic
-            is_constraint - is box-constraint flag
-            is_lagrange_constraint - is Lagrange-constraint flag
-        Returns:
-            if the point type is EmPoint, the output is:
-                named tuple with (T - fitted temperature,
-                                    res - optimization output object,
-                                    optimizer - chosen optimizer)
-            if the point is of the BandPyrometryPoint type, the output is:
-                named tuple with (T - fitted temperature ,a - fitted emissivity approximation coefficients,
-                                    ϵ - emissivity spectrum in the whole wavelemgth range,
-                                    res - optimization output object,
-                                    optimizer - chosen optimizer)                
+Input:
+    point - (modified) real suraface (BandPyrometryPoint) of blackbody thermal emission object
+    (optional)
+    optimizer_name - the name of optimizer must be the key of optim_dic
+    is_constraint - is box-constraint flag
+    is_lagrange_constraint - is Lagrange-constraint flag
+
+Returns:
+    if the point type is EmPoint, the output is:
+        named tuple with (T - fitted temperature,
+                            res - optimization output object,
+                            optimizer - chosen optimizer)
+    if the point is of the BandPyrometryPoint type, the output is:
+        named tuple with (T - fitted temperature ,a - fitted emissivity approximation coefficients,
+                            ϵ - emissivity spectrum in the whole wavelemgth range,
+                            res - optimization output object,
+                            optimizer - chosen optimizer)                
 """
 function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
         optimizer_name="Default",is_constraint::Bool=false,
