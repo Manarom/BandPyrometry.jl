@@ -7,21 +7,10 @@
 <p>Detailed description of the underlying mathematics is available at:<a href="assets/supplementary_v_0_0_1.pdf">Download PDF</a>.</p
 ```
 
-- Planck.jl module contains several functions to evaluate: 
-    - Blackbody spectral intensity (Planck function)
-    - The first and the second derivatives of Planck function with respect to the wavelength and temperature 
-    - Planck function fast integration over the specified wavelength region  
-
 - BandPyrometry.jl module provides:
     - EmPoint type formulates the least-square problem to optimize the temperature of blackbody 
     - BandPyrometryPoint type formulates the least-square problem to optimize the temperature and spectral emissivity approximation to the real surface (with emissivity dependent on wavelength) formulates the least-square problem to optimize the temperature of blackbody 
     - Methods to solve the least-square optimization problem using zero,first and second order methods using optimizers provided by Optim.jl package 
-
-- JDXreader.jl module provides:
-    - Function to read files in spectroscopic format (JCAMP-DX=4.24 version) 
-
-- Pyrometers.jl module
-    - Brings Pyrometer type (partial radiation pyrometer)
 
 ## Contact
 

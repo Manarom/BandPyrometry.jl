@@ -2,9 +2,9 @@
 
   This package is based on part of the code that was written for laboratory setup for measuring spectral emissivity. The details of the setup itself are described in the [article](http://dx.doi.org/10.1007/s00340-024-08331-9), the preprint is also [available](http://dx.doi.org/10.21203/rs.3.rs-4766080/v1)  
   
-  This repository codes can be used to process experimentally measured thermal emission spectra of real surfaces, that is, those for which the spectral emissivity depends on the wavelength. In particular, it allows one to calculate the surface temperature of a real object with an unknown emissivity from its thermal radiation intensity (for correct determination of intensity, the measured spectrum should be corrected according to the spectral sensitivity of the receiving system, thats why we need a laboratory setup!). Multiwavelength pyrometry approach is realized in the general module `BandPyrometry.jl`. 
-The package also includes `Planck.jl` module for calculating the blackbody thermal emission intensity (aka Planck function) and its derivatives. 
-And also, two small modules called `JDXreader.jl` and `Pyrometers.jl`. The first one is for reading files in the JCAMP-DX=4.24 format. This format is very quite common in spectroscopy and has a large number of variations, so my module does not pretend to be a fully developed reader for this format, but it worked well for FTIR spectrometer which was available for me. The second one is for partial radiation pyrometers. Several common pyrometers types together with their working spectral ranges are brought together. 
+This repository contains code for processing experimentally measured thermal emission spectra of real surfaces, where the spectral emissivity varies with wavelength. Specifically, it enables the calculation of the surface temperature of an object with unknown emissivity based on its thermal radiation intensity. To ensure accurate intensity determination, the measured spectrum must be corrected according to the spectral sensitivity of the detection system, which requires a laboratory setup. The multiwavelength pyrometry method is implemented in `BandPyrometry.jl` module.
+
+Previously, this package also included  `Planck.jl`, `JDXreader.jl` and `Pyrometers.jl`  modules for calculating the blackbody thermal emission, reading spectroscopic format JCAMP-DX and  virtual partial radiation pyrometers calculator. These packages are now moved to independent repositories [PlanckFunctions.jl](https://github.com/Manarom/PlanckFunctions.jl.git), [JCAMPDXir.jl](https://github.com/Manarom/JCAMPDXir.jl.git) and [RadiationPyrometers.jl](https://github.com/Manarom/RadiationPyrometers.jl.git) respectively.
   
   In `/test` folder there are two [Pluto](https://plutojl.org/) notebooks, which can be used as examples of package usage.
 
@@ -29,5 +29,3 @@ And also, two small modules called `JDXreader.jl` and `Pyrometers.jl`. The first
 
 3c) Enter the package manager in REPL by pressing `]`  then add the package by typing `dev BandPyrometry`
 
-
-This is my first repository on GitHub, so some problems are quite possible, but I hope that these codes will be useful to someone.

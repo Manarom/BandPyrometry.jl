@@ -76,6 +76,19 @@ Structure VanderMatrix has the following fields:
         polynomial at a praticular point. V-matrix is filled by first creating the polynomial 
         obj with only one non-zero polynomial coefficient and then sending the values of xi
         to the created object 
+This type stores the Vandemonde matrix (fundamental matrix of basis functions),
+supports various types of internal polynomials including provided externally
+Structure VanderMatrix has the following fields:
+    v - the matrix itself (each column of this matrix is the value of basis function)
+    x_first -  first element of the initial vector 
+    x_last  -  the last value of the initial vector
+    xi - normalized vector 
+    poly_type  - string of polynomial type name (nothing depends on this name)
+    poly_constructor  - the constructor of the polynomial object, accepts the value of 
+        polynomial coefficients and returns a callable object to evaluate the obtained 
+        polynomial at a praticular point. V-matrix is filled by first creating the polynomial 
+        obj with only one non-zero polynomial coefficient and then sending the values of xi
+        to the created object 
 """
 struct VanderMatrix{MatrixType, PolyWrapper <: AbstractPolyWrapper}
     v::MatrixType # matrix of approximating functions 
@@ -161,7 +174,7 @@ end
 """
     *(V::VanderMatrix,a::AbstractVector)
 
-    VanderMatrix object can be directly multiplyed by a vector
+VanderMatrix object can be directly multiplyed by a vector
 """
 Base.:*(V::VanderMatrix,a::AbstractVector) =V.v*a 
 """
@@ -195,6 +208,9 @@ end
 Makes all elements of vector x to fit in range -1...1
 returns normalized vector , xmin and xmax values
 All elements of x must be unique
+Makes all elements of vector x to fit in range -1...1
+returns normalized vector , xmin and xmax values
+All elements of x must be unique
 
 """
 function normalize_x(x::AbstractVector)
@@ -224,14 +240,13 @@ denormalize_x(V::VanderMatrix) = denormalize_x(V.xi, V.x_first,V.x_last)
 #function 
 """
 EmPoint type stores data on thermal emission spectrum and its 
-first and second derivatives
-    it also stores "Measurements " vector which further can be fitted? it also provides the constructor
-    EmPoint(I_measured,λ) -  I_measured is a measured spectrum
-                          -  λ - wavelength vector (in μm)
+first and second derivatives it also stores "Measurements " vector 
+which further can be fitted? it also provides the constructor
+EmPoint(I_measured,λ) -  I_measured is a measured spectrum
+                      -  λ - wavelength vector (in μm)
 
 """
 struct EmPoint{VectType,AmatType} 
-
     I_measured :: VectType#MVector{N,Float64}# data to fit
     λ:: VectType #MVector{N,Float64}  # wavelength vector (it is constant during the optimization)
     Ib::VectType#MVector{N,Float64} # Planck function values vector ????
@@ -251,10 +266,10 @@ struct EmPoint{VectType,AmatType}
     """
     EmPoint(I_measured::AbstractVector,λ::AbstractVector)
 
-    Constructor of the EmPoint object instance
-    Input: 
-        I_measured - mesured blackbody spectral intensity
-        λ - wavelength in μm
+Constructor of the EmPoint object instance
+Input: 
+    I_measured - mesured blackbody spectral intensity
+    λ - wavelength in μm
 """
 function EmPoint(I_measured::AbstractVector,λ::AbstractVector)
 
@@ -286,16 +301,16 @@ function triplicate_columns(a::AbstractVector,T)
     return T(repeat(a,1,3))
 end
 """
-        BandPyrometryPoint type stores data of thermal emission spectrum of a real body with 
-        emissivity polynomial approximation, and  its first and second derivatives
-        it also stores "measurements" vector which further can be fitted, it also 
-        provides the constructor BandPyrometryPoint(I_measured,λ,initial_x,polynomial_type) 
-        where:
-            -  I_measured is a measured spectrum
-            -  λ - wavelength vector (in μm)
-            - initial_x - starting parameters vector (initial_x[end] - starting temperature,
-                x[1:end-1] - emissivity approximation coefficients)
-            - polynomial_type - string of polynomial (this value governs the Vandermonde matrix form)
+    BandPyrometryPoint type stores data of thermal emission spectrum of a real body with 
+emissivity polynomial approximation, and  its first and second derivatives
+it also stores "measurements" vector which further can be fitted, it also 
+provides the constructor BandPyrometryPoint(I_measured,λ,initial_x,polynomial_type) 
+where:
+    -  I_measured is a measured spectrum
+    -  λ - wavelength vector (in μm)
+    - initial_x - starting parameters vector (initial_x[end] - starting temperature,
+        x[1:end-1] - emissivity approximation coefficients)
+    - polynomial_type - string of polynomial (this value governs the Vandermonde matrix form)
                       
 """
 struct BandPyrometryPoint{Lx1,Px1,LxP,PxP,LxPm1} 
@@ -326,10 +341,10 @@ struct BandPyrometryPoint{Lx1,Px1,LxP,PxP,LxPm1}
                         polynomial_type::String="stand",
                         I_sur::AbstractVector=[])
 
-    Constructor for band pyrometry fitting, 
-        λ - wavelength vector, 
-        initial_x - starting optimization vector 
-        polynomial_type - type of polynomial for emissivity approximation
+Constructor for band pyrometry fitting, 
+    λ - wavelength vector, 
+    initial_x - starting optimization vector 
+    polynomial_type - type of polynomial for emissivity approximation
 """
 function BandPyrometryPoint(measured_Intensity::AbstractVector,
                         λ::AbstractVector,
