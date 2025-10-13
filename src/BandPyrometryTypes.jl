@@ -32,7 +32,7 @@ function eval_poly(::TrigPolyWrapper,degree,x)
      if degree==0
         return 1
      end  
-     n = floor(degree/2) 
+     n = 1 + floor(degree/2) 
      if isodd(degree)
         return sin(n*pi*x)
      else
@@ -117,7 +117,8 @@ Input:
 """
 function VanderMatrix(x::AbstractVector;
                     poly_degree::Int,
-                    poly_type::Symbol = :stand
+                    poly_type::Symbol = :stand,
+                    use_static::Union{Bool,Nothing} = nothing
                     ) 
 
                     @assert issorted(x) "The x-vector must be sorted in ascending order"
@@ -127,8 +128,6 @@ function VanderMatrix(x::AbstractVector;
                     
                     PolyWrapper = SUPPORTED_POLYNOMIAL_TYPES[poly_type]
                     L = length(x) # number of rows
-                    
-
                     col_number = poly_degree + 1 # number of columns
                     (xi,x_first,x_last) = normalize_x(x)
                     V = repeat(xi,1,col_number) #firts column is always zero
@@ -139,11 +138,16 @@ function VanderMatrix(x::AbstractVector;
                         @. col = poly_obj(xi)
                         poly_obj.coeffs[i] = 0.0
                     end  
-                    MatrixType=SMatrix{L,poly_degree+1,Float64,L*(poly_degree+1)}
-                    _V = MatrixType(V)
-                    (Q,R) = qr(_V)
-                    
-                    new{MatrixType,PolyWrapper}(_V,# Vandermonde matrix
+                    total_elements_number = L*(poly_degree + 1) #number of elements in vandermatrix
+                    use_static = !isnothing(use_static) ? use_static :  total_elements_number < 100
+                    _V = use_static ? SMatrix{L, col_number}(V) : V 
+                    if use_static
+                        (Q,R) = qr(_V)
+                    else
+                        F = qr(_V)
+                        (Q,R) = (Matrix(F.Q),F.R)
+                    end
+                    new{typeof(_V),PolyWrapper}(_V,# Vandermonde matrix
                         Q,
                         R,
                         x_first, # first element of the initial array
@@ -166,8 +170,8 @@ function is_the_same_x(v::VanderMatrix,x::AbstractVector)
     v.x_first == x_f || return false
     x_l = last(x)
     v.x_last == x_l || return false
-    for i in 1:L
-        v.xi[i] == x[i] || return false
+    for i in 1:L 
+        x[i] == denormalize_x(V.xi[i], x_f, x_l)  || return false
     end
     return true
 end
@@ -233,10 +237,10 @@ end
 
 Creates normal vector from one created with [`normalize_x`](@ref)` function 
 """
-function denormalize_x(normalized_x::AbstractVector, x_min,x_max)
-    return 0.5*(normalized_x .+ 1.0)*(x_max - x_min) .+ x_min
+function denormalize_x(normalized_x::Number, x_min, x_max)
+    return 0.5*(normalized_x + 1.0)*(x_max - x_min) + x_min
 end
-denormalize_x(V::VanderMatrix) = denormalize_x(V.xi, V.x_first,V.x_last)
+denormalize_x(V::VanderMatrix) = denormalize_x.(V.xi, V.x_first,V.x_last)
 #function 
 """
 EmPoint type stores data on thermal emission spectrum and its 
