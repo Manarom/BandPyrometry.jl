@@ -1,21 +1,21 @@
 using LinearAlgebra,Interpolations,Polynomials,LegendrePolynomials,StaticArrays
 # BandPyrometryTypes should be included in the BandPyrometry module
 
-abstract type AbstractPolyWrapper end
+abstract type AbstractPolyWrapper{P} end
 
-struct TrigPolyWrapper <: AbstractPolyWrapper
-    coeffs::AbstractVector
+struct TrigPolyWrapper{P} <: AbstractPolyWrapper{P}
+    coeffs::MVector{P,Float64}
 end
-struct LegPolyWrapper <: AbstractPolyWrapper
-    coeffs::AbstractVector
+struct LegPolyWrapper{P}  <: AbstractPolyWrapper{P}
+    coeffs::MVector{P,Float64}
 end
-struct StandPolyWrapper <: AbstractPolyWrapper 
-    coeffs::AbstractVector
+struct StandPolyWrapper{P}  <: AbstractPolyWrapper{P} 
+    coeffs::MVector{P,Float64}
 end
-struct ChebPolyWrapper <: AbstractPolyWrapper
-    coeffs::AbstractVector
+struct ChebPolyWrapper{P}  <: AbstractPolyWrapper{P}
+    coeffs::MVector{P,Float64}
 end
-
+(::Type{T})(x::Vector) where T<:AbstractPolyWrapper = T{length(x)}(MVector{length(x)}(x))
 const SUPPORTED_POLYNOMIAL_TYPES = Base.ImmutableDict(
                 :stand=> StandPolyWrapper,#Standard basis polynomials from Polynomials.Polynomial,
                 :chebT=> ChebPolyWrapper,# Chebyshev polynomials from Polynomials.ChebyshevT,
@@ -90,17 +90,17 @@ Structure VanderMatrix has the following fields:
         obj with only one non-zero polynomial coefficient and then sending the values of xi
         to the created object 
 """
-struct VanderMatrix{MatrixType, PolyWrapper <: AbstractPolyWrapper}
-    v::MatrixType # matrix of approximating functions 
+struct VanderMatrix{M <: SMatrix , R <: SMatrix, V <: SVector}
+    v::M # matrix of approximating functions 
+    v_unnorm::M # unnormalized vandermatrix used to convert fitted parameters if necessarys
     # QR factorization matrices
-    Q 
-    R 
+    Q::M 
+    R::R
     x_first::Float64 # first element of the initial array
     x_last::Float64 # normalizing coefficient 
-    xi::AbstractArray # normalized vector 
-    poly_type::Symbol # polynomial type 
-    poly_constructor::PolyWrapper # producing function must return the polynomial object which is callable with x input
-    # the inintial xi array is normalized in a wy that all points are within -1...1
+    xi::V # normalized vector 
+    poly_type::Symbol
+end# struct spec
 
 """
     VanderMatrix(x::AbstractVector;
@@ -115,63 +115,68 @@ Input:
     poly_type - polynomial type name, must be member of SUPPORTED_POLYNOMIAL_TYPES
 
 """
-function VanderMatrix(x::AbstractVector;
-                    poly_degree::Int,
-                    poly_type::Symbol = :stand,
-                    use_static::Union{Bool,Nothing} = nothing
-                    ) 
+function VanderMatrix(x::SVector{L},
+                      ::Val{CN};
+                      poly_type::Symbol = :stand,
+                    ) where {L,CN}
 
-                    @assert issorted(x) "The x-vector must be sorted in ascending order"
-                    @assert allunique(x) "All x-values must be unique"
-                    @assert poly_degree>=0 "Degree of polynomial must be greater or equal zero"
-                    @assert haskey(SUPPORTED_POLYNOMIAL_TYPES,poly_type) "Polynomial type must be member of $(keys(SUPPORTED_POLYNOMIAL_TYPES))"# polynomial must be of supported type
-                    
-                    PolyWrapper = SUPPORTED_POLYNOMIAL_TYPES[poly_type]
-                    L = length(x) # number of rows
-                    col_number = poly_degree + 1 # number of columns
-                    (xi,x_first,x_last) = normalize_x(x)
-                    V = repeat(xi,1,col_number) #firts column is always zero
-                    VW = @views eachcol(V)
-                    poly_obj = PolyWrapper(zeros(col_number))
-                    for (i,col) ∈ enumerate(VW)
-                        poly_obj.coeffs[i] = 1.0                              
-                        @. col = poly_obj(xi)
-                        poly_obj.coeffs[i] = 0.0
-                    end  
-                    total_elements_number = L*(poly_degree + 1) #number of elements in vandermatrix
-                    use_static = !isnothing(use_static) ? use_static :  total_elements_number < 100
-                    _V = use_static ? SMatrix{L, col_number}(V) : V 
-                    if use_static
-                        (Q,R) = qr(_V)
-                    else
-                        F = qr(_V)
-                        (Q,R) = (Matrix(F.Q),F.R)
-                    end
-                    new{typeof(_V),PolyWrapper}(_V,# Vandermonde matrix
-                        Q,
-                        R,
-                        x_first, # first element of the initial array
-                        x_last, # normalizing coefficient 
-                        xi,
-                        poly_type, # polynomial type 
-                        poly_obj #   
-                    )
-            end
-end# struct spec
+            @assert issorted(x) "The x-vector must be sorted in ascending order"
+            @assert allunique(x) "All x-values must be unique"
+            # @assert P >= 0 "Degree of polynomial must be greater or equal zero"
+            @assert haskey(SUPPORTED_POLYNOMIAL_TYPES,poly_type) "Polynomial type must be member of $(keys(SUPPORTED_POLYNOMIAL_TYPES))"# polynomial must be of supported type
+            
+            PolyWrapper = SUPPORTED_POLYNOMIAL_TYPES[poly_type]
+            # CN = P + 1 # number of columns
+            (_xi,x_first,x_last) = normalize_x(x)
+           
+            V = Matrix{Float64}(undef,L,CN) 
+            Vunnorm = Matrix{Float64}(undef,L,CN)  
+            poly_obj = PolyWrapper(zeros(CN))
+            _fill_vander!(V, poly_obj,_xi)
+            _fill_vander!(Vunnorm, poly_obj,x)
+
+            MatrixType  = SMatrix{L, CN, Float64, L*CN}
+            RMatrixType = SMatrix{CN, CN, Float64, CN * CN}
+            VectorType = SVector{L,Float64}
+
+            _V = MatrixType(V)
+            (Q,R) = qr(_V)
+            # {MatrixType,RMatrixType,VectorType,PolyWrapper}
+            VanderMatrix{MatrixType,RMatrixType,VectorType}(_V,# Vandermonde matrix
+                MatrixType(Vunnorm), #unnormalized vandermatrix
+                MatrixType(Q),
+                RMatrixType(R),
+                x_first, # first element of the initial array
+                x_last, # normalizing coefficient 
+                VectorType(_xi),  
+                poly_type
+            )
+end
+
+
+function _fill_vander!(V, poly_obj::AbstractPolyWrapper,xi)
+    VW = @views eachcol(V)
+    for (i,col) ∈ enumerate(VW)
+        poly_obj.coeffs[i] = 1.0                              
+        @. col = poly_obj(xi)
+        poly_obj.coeffs[i] = 0.0
+    end  
+    return poly_obj
+end
 """
     is_the_same_x(v::VanderMatrix,x::AbstractVector)
 
 Checks if input `x` is the same as the one used for VanderMatrix creation
 """
-function is_the_same_x(v::VanderMatrix,x::AbstractVector) 
+function is_the_same_x(vander::VanderMatrix,x::AbstractVector) 
     L = length(x)
-    (L == length(v.xi) && issorted(x) ) || return false
+    (L == length(vander.xi) && issorted(x) ) || return false
     x_f = first(x)
-    v.x_first == x_f || return false
+    vander.x_first == x_f || return false
     x_l = last(x)
-    v.x_last == x_l || return false
+    vander.x_last == x_l || return false
     for i in 1:L 
-        x[i] == denormalize_x(V.xi[i], x_f, x_l)  || return false
+        x[i] == denormalize_x(vander.xi[i], x_f, x_l)  || return false
     end
     return true
 end
@@ -193,17 +198,12 @@ Input:
 returns tuple with vector of polynomial coefficints, values of y_fitted at x points
 and the norm of goodness of fit     
 """
-function polyfit(V::VanderMatrix,x::T,y::T) where T<:AbstractVector
-    if !is_the_same_x(V,x)
-        #(xi_converted,x_min,x_max) = normalize_x(x)
-        yi = linear_interpolation(x,y)(denormalize_x(V)) 
-    else
-        yi = copy(y)
-    end
+function polyfit(V::VanderMatrix,x::T,y::T; normalized_x::Bool = true) where T<:AbstractVector
+    yi =  !is_the_same_x(V,x) ? linear_interpolation(x,y)(denormalize_x(V)) : copy(y)
     a = V.R\(transpose(V.Q)*yi) # calculating pseudo-inverse
     y_fit = V*a
     goodness_fit = norm(yi .- y_fit)
-    return  (a,y_fit,goodness_fit)
+    return  normalized_x ? (a, y_fit, goodness_fit) : (V.v_unnorm\(V*a), y_fit, goodness_fit)
 end
 
 """
@@ -219,17 +219,13 @@ All elements of x must be unique
 """
 function normalize_x(x::AbstractVector)
     @assert allunique(x) "All elements of input vector must be unique"
+    _x = !issorted(x) ? sort(x) : x
 
-    if !issorted(x)
-        xi_converted = sort(x)
-    else
-        xi_converted = copy(x)
-    end
-    x_min = xi_converted[1]
-    x_max = xi_converted[end]
+    x_min = _x[1]
+    x_max = _x[end]
     a = 2.0/(x_max - x_min)
-    @. xi_converted  = a*(xi_converted - x_min) - 1.0
-    return (xi_converted,x_min,x_max)
+    xi_converted  = @. a*(_x - x_min) - 1.0
+    return (xi_converted ,x_min,x_max)
 end
 
 """
@@ -240,7 +236,7 @@ Creates normal vector from one created with [`normalize_x`](@ref)` function
 function denormalize_x(normalized_x::Number, x_min, x_max)
     return 0.5*(normalized_x + 1.0)*(x_max - x_min) + x_min
 end
-denormalize_x(V::VanderMatrix) = denormalize_x.(V.xi, V.x_first,V.x_last)
+denormalize_x(V::VanderMatrix) = Vector(denormalize_x.(V.xi, V.x_first,V.x_last))
 #function 
 """
 EmPoint type stores data on thermal emission spectrum and its 
