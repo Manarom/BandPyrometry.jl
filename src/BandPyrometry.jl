@@ -10,7 +10,7 @@ module BandPyrometry
     import PlanckFunctions as Planck
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
     #include("Pyrometers.jl") 
-    
+    const NPOINT = 30
 
     export  BandPyrometryPoint,# type for least-square fitting 
             EmPoint, # type for BB temperature fitting
@@ -41,6 +41,7 @@ module BandPyrometry
                             "Default"=>NelderMead,
                             "LBFGS"=>LBFGS,
                             "IPNewton"=>IPNewton) # list of supported optimizers
+    const DEFAULT_OPTIMIZER = Ref(LBFGS())
     """
     Optimizers supporting box-constraint optimization
     """                        
@@ -52,6 +53,7 @@ module BandPyrometry
     Optimizer supporting lagrangian-constraint optimization
     """                                        
     const support_lagrange_constraints = ["IPNewton"]
+
     """
     optimizer_switch(name::String;is_constraint::Bool=false,
                 is_lagrange_constraint::Bool=false)
@@ -436,8 +438,8 @@ Fills the second derivative of Planck function
 """
 function ∇²!(t::Float64,e::EmPoint)
         ∇!(t,e)# refreshes amat and Planck gradient
-        if t!=e.T∇²ib[]
-           Planck.∇²ₜibb!(e.∇²I,t,e.amat,e.∇I) 
+        if t != e.T∇²ib[]
+           Planck.∇²ₜibb!(e.∇²I, t, e.amat, e.∇I) 
            e.T∇²ib[] = t # ref value
         end
         return e.∇²I
@@ -465,6 +467,10 @@ function hess!(h,t::Float64,e::EmPoint) # calculates hessian of a simple Planck 
         end
         return nothing
     end
+
+
+    const LAGRANGE_OPTIM_FUN = OptimizationFunction(disc,grad=grad!,hess=hess!,cons=em_cons!)
+    const OPTIM_FUN  = OptimizationFunction(disc,grad=grad!,hess=hess!) 
     """
     fit_T!(point::Union{EmPoint,BandPyrometryPoint};
         optimizer_name="Default",is_constraint::Bool=false,
@@ -505,16 +511,17 @@ Returns:
                             optimizer - chosen optimizer)                
 """
 function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
-        optimizer_name="Default",is_constraint::Bool=false,
-        is_lagrange_constraint::Bool=false)
-        optimizer = optimizer_switch(optimizer_name,
+            optimizer_name::String="Default",
+            is_constraint::Bool=false,
+            is_lagrange_constraint::Bool=false)
+            
+            !(optimizer_name == "Default" && is_constraint && is_lagrange_constraint) || return fitT_default(point)
+
+
+            optimizer = optimizer_switch(optimizer_name,
                                     is_constraint = is_constraint,
                                     is_lagrange_constraint = is_lagrange_constraint)
-        if is_lagrange_constraint
-            fun=OptimizationFunction(disc,grad=grad!,hess=hess!,cons=em_cons!)
-        else
-            fun=OptimizationFunction(disc,grad=grad!,hess=hess!) 
-        end
+        fun = is_lagrange_constraint ? LAGRANGE_OPTIM_FUN : OPTIM_FUN
         # by default all derivatives are supported
         if point isa EmPoint
             starting_vector = MVector{1}([235.0])
@@ -538,13 +545,26 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
                                 point)           
         end
         results = solve(probl,optimizer())
-
+        feval!(point,results.u)
         return  point isa BandPyrometryPoint ? 
-                        (T=results.u[end],a=results.u[1:end-1],
+                        (T=temperature(point),a=results.u[1:end-1],
                         ϵ=point.vandermonde*results.u[1:end-1],
                         res=results,
                         optimizer=optimizer) :
-                        (T=results.u[end],res=results,optimizer=optimizer)
+                        (T=temperature(point), res=results, optimizer=optimizer)
+    end
+    function fitT_default(point::EmPoint)
+        probl= OptimizationProblem(OPTIM_FUN, MVector{1}([235.0]))
+        results = solve(probl,DEFAULT_OPTIMIZER[])   
+        feval!(point,results.u)
+        return (T=temperature(point), res=results, optimizer=DEFAULT_OPTIMIZER[])                 
+    end
+    function (emp::EmPoint{N})(I::Union{SVector{N},MVector{N}}) where N 
+        copyto!(emp.I_measured,I)
+        return fit_T!(emp).T
+    end
+    function (emp::EmPoint)()
+        return fit_T!(emp).T
     end
 end
 

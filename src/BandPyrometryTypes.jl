@@ -1,21 +1,24 @@
 using LinearAlgebra,Interpolations,Polynomials,LegendrePolynomials,StaticArrays
 # BandPyrometryTypes should be included in the BandPyrometry module
 
-abstract type AbstractPolyWrapper{P} end
+abstract type AbstractPolyWrapper{P,V} end
 
-struct TrigPolyWrapper{P} <: AbstractPolyWrapper{P}
+struct TrigPolyWrapper{P} <: AbstractPolyWrapper{P,Val{:trig}}
     coeffs::MVector{P,Float64}
 end
-struct LegPolyWrapper{P}  <: AbstractPolyWrapper{P}
+struct LegPolyWrapper{P}  <: AbstractPolyWrapper{P,Val{:leg}}
     coeffs::MVector{P,Float64}
 end
-struct StandPolyWrapper{P}  <: AbstractPolyWrapper{P} 
+struct StandPolyWrapper{P}  <: AbstractPolyWrapper{P,Val{:stand}} 
     coeffs::MVector{P,Float64}
 end
-struct ChebPolyWrapper{P}  <: AbstractPolyWrapper{P}
+struct ChebPolyWrapper{P}  <: AbstractPolyWrapper{P,Val{:chebT}}
     coeffs::MVector{P,Float64}
 end
+
 (::Type{T})(x::Vector) where T<:AbstractPolyWrapper = T{length(x)}(MVector{length(x)}(x))
+name(::AbstractPolyWrapper{N,V}) where {N,V} = V
+
 const SUPPORTED_POLYNOMIAL_TYPES = Base.ImmutableDict(
                 :stand=> StandPolyWrapper,#Standard basis polynomials from Polynomials.Polynomial,
                 :chebT=> ChebPolyWrapper,# Chebyshev polynomials from Polynomials.ChebyshevT,
@@ -61,88 +64,71 @@ function (poly::Union{LegPolyWrapper,TrigPolyWrapper})(x::Number)
     return res
 end
 """
-    VanderMatrix(λ,polynomial_degree,MatrixType,polynomial_type)
+    VanderMatrix{M <: SMatrix , R <: SMatrix, V <: SVector}
     
 This type stores the Vandemonde matrix (fundamental matrix of basis functions),
-supports various types of internal polynomials including provided externally
+supports various types of internal polynomials 
 Structure VanderMatrix has the following fields:
     v - the matrix itself (each column of this matrix is the value of basis function)
+    v_unnorm - version of matrix with unnormalized basis vectors (used for annormalized coefficients of polynomial fitting)
     x_first -  first element of the initial vector 
     x_last  -  the last value of the initial vector
     xi - normalized vector 
-    poly_type  - string of polynomial type name (nothing depends on this name)
-    poly_constructor  - the constructor of the polynomial object, accepts the value of 
-        polynomial coefficients and returns a callable object to evaluate the obtained 
-        polynomial at a praticular point. V-matrix is filled by first creating the polynomial 
-        obj with only one non-zero polynomial coefficient and then sending the values of xi
-        to the created object 
-This type stores the Vandemonde matrix (fundamental matrix of basis functions),
-supports various types of internal polynomials including provided externally
-Structure VanderMatrix has the following fields:
-    v - the matrix itself (each column of this matrix is the value of basis function)
-    x_first -  first element of the initial vector 
-    x_last  -  the last value of the initial vector
-    xi - normalized vector 
-    poly_type  - string of polynomial type name (nothing depends on this name)
-    poly_constructor  - the constructor of the polynomial object, accepts the value of 
-        polynomial coefficients and returns a callable object to evaluate the obtained 
-        polynomial at a praticular point. V-matrix is filled by first creating the polynomial 
-        obj with only one non-zero polynomial coefficient and then sending the values of xi
-        to the created object 
+    poly_type  - polynomial type name (nothing depends on this name)
 """
-struct VanderMatrix{M <: SMatrix , R <: SMatrix, V <: SVector}
-    v::M # matrix of approximating functions 
-    v_unnorm::M # unnormalized vandermatrix used to convert fitted parameters if necessarys
+struct VanderMatrix{N,CN,T,NCN,CNCN} #M <: SMatrix , R <: SMatrix, V <: SVector}
+    v::SMatrix{N,CN,T,NCN} # matrix of approximating functions 
+    v_unnorm::SMatrix{N,CN,T,NCN} # unnormalized vandermatrix used to convert fitted parameters if necessarys
     # QR factorization matrices
-    Q::M 
-    R::R
-    x_first::Float64 # first element of the initial array
-    x_last::Float64 # normalizing coefficient 
-    xi::V # normalized vector 
+    Q::SMatrix{N,CN,T,NCN} 
+    R::SMatrix{CN,CN,T,CNCN}
+    x_first::T # first element of the initial array
+    x_last::T # normalizing coefficient 
+    xi::SVector{N,T} # normalized vector-column 
     poly_type::Symbol
 end# struct spec
 
 """
-    VanderMatrix(x::AbstractVector;
-                    poly_degree::Int,
-                    poly_type::Symbol = :stand)
+    VanderMatrix(x::StaticArray{Tuple{N},T,1},
+                      ::Val{CN};
+                      poly_type::Symbol = :stand,
+                    ) where {N,CN,T}
 
 Input: 
     x  - vector of independent variables (coordinates)
-    poly_degree - degree of polynomial starting from zero, 
-        (e.g. for standard basis constant value poly_degree=0)
-        the number of V-matrix columns is poly_degree + 1
+    Val(CN) - vandermatrix column size (degree of polynomial + 1)
     poly_type - polynomial type name, must be member of SUPPORTED_POLYNOMIAL_TYPES
 
 """
-function VanderMatrix(x::SVector{L},
+function VanderMatrix(x::StaticArray{Tuple{N},T,1},
                       ::Val{CN};
                       poly_type::Symbol = :stand,
-                    ) where {L,CN}
+                    ) where {N,CN,T}
 
             @assert issorted(x) "The x-vector must be sorted in ascending order"
             @assert allunique(x) "All x-values must be unique"
-            # @assert P >= 0 "Degree of polynomial must be greater or equal zero"
+            #@assert P >= 0 "Degree of polynomial must be greater or equal zero"
             @assert haskey(SUPPORTED_POLYNOMIAL_TYPES,poly_type) "Polynomial type must be member of $(keys(SUPPORTED_POLYNOMIAL_TYPES))"# polynomial must be of supported type
             
             PolyWrapper = SUPPORTED_POLYNOMIAL_TYPES[poly_type]
             # CN = P + 1 # number of columns
             (_xi,x_first,x_last) = normalize_x(x)
            
-            V = Matrix{Float64}(undef,L,CN) 
-            Vunnorm = Matrix{Float64}(undef,L,CN)  
-            poly_obj = PolyWrapper(zeros(CN))
+            V = Matrix{T}(undef,N,CN) 
+            Vunnorm = Matrix{T}(undef,N,CN)  # T{length(x)}(MVector{length(x)}(x))
+            poly_obj = PolyWrapper{CN}(MVector{CN}(zeros(CN)))
             _fill_vander!(V, poly_obj,_xi)
             _fill_vander!(Vunnorm, poly_obj,x)
-
-            MatrixType  = SMatrix{L, CN, Float64, L*CN}
-            RMatrixType = SMatrix{CN, CN, Float64, CN * CN}
-            VectorType = SVector{L,Float64}
+            NCN =  N*CN     
+            MatrixType  = SMatrix{N, CN, T,NCN}
+            CNCN =  CN * CN
+            RMatrixType = SMatrix{CN, CN, T,CNCN}
+            VectorType = SVector{N,T}
 
             _V = MatrixType(V)
             (Q,R) = qr(_V)
             # {MatrixType,RMatrixType,VectorType,PolyWrapper}
-            VanderMatrix{MatrixType,RMatrixType,VectorType}(_V,# Vandermonde matrix
+            VanderMatrix{N,CN,T,NCN,CNCN}(_V,# Vandermonde matrix
                 MatrixType(Vunnorm), #unnormalized vandermatrix
                 MatrixType(Q),
                 RMatrixType(R),
@@ -153,7 +139,12 @@ function VanderMatrix(x::SVector{L},
             )
 end
 
+"""
+    _fill_vander!(V, poly_obj::AbstractPolyWrapper,xi)
 
+Function to fill the matrix V columns from polynomial basis functions constructor
+with argument vector xi 
+"""
 function _fill_vander!(V, poly_obj::AbstractPolyWrapper,xi)
     VW = @views eachcol(V)
     for (i,col) ∈ enumerate(VW)
@@ -168,14 +159,13 @@ end
 
 Checks if input `x` is the same as the one used for VanderMatrix creation
 """
-function is_the_same_x(vander::VanderMatrix,x::AbstractVector) 
-    L = length(x)
-    (L == length(vander.xi) && issorted(x) ) || return false
+function is_the_same_x(vander::VanderMatrix{N,CN,T},x::AbstractVector{T}) where {N,CN,T}
+    (length(x) == N && issorted(x) ) || return false
     x_f = first(x)
     vander.x_first == x_f || return false
     x_l = last(x)
     vander.x_last == x_l || return false
-    for i in 1:L 
+    for i in 1:N 
         x[i] == denormalize_x(vander.xi[i], x_f, x_l)  || return false
     end
     return true
@@ -198,14 +188,22 @@ Input:
 returns tuple with vector of polynomial coefficints, values of y_fitted at x points
 and the norm of goodness of fit     
 """
-function polyfit(V::VanderMatrix,x::T,y::T; normalized_x::Bool = true) where T<:AbstractVector
+function polyfit(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
     yi =  !is_the_same_x(V,x) ? linear_interpolation(x,y)(denormalize_x(V)) : copy(y)
-    a = V.R\(transpose(V.Q)*yi) # calculating pseudo-inverse
+    a =SVector{CN,T}(V.R\(transpose(V.Q)*yi)) # calculating pseudo-inverse
     y_fit = V*a
     goodness_fit = norm(yi .- y_fit)
-    return  normalized_x ? (a, y_fit, goodness_fit) : (V.v_unnorm\(V*a), y_fit, goodness_fit)
+    return  (a, y_fit, goodness_fit) 
 end
-
+function polyfitn(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
+    yi =  !is_the_same_x(V,x) ? linear_interpolation(x,y)(denormalize_x(V)) : copy(y)
+    a =SVector{CN,T}(V.R\(transpose(V.Q)*yi)) # calculating pseudo-inverse
+    y_fit = V.v_unnorm\(V*a)
+    goodness_fit = norm(yi .- y_fit)
+    return  (a, y_fit, goodness_fit) 
+    #normalized_x::Bool = true: 
+    #(V.v_unnorm\(V*a), y_fit, goodness_fit)
+end
 """
     normalize_x(x::AbstractVector)
 
@@ -246,23 +244,22 @@ EmPoint(I_measured,λ) -  I_measured is a measured spectrum
                       -  λ - wavelength vector (in μm)
 
 """
-struct EmPoint{VectType,AmatType} 
-    I_measured :: VectType#MVector{N,Float64}# data to fit
-    λ:: VectType #MVector{N,Float64}  # wavelength vector (it is constant during the optimization)
-    Ib::VectType#MVector{N,Float64} # Planck function values vector ????
-    ri::VectType#MVector{N,Float64} # residual vector
-    r::Base.RefValue{Float64} # discrepancy value
-    ∇I::VectType#MVector{N,Float64} # first derivative value
-    ∇²I::VectType#MVector{N,Float64} # second derivative vector
-    amat::AmatType#MMatrix{N,3,Float64,L} # intermediate private data used to speed up the planck function evaluation
+struct EmPoint{N,NNN,T} 
+    I_measured::MVector{N,T}# data to fit
+    λ:: SVector{N,T}  # wavelength vector (it is constant during the optimization)
+    Ib::MVector{N,T} # Planck function values vector ????
+    ri::MVector{N,T} # residual vector
+    r::Base.RefValue{T} # discrepancy value
+    ∇I::MVector{N,T} # first derivative value
+    ∇²I::MVector{N,T} # second derivative vector
+    amat::MMatrix{N,3,T,NNN} # intermediate private data used to speed up the planck function evaluation
     # temperatures of:
-    Tib::Base.RefValue{Float64} # Planck intensity  
-    Tri::Base.RefValue{Float64} # Residual vector  
-    T∇ib::Base.RefValue{Float64} # Planck derivative  
-    Tgrad::Base.RefValue{Float64} # Gradient of emission discrepancy function 
-    T∇²ib::Base.RefValue{Float64} # Planck function second derivative 
-    Thess::Base.RefValue{Float64} # Discrepancy function second derivative
-    points_number::Int64 # number of points in wavelength
+    Tib::Base.RefValue{T} # Planck intensity  
+    Tri::Base.RefValue{T} # Residual vector  
+    T∇ib::Base.RefValue{T} # Planck derivative  
+    Tgrad::Base.RefValue{T} # Gradient of emission discrepancy function 
+    T∇²ib::Base.RefValue{T} # Planck function second derivative 
+    Thess::Base.RefValue{T} # Discrepancy function second derivative
     """
     EmPoint(I_measured::AbstractVector,λ::AbstractVector)
 
@@ -271,32 +268,33 @@ Input:
     I_measured - mesured blackbody spectral intensity
     λ - wavelength in μm
 """
-function EmPoint(I_measured::AbstractVector,λ::AbstractVector)
+function EmPoint(I_measured::StaticArray{Tuple{N},T,1},λ::StaticArray{Tuple{N},T,1}) where {N,T}
 
-       points_number = length(λ)
-       VectType = MVector{points_number,Float64}
-       MatType = MMatrix{points_number,3,Float64,3*points_number} 
-       @assert length(I_measured)==points_number
-       new{VectType,MatType}(MVector{points_number}(I_measured), # measured value
-            VectType(λ),# wavelength
-            VectType(undef),#Ib::AbstractVector# Planck function values vector
-            VectType(undef),#ri::AbstractVector  # discrepancy vector
+       #points_number = length(λ)
+       SVectType = SVector{N,T}
+       MVectType = MVector{N,T}
+       MatType = MMatrix{N,3,T,3*N} 
+
+       new{N,3*N,T}(
+            I_measured, # measured value
+            SVectType(λ),# wavelength
+            MVectType(undef),#Ib::AbstractVector# Planck function values vector
+            MVectType(undef),#ri::AbstractVector  # discrepancy vector
             Ref(maxintfloat(Float64)),#r::Base.RefValue{Float64}# discrepancy value
-            VectType(undef),#∇I::AbstractVector # first derivative value
-            VectType(undef),#∇²I::AbstractVector # second derivative vector
-            triplicate_columns(λ,MatType),#amat::Matrix{Float64} # intermediate private data 
+            MVectType(undef),#∇I::AbstractVector # first derivative value
+            MVectType(undef),#∇²I::AbstractVector # second derivative vector
+            MatType(zeros(N,3)),#amat::Matrix{Float64} # intermediate private data 
             Ref(0.0),#  stores the temperature of Planck function evaluation
             Ref(0.0), # Tri
             Ref(0.0),# T∇ibb
             Ref(0.0),# Tgrad
             Ref(0.0),# T∇²ibb
-            Ref(0.0),# Tsec
-            points_number#points_number::Int64 # number of points in wavelength            
+            Ref(0.0),# Tsec          
        ) # calling the constructor
 
     end
 end
-
+VanderMatrix(em::EmPoint,vv::Val{CN};poly_type::Symbol = :stand) where CN = VanderMatrix(em.λ,vv,poly_type = poly_type)
 function triplicate_columns(a::AbstractVector,T)
     return T(repeat(a,1,3))
 end
@@ -353,8 +351,6 @@ function BandPyrometryPoint(measured_Intensity::AbstractVector,
                         I_sur::AbstractVector=[])
 
        polynomial_type = haskey(SUPPORTED_POLYNOMIAL_TYPES,polynomial_type) ? polynomial_type : :stand
-       PolyWrapper = SUPPORTED_POLYNOMIAL_TYPES[polynomial_type]
-
 
        # if entered polynomial type is not supported then it turns to "simple"
        L = length(λ) #total number of spectral points
@@ -379,10 +375,8 @@ function BandPyrometryPoint(measured_Intensity::AbstractVector,
                 LxP(undef),# jacobian
                 PxP(undef),# approximate hessian
                 PxP(undef),# hessian
-                VanderMatrix(λ, # wavelength
-                            polynomial_degree, # polynomial degree (constant polynomial is zero!)
-                            MatrixType = LxPm1,# vandermonde matrix type
-                            poly_constructor = polynomial_producing_function, # polynomial object Constructor
+                VanderMatrix(SVector{L}(λ), # wavelength
+                            Val(polynomial_degree + 1), # polynomial degree (constant polynomial is zero!)
                             poly_type = polynomial_type # type of polynomial
                 ),
                 Px1(undef), # x_em_vec - emissivity evaluation vector
@@ -394,4 +388,10 @@ function BandPyrometryPoint(measured_Intensity::AbstractVector,
     end
 end
 
+function temperature(emp::EmPoint)
+    return emp.Tib[]
+end
+function temperature(bpp::BandPyrometryPoint)
+    return bpp.e_p.Tib[]
+end
 
