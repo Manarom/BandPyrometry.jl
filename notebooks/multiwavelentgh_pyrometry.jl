@@ -19,7 +19,7 @@ end
 # ╔═╡ 1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
 using Plots,PlanckFunctions, StaticArrays, MKL,LinearAlgebra, Optimization,
     OptimizationOptimJL, 
-    Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings, Revise,Printf, NumericalIntegration,PrettyTables,DelimitedFiles, BenchmarkTools
+    Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings, Revise,Printf, NumericalIntegration,PrettyTables, DelimitedFiles, BenchmarkTools, RecipesBase
 
 # ╔═╡ 15a5265e-61bc-440d-9a7d-ff10773b78d8
 using Main.BandPyrometry #this line returns not defined error on the first Pluto run (probably, because of the Pluto running all "using"'s before the cells) just re-run this cell manually
@@ -249,7 +249,7 @@ Independent variable vector ``\lambda`` is stored in normalized (in order to fit
 show_polyfit_docs ? @doc(BandPyrometry.polyfit) : nothing
 
 # ╔═╡ 529b07d7-e622-4816-8de9-e31581ea96a6
-@bind  λ_fit_vand confirm(PlutoUI.combine() do Child
+@bind  λ_fit_vand PlutoUI.combine() do Child
 	md"""
 	Emissivity fitting spectral range, ``\mu m`` : \
 	``\lambda_{left}`` = $(
@@ -259,7 +259,7 @@ show_polyfit_docs ? @doc(BandPyrometry.polyfit) : nothing
 		Child(Slider(0.1:0.1:16,default=8.0,show_value = true))
 	)  ``\lambda_{right}`` 
 	"""
-end)
+end
 
 # ╔═╡ ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
 md"Select the polynomial type = $(@bind em_approx_poly_type Select(collect(keys(BandPyrometry.SUPPORTED_POLYNOMIAL_TYPES))))"
@@ -269,12 +269,13 @@ md"Set polynomial degree : $(@bind poly_fit_degree Select(0:10,default=3)) (the 
 
 # ╔═╡ 111122e9-1260-4f00-aba6-0fdf6cf04c4e
 begin 
-	λ_fit_vec = collect(range(λ_fit_vand...,length=30)) 
+	N1 = 50
+	λ_fit_vec = collect(range(λ_fit_vand...,length=N1)) 
 	rt_emissivity_data = readdlm("real_surface_emissivity.txt") # loading file, actually this file is two-column data with no headers, but this is ok
 	rt_emissivity_interpolation = linear_interpolation(rt_emissivity_data[:,1],rt_emissivity_data[:,2],extrapolation_bc = Interpolations.Flat())
 	
 	interpolated_values =rt_emissivity_interpolation(λ_fit_vec) # interpolating data at λ points
-	Vander_test = BandPyrometry.VanderMatrix(λ_fit_vec,poly_degree=poly_fit_degree, poly_type=em_approx_poly_type) # creating new matrix 
+	Vander_test = BandPyrometry.VanderMatrix(SVector{N1}(λ_fit_vec),Val(poly_fit_degree + 1), poly_type=em_approx_poly_type) # creating new matrix 
 	(a_fit_check,fitted_value,goodness_of_fit) = BandPyrometry.polyfit(Vander_test,λ_fit_vec,interpolated_values)# fitting polynomial coefficients
 	plot(rt_emissivity_data[:,1],rt_emissivity_data[:,2],label = "ϵ real")
 	scatter!(λ_fit_vec,fitted_value, label="ϵ fitted")
@@ -319,20 +320,8 @@ md"""
 # ╔═╡ 8a54d856-2298-4225-81ac-23bf66f35136
 md"Measured spectrum fitting region:"
 
-# ╔═╡ 6f17606c-e52e-4913-87f6-56190d209308
-@bind  lam_region confirm(PlutoUI.combine() do Child
-	md"""
-	λₘᵢₙ ,μm = $(
-		Child(Slider(0.01:0.1:30,default=8.0,show_value = true))
-	) \
-	λₘₐₓ ,μm = $(
-		Child(Slider(0.0:0.1:30,default=13.0,show_value = true))
-	) 
-	"""
-end)
-
-# ╔═╡ 78edb9ca-0d47-4503-8c86-175cf9cfeeba
-λ = collect(range(lam_region[1],lam_region[2],length=50));
+# ╔═╡ d14c4a0d-b641-457c-b1ed-491ff047a468
+N = 50 # number of spectral points
 
 # ╔═╡ 278c2da0-b396-493e-bdcd-fc2a539780b6
 md"Select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(BandPyrometry.SUPPORTED_POLYNOMIAL_TYPES)))))"
@@ -341,7 +330,7 @@ md"Select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(Ba
 md"""Set the "measured" spectrum emissivity approximation coefficients:"""
 
 # ╔═╡ 22eab67b-868a-44fd-9d40-69234f1ecb43
-@bind  a confirm(PlutoUI.combine() do Child
+@bind  a PlutoUI.combine() do Child
 	md"""
 	a0 = $(
 		Child(Slider(-1:0.01:1,default=0.3,show_value = true))
@@ -362,10 +351,10 @@ md"""Set the "measured" spectrum emissivity approximation coefficients:"""
 		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
 	)\
 	"""
-end)
+end
 
 # ╔═╡ 8ef42759-fb53-41af-904e-8916924415fa
-md"Set polynomial degree : $(@bind poly_degree confirm(Select(0:4,default=2))) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
+md"Set polynomial degree : $(@bind poly_degree confirm(Select(0:6,default=3))) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
 
 # ╔═╡ a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 md"""
@@ -377,9 +366,48 @@ The following two figures show:
 
 """
 
+# ╔═╡ 80dacea5-ea46-479f-b0d8-da9a9cf41aa2
+md"""
+#### II.II. Generating the "measured" spectral intensity
+"""
+
+# ╔═╡ 321172de-dcf6-4f51-ab31-edb37b8c3983
+L"""\text{Real values of the optimization variables for "measured" thermal emission spectrum: } """
+
+# ╔═╡ 01cd1f0d-15b8-474b-a05a-eec840c54fff
+md"""
+	add noise to the "measured" spectrum = $(@bind noise_amplitude  Slider(0.0:0.0001:0.1,show_value = true))
+	"""
+
+# ╔═╡ 6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
+md"""
+"Measured" spectrum temperature, K = $(@bind T_to_fit Slider(range(273,2573,length=1000), show_value=true,default=1000))
+"""
+
+# ╔═╡ 36c655f8-141b-4472-96d7-01c8fd1f1515
+x_data = [a[1:poly_degree+1]...,T_to_fit];
+
+# ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
+L"""%$(x_data)"""
+
+# ╔═╡ 6f17606c-e52e-4913-87f6-56190d209308
+@bind  lam_region confirm(PlutoUI.combine() do Child
+	md"""
+	λₘᵢₙ ,μm = $(
+		Child(Slider(0.01:0.1:30,default=8.0,show_value = true))
+	) \
+	λₘₐₓ ,μm = $(
+		Child(Slider(0.0:0.1:30,default=13.0,show_value = true))
+	) 
+	"""
+end)
+
+# ╔═╡ 78edb9ca-0d47-4503-8c86-175cf9cfeeba
+λ = SVector{N}(collect(range(lam_region[1],lam_region[2],length=N)));
+
 # ╔═╡ d17a5db7-0125-48b5-9016-76da6d72c673
 begin
-	VVV= BandPyrometry.VanderMatrix(λ,poly_degree=poly_degree,poly_type=poly_type);
+	VVV= BandPyrometry.VanderMatrix(λ,Val(poly_degree + 1),poly_type=poly_type);
 	p_mode = plot(VVV.xi,VVV.v[:,1], label="n= "*string(0),linewidth=3)
 	for (i,V) in enumerate(eachcol(VVV.v[:,2:end]))
 		plot!(VVV.xi,V, label="n= "*string(i),linewidth=3)
@@ -399,34 +427,17 @@ begin
 	p_em
 end
 
-# ╔═╡ 80dacea5-ea46-479f-b0d8-da9a9cf41aa2
-md"""
-#### II.II. Generating the "measured" spectral intensity
-"""
-
-# ╔═╡ 6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
-md"""
-"Measured" spectrum temperature, K = $(@bind T_to_fit confirm(Slider(range(273,2573,length=1000), show_value=true,default=1000)))
-"""
-
-# ╔═╡ 36c655f8-141b-4472-96d7-01c8fd1f1515
-x_data = [a[1:poly_degree+1]...,T_to_fit];
-
-# ╔═╡ 321172de-dcf6-4f51-ab31-edb37b8c3983
-L"""\text{Real values of the optimization variables for "measured" thermal emission spectrum: } """
-
-# ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
-L"""%$(x_data)"""
-
-# ╔═╡ 01cd1f0d-15b8-474b-a05a-eec840c54fff
-md"""
-	add noise to the "measured" spectrum = $(@bind noise_amplitude  confirm(Slider(0.0:0.0001:0.1,show_value = true)))
-	"""
+# ╔═╡ 0232ff3c-daa9-4e86-a6c7-582d66a16cb9
+md" Use real emissivity $(@bind is_real_emissivity CheckBox(default = false))"
 
 # ╔═╡ 3b4308dc-da18-43ab-9f50-2c8bc05acb78
 begin
 	Ib = Main.BandPyrometry.Planck.ibb.(λ,T_to_fit) # bb spectrum
-	ϵ_data= VVV*x_data[1:end-1]# "measured" spectrum emissivity 
+	ϵ_data= if is_real_emissivity 
+			rt_emissivity_interpolation(Vector(λ))
+		else
+			VVV*x_data[1:end-1]# "measured" spectrum emissivity 
+	end
 	I_data = Ib.*ϵ_data .+ noise_amplitude*Ib.*(0.5 .-rand(length(λ)))# adding noise to the "measured" spectrum
 end;
 
@@ -454,20 +465,38 @@ $(Main.BandPyrometry.optimizer_switch(optim_type,is_constraint=is_constraint,is_
 
 # ╔═╡ 6118cebc-d18e-42cc-ac1b-aa1ad95cd719
 begin 
-	x_starting = zeros(length(x_data))
-	x_starting[end] = 673.5
+	x_starting = MVector{poly_degree + 2}(zeros(length(x_data)))
+	x_starting[end] = 1700.0
 	band_fit =Main.BandPyrometry.BandPyrometryPoint(I_data,λ,x_starting,polynomial_type=poly_type)# creating BandPyrometryPoint from the data to be fitted, wavelength region and starting optimization variables vector x_starting
 	@time out = Main.BandPyrometry.fit_T!(band_fit,optimizer_name=optim_type,is_constraint=is_constraint,is_lagrange_constraint = false) # this function runs the optimizaiton 
 end # starting values
 
+# ╔═╡ 950a61f6-fe83-47a3-b65f-fd4b70ff12ba
+plot(band_fit)
+
 # ╔═╡ a73dc68d-7e41-4748-b0bb-458d6ef73305
-T_fitted = out[1];
+T_fitted = BandPyrometry.temperature(band_fit)
+
+# ╔═╡ c947d126-092b-4b92-ab56-373d5a387908
+begin 
+	p3 = plot(λ, I_data, lw=2,label="Data T=  $(T_to_fit) ");
+	plot!(p3,λ, band_fit.Ic, lw=2,label="Fitting T= $(T_fitted)", ls=:dot)
+	title!("Initial data vs fitting results")
+	xlabel!("Wavelength, μm") 
+	ylabel!("Emission intensity")
+end
 
 # ╔═╡ 73c85c85-2fc4-48ac-b5f4-4c35edcf935c
-a_vect_fitted = out[2];
+begin 
+	a_vect_fitted = out[2]
+	a_vect_real = x_data[1:end-1]
+end;
 
-# ╔═╡ d6406663-77e9-4987-9ddf-955d8101c401
-a_vect_real = x_data[1:end-1];
+# ╔═╡ 415ffaa1-fc30-408c-a5a2-f27bc0821506
+#band_fit.e_p(I_data/0.99)
+
+# ╔═╡ c0738eeb-b0ec-441e-a3ed-4ac0f053063e
+
 
 # ╔═╡ ebc0b228-01c8-42e4-9388-8194be1dd669
 md"""
@@ -481,24 +510,12 @@ L"""
 """
 
 # ╔═╡ e9b7169f-0d75-44bb-8505-ccfde1bdce98
-e_fitted_spectrum = out[3];
-
-# ╔═╡ 68b4b548-0a96-4f67-baef-921bda3ff0a5
-out[4].original
-
-# ╔═╡ c947d126-092b-4b92-ab56-373d5a387908
-begin 
-	p3 = plot(λ, I_data, lw=2,label="Data T=  $(T_to_fit) ");
-	plot!(p3,λ, band_fit.Ic, lw=2,label="Fitting T= $(T_fitted)", ls=:dot)
-	title!("Initial data vs fitting results")
-	xlabel!("Wavelength, μm") 
-	ylabel!("Emission intensity")
-end
+e_fitted_spectrum = band_fit.ϵ;
 
 # ╔═╡ fead76f5-c0b5-4fcb-a39e-c97ded034653
 begin
-	p1 = plot(λ,ϵ_data,label="Real emissivity, a=  $(map(i->@sprintf("%.2f",i),x_data[1:end-1]) )");
-	scatter!(p1,λ, e_fitted_spectrum,label="Fitted emissivity, a=  $(map(i->@sprintf("%.2f",i), a_vect_fitted ))")
+	p1 = plot(λ,ϵ_data,label="Real emissivity "); #a=  $(map(i->@sprintf("%.2f",i),x_data[1:end-1]) )
+	scatter!(p1,λ, e_fitted_spectrum,label="Fitted emissivity") #, a=  $(map(i->@sprintf("%.2f",i), a_vect_fitted ))
 	ylims!(0, 1.2)
 	xlabel!("Wavelength, μm") 
 	ylabel!(L"\epsilon")
@@ -527,6 +544,7 @@ PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
@@ -545,6 +563,7 @@ Plots = "~1.41.1"
 PlutoUI = "~0.7.71"
 Polynomials = "~4.1.0"
 PrettyTables = "~2.4.0"
+RecipesBase = "~1.3.4"
 Revise = "~3.9.0"
 StaticArrays = "~1.9.15"
 """
@@ -555,7 +574,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "62ddd448cb03e748cae37f456e8084edb69b1636"
+project_hash = "8e363c9061f3aa0871b07c3c041f0ec0dc5266ae"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "7927b9af540ee964cc5d1b73293f1eb0b761a3a1"
@@ -2497,41 +2516,44 @@ version = "1.9.2+0"
 # ╟─529b07d7-e622-4816-8de9-e31581ea96a6
 # ╟─ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
 # ╟─988274c4-ad6a-42df-aead-5f40e0000998
-# ╟─111122e9-1260-4f00-aba6-0fdf6cf04c4e
+# ╠═111122e9-1260-4f00-aba6-0fdf6cf04c4e
 # ╟─efbc4a5f-8853-47b1-8842-c77b060d2de7
 # ╟─38300c92-e5e6-4d5e-a394-aa1a47cfd757
 # ╟─8a54d856-2298-4225-81ac-23bf66f35136
-# ╟─6f17606c-e52e-4913-87f6-56190d209308
-# ╟─78edb9ca-0d47-4503-8c86-175cf9cfeeba
+# ╟─d14c4a0d-b641-457c-b1ed-491ff047a468
+# ╠═78edb9ca-0d47-4503-8c86-175cf9cfeeba
 # ╟─278c2da0-b396-493e-bdcd-fc2a539780b6
 # ╟─d90da478-40b3-4677-82b9-fbfd79a72ef0
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
-# ╟─8ef42759-fb53-41af-904e-8916924415fa
+# ╠═8ef42759-fb53-41af-904e-8916924415fa
 # ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
-# ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
+# ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2
-# ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 # ╟─36c655f8-141b-4472-96d7-01c8fd1f1515
 # ╟─321172de-dcf6-4f51-ab31-edb37b8c3983
 # ╟─c4df3ad4-9f1a-414c-b02c-8161f007ccd5
 # ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
 # ╟─3b4308dc-da18-43ab-9f50-2c8bc05acb78
+# ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
+# ╟─6f17606c-e52e-4913-87f6-56190d209308
+# ╟─0232ff3c-daa9-4e86-a6c7-582d66a16cb9
 # ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
+# ╠═c947d126-092b-4b92-ab56-373d5a387908
+# ╠═fead76f5-c0b5-4fcb-a39e-c97ded034653
+# ╟─950a61f6-fe83-47a3-b65f-fd4b70ff12ba
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
-# ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
+# ╠═0ca01e99-bf48-4e24-b937-c3863eb03f50
 # ╟─15025715-1ff3-4e7c-8136-cc442b77528a
 # ╟─6118cebc-d18e-42cc-ac1b-aa1ad95cd719
-# ╟─a73dc68d-7e41-4748-b0bb-458d6ef73305
-# ╟─73c85c85-2fc4-48ac-b5f4-4c35edcf935c
-# ╟─d6406663-77e9-4987-9ddf-955d8101c401
+# ╠═a73dc68d-7e41-4748-b0bb-458d6ef73305
+# ╠═73c85c85-2fc4-48ac-b5f4-4c35edcf935c
+# ╠═415ffaa1-fc30-408c-a5a2-f27bc0821506
+# ╠═c0738eeb-b0ec-441e-a3ed-4ac0f053063e
 # ╟─ebc0b228-01c8-42e4-9388-8194be1dd669
 # ╟─5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
-# ╟─e9b7169f-0d75-44bb-8505-ccfde1bdce98
-# ╟─68b4b548-0a96-4f67-baef-921bda3ff0a5
-# ╟─c947d126-092b-4b92-ab56-373d5a387908
-# ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
+# ╠═e9b7169f-0d75-44bb-8505-ccfde1bdce98
 # ╟─3f1e1a4c-48bf-44fa-a146-020dde04d2ff
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

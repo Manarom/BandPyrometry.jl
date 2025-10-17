@@ -5,7 +5,8 @@ module BandPyrometry
     Optimization,
     OptimizationOptimJL, 
     Interpolations,
-    StaticArrays
+    StaticArrays,
+    RecipesBase
     
     import PlanckFunctions as Planck
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
@@ -515,7 +516,7 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
             is_constraint::Bool=false,
             is_lagrange_constraint::Bool=false)
             
-            !(optimizer_name == "Default" && is_constraint && is_lagrange_constraint) || return fitT_default(point)
+            !(optimizer_name == "Default")  || return fitT_default(point)
 
 
             optimizer = optimizer_switch(optimizer_name,
@@ -554,17 +555,79 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
                         (T=temperature(point), res=results, optimizer=optimizer)
     end
     function fitT_default(point::EmPoint)
-        probl= OptimizationProblem(OPTIM_FUN, MVector{1}([235.0]))
+        probl= OptimizationProblem(OPTIM_FUN, MVector{1}([235.0]),point)
         results = solve(probl,DEFAULT_OPTIMIZER[])   
         feval!(point,results.u)
         return (T=temperature(point), res=results, optimizer=DEFAULT_OPTIMIZER[])                 
     end
-    function (emp::EmPoint{N})(I::Union{SVector{N},MVector{N}}) where N 
+    function fitT_default(point::BandPyrometryPoint)
+        probl= OptimizationProblem(OPTIM_FUN, point.x,point)
+        results = solve(probl,DEFAULT_OPTIMIZER[])   
+        feval!(point,results.u)
+        return (T=temperature(point), res=results, optimizer=DEFAULT_OPTIMIZER[])                 
+    end
+    function (emp::EmPoint)(I) 
         copyto!(emp.I_measured,I)
+        return fitT_default(emp).T
+    end
+    function (emp::EmpPoint)(I)
+        copyto!(emp.e_p.I_measured,I)
+        return fitT_default(emp).T
+    end
+    function (emp::Union{EmPoint,BandPyrometryPoint})()
         return fit_T!(emp).T
     end
-    function (emp::EmPoint)()
-        return fit_T!(emp).T
+    @recipe function f(m::EmPoint)
+        minorgrid--> true
+        gridlinewidth-->2
+        dpi-->600
+        xlabel-->"Wavelength"
+        ylabel-->"Spectral intensity"
+        linewidth-->3
+
+        @series begin 
+            label:= "Measured"    
+            linewidth:=2
+            markershape:=:none
+            fillrange:=0
+            fillalpha:=0.3
+            (m.λ,m.I_measured)
+        end
+        @series begin 
+            label:="Fitted"    
+            linewidth:=2
+            fillrange:=0
+            fillalpha:=0.3
+            markersize := 3
+            markershape:=:diamond
+            (m.λ,m.Ib)
+        end
+    end
+    @recipe function f(m::BandPyrometryPoint)
+        minorgrid--> true
+        gridlinewidth-->2
+        dpi-->600
+        xlabel-->"Wavelength"
+        ylabel-->"Spectral intensity"
+        linewidth-->3
+
+        @series begin 
+            label:= "Measured"    
+            linewidth:=2
+            markershape:=:none
+            fillrange:=0
+            fillalpha:=0.3
+            (m.e_p.λ,m.e_p.I_measured)
+        end
+        @series begin 
+            label:="Fitted"    
+            linewidth:=2
+            fillrange:=0
+            fillalpha:=0.3
+            markersize := 3
+            markershape:=:diamond
+            (m.e_p.λ,m.Ic)
+        end
     end
 end
 

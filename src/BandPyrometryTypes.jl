@@ -76,12 +76,12 @@ Structure VanderMatrix has the following fields:
     xi - normalized vector 
     poly_type  - polynomial type name (nothing depends on this name)
 """
-struct VanderMatrix{N,CN,T,NCN,CNCN} #M <: SMatrix , R <: SMatrix, V <: SVector}
-    v::SMatrix{N,CN,T,NCN} # matrix of approximating functions 
-    v_unnorm::SMatrix{N,CN,T,NCN} # unnormalized vandermatrix used to convert fitted parameters if necessarys
+struct VanderMatrix{N,CN,T,NxCN,CNxCN} #M <: SMatrix , R <: SMatrix, V <: SVector}
+    v::SMatrix{N,CN,T,NxCN} # matrix of approximating functions 
+    v_unnorm::SMatrix{N,CN,T,NxCN} # unnormalized vandermatrix used to convert fitted parameters if necessarys
     # QR factorization matrices
-    Q::SMatrix{N,CN,T,NCN} 
-    R::SMatrix{CN,CN,T,CNCN}
+    Q::SMatrix{N,CN,T,NxCN} 
+    R::SMatrix{CN,CN,T,CNxCN}
     x_first::T # first element of the initial array
     x_last::T # normalizing coefficient 
     xi::SVector{N,T} # normalized vector-column 
@@ -118,17 +118,17 @@ function VanderMatrix(x::StaticArray{Tuple{N},T,1},
             Vunnorm = Matrix{T}(undef,N,CN)  # T{length(x)}(MVector{length(x)}(x))
             poly_obj = PolyWrapper{CN}(MVector{CN}(zeros(CN)))
             _fill_vander!(V, poly_obj,_xi)
-            _fill_vander!(Vunnorm, poly_obj,x)
-            NCN =  N*CN     
-            MatrixType  = SMatrix{N, CN, T,NCN}
-            CNCN =  CN * CN
-            RMatrixType = SMatrix{CN, CN, T,CNCN}
+            poly_type != :stand || _fill_vander!(Vunnorm, poly_obj,x)
+            NxCN =  N*CN     
+            MatrixType  = SMatrix{N, CN, T,NxCN}
+            CNxCN =  CN * CN
+            RMatrixType = SMatrix{CN, CN, T,CNxCN}
             VectorType = SVector{N,T}
 
             _V = MatrixType(V)
             (Q,R) = qr(_V)
             # {MatrixType,RMatrixType,VectorType,PolyWrapper}
-            VanderMatrix{N,CN,T,NCN,CNCN}(_V,# Vandermonde matrix
+            VanderMatrix{N,CN,T,NxCN,CNxCN}(_V,# Vandermonde matrix
                 MatrixType(Vunnorm), #unnormalized vandermatrix
                 MatrixType(Q),
                 RMatrixType(R),
@@ -189,20 +189,19 @@ returns tuple with vector of polynomial coefficints, values of y_fitted at x poi
 and the norm of goodness of fit     
 """
 function polyfit(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
-    yi =  !is_the_same_x(V,x) ? linear_interpolation(x,y)(denormalize_x(V)) : copy(y)
+    yi =  !is_the_same_x(V,x) ? linear_interpolation(x,y)(denormalize_x(V)) : y
     a =SVector{CN,T}(V.R\(transpose(V.Q)*yi)) # calculating pseudo-inverse
     y_fit = V*a
     goodness_fit = norm(yi .- y_fit)
     return  (a, y_fit, goodness_fit) 
 end
 function polyfitn(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
-    yi =  !is_the_same_x(V,x) ? linear_interpolation(x,y)(denormalize_x(V)) : copy(y)
-    a =SVector{CN,T}(V.R\(transpose(V.Q)*yi)) # calculating pseudo-inverse
-    y_fit = V.v_unnorm\(V*a)
+    yi =  !is_the_same_x(V,x) ? linear_interpolation(x,y)(denormalize_x(V)) : y
+    (Q,R) = qr(V.v_unnorm)
+    a =SVector{CN,T}(R\transpose(Q)*yi)# calculating pseudo-inverse
+    y_fit = V.v_unnorm * a
     goodness_fit = norm(yi .- y_fit)
     return  (a, y_fit, goodness_fit) 
-    #normalized_x::Bool = true: 
-    #(V.v_unnorm\(V*a), y_fit, goodness_fit)
 end
 """
     normalize_x(x::AbstractVector)
@@ -244,7 +243,7 @@ EmPoint(I_measured,λ) -  I_measured is a measured spectrum
                       -  λ - wavelength vector (in μm)
 
 """
-struct EmPoint{N,NNN,T} 
+struct EmPoint{N,Nx3,T} 
     I_measured::MVector{N,T}# data to fit
     λ:: SVector{N,T}  # wavelength vector (it is constant during the optimization)
     Ib::MVector{N,T} # Planck function values vector ????
@@ -252,7 +251,7 @@ struct EmPoint{N,NNN,T}
     r::Base.RefValue{T} # discrepancy value
     ∇I::MVector{N,T} # first derivative value
     ∇²I::MVector{N,T} # second derivative vector
-    amat::MMatrix{N,3,T,NNN} # intermediate private data used to speed up the planck function evaluation
+    amat::MMatrix{N,3,T,Nx3} # intermediate private data used to speed up the planck function evaluation
     # temperatures of:
     Tib::Base.RefValue{T} # Planck intensity  
     Tri::Base.RefValue{T} # Residual vector  
@@ -309,34 +308,44 @@ where:
     - initial_x - starting parameters vector (initial_x[end] - starting temperature,
         x[1:end-1] - emissivity approximation coefficients)
     - polynomial_type - string of polynomial (this value governs the Vandermonde matrix form)
-                      
+
+N - number ob wavelength points
+Nx3 - 3*N used to store the intermediate data for planck function and derivarives evaluation
+L - length of optimization variables vector
+P -   number of variables to be optimized (can be less or equal to the number of )
+NxP - N*P number of elements in jacobian 
+PxP - P*P number of elements in hessian
+Pm1 - P-1 number of parameters approximating 
+NxPm1 - N*(P-1) number of vandermatrix elements
+T - type of data
 """
-struct BandPyrometryPoint{Lx1,Px1,LxP,PxP,LxPm1} 
+struct BandPyrometryPoint{N , Nx3 ,P, NxP, PxP, Pm1 , NxPm1, Pm1xPm1 , T}#{N,P,T} # N - wavelength number, CN - parameters number + 1
+    # N , Nx3 , P, NxP, PxP, Pm1 , NxCN, CNxCN , T
     # Stores data about the spectral band, BBemission spectrum and experimental measured spectrum
-    e_p::EmPoint 
+    e_p::EmPoint{N,Nx3,T} 
     # Additional data storages
-    x::Px1 # Optimization variables vector
+    x::MVector{P,T}   #Px1 # Optimization variables vector
     # x[end] - temperature, x[1:end-1] - emissivity poynomial approximation
-    Ic::Lx1 # sample spectral emittance
-    Iₛᵤᵣ::Lx1 # surrounding radiation spectra
-    ϵ::Lx1 # spectral emissivity in band
-    r::Lx1 # residual vector
-    jacobian::LxP # Jacobian matrix
-    hessian_approx::PxP # approximate hessian matrix
-    hessian::PxP # Hesse matrix
-    vandermonde::VanderMatrix # Vandermonde matrix type
+    Ic::MVector{N,T} #Lx1 # sample spectral emittance
+    Iₛᵤᵣ::SVector{N,T} #::Lx1 # surrounding radiation spectra
+    ϵ::MVector{N,T}  #Lx1 # spectral emissivity in band
+    r::MVector{N,T} #Lx1 # residual vector
+    jacobian::MMatrix{N,P,T,NxP}#LxP # Jacobian matrix
+    hessian_approx::MMatrix{P,P,T,PxP} #PxP # approximate hessian matrix
+    hessian::MMatrix{P,P,T,PxP} # Hesse matrix
+    vandermonde::VanderMatrix{N,Pm1, T, NxPm1, Pm1xPm1} # Vandermonde matrix type VanderMatrix{N,CN,T,NxCN,CNxCN} - N - rows number, CN - columns of vander number ()
     # internal usage
-    x_em_vec::Px1 # vector of emissivity evaluation values
-    x_jac_vec::Px1 # vector of jacobian claculation parameters
-    x_hess_approx::Px1 # vector of the approximate hessian calculation
-    x_hess_vec::Px1 # vector of hessian calculation parameters
+    x_em_vec::MVector{P,T} # vector of emissivity evaluation values
+    x_jac_vec::MVector{P,T} #Px1 # vector of jacobian claculation parameters
+    x_hess_approx::MVector{P,T}#Px1 # vector of the approximate hessian calculation
+    x_hess_vec::MVector{P,T} #Px1 # vector of hessian calculation parameters
     is_has_Iₛᵤᵣ::Bool # flag 
 
 """
     BandPyrometryPoint(measured_Intensity::AbstractVector,
                         λ::AbstractVector,
                         initial_x::AbstractVector;
-                        polynomial_type::String="stand",
+                        polynomial_type::Symbol="stand",
                         I_sur::AbstractVector=[])
 
 Constructor for band pyrometry fitting, 
@@ -344,45 +353,54 @@ Constructor for band pyrometry fitting,
     initial_x - starting optimization vector 
     polynomial_type - type of polynomial for emissivity approximation
 """
-function BandPyrometryPoint(measured_Intensity::AbstractVector,
-                        λ::AbstractVector,
-                        initial_x::AbstractVector;
+function BandPyrometryPoint(measured_Intensity::StaticArray{Tuple{N},T,1},
+                        λ::StaticArray{Tuple{N},T,1},
+                        initial_x::StaticArray{Tuple{P},T,1};
                         polynomial_type::Symbol=:stand,
-                        I_sur::AbstractVector=[])
+                        I_sur::Union{StaticArray{Tuple{N},T,1},Nothing}=nothing) where {N,P,T}
 
        polynomial_type = haskey(SUPPORTED_POLYNOMIAL_TYPES,polynomial_type) ? polynomial_type : :stand
 
        # if entered polynomial type is not supported then it turns to "simple"
-       L = length(λ) #total number of spectral points
-       P = length(initial_x) # full number of the optimization variables
-       polynomial_degree =  P - 2 #degree of emissivity polynomial approximation
+       #L = length(λ) #total number of spectral points
+       #P = length(initial_x) # full number of the optimization variables
+       #polynomial_degree =  P - 2 #degree of emissivity polynomial approximation
        # polynomial degree goes from 0,1... where 1 is linear approximation
-       Lx1 = MVector{L,Float64} # independent data column
-       Px1 = MVector{P,Float64} # optimization variables vector 
-       LxP = MMatrix{L,P,Float64,L*P} # Jacobian type
-       PxP = MMatrix{P,P,Float64,P*P} # Hessian type     
-       LxPm1 = MMatrix{L,P-1,Float64,L*(P-1)} #Vandermonde matrix type
-       is_has_Iₛᵤᵣ = length(I_sur)==length(λ)
-       is_has_Iₛᵤᵣ ? Isr =Lx1(I_sur) : Isr = Lx1(undef)
-       @assert length(measured_Intensity) == L
-       new{Lx1,Px1,LxP,PxP,LxPm1}(
-                EmPoint(measured_Intensity::AbstractVector{Float64},λ::AbstractVector{Float64}),# filling BB emission obj
-                Px1(initial_x), #em_poly
-                Lx1(undef), # emissivity
-                Lx1(undef), # Ic corrected emission spectrum
+       # {N , Nx3 , P, NxP, PxP, Pm1 , NxPm1, Pm1xPm1 , T}
+       Nx3 = 3*N
+       NxP = N*P
+       PxP = P*P 
+       Pm1 = P-1
+       NxPm1 = N*(P-1)
+       Pm1xPm1 = (P-1)*(P-1) 
+       
+
+       Nx1_T = MVector{N,T} # independent data column
+       Px1_T = MVector{P,T} # optimization variables vector 
+       NxP_T = MMatrix{N,P,T,NxP} # Jacobian type
+       PxP_T = MMatrix{P,P,T,PxP} # Hessian type     
+       #LxPm1_T = MMatrix{N,Pm1,T,NxPm1} #Vandermonde matrix type
+       is_has_Iₛᵤᵣ = !isnothing(I_sur) && length(I_sur)==length(λ)
+       Isr =  is_has_Iₛᵤᵣ ? SVector{N}(I_sur) : SVector{N}(zeros(T,N))
+       # {N , Nx3 , P, NxP, PxP, Pm1 , NxPm1, Pm1xPm1 , T}
+       new{N , Nx3 , P, NxP, PxP, Pm1 , NxPm1, Pm1xPm1 , T}(
+                EmPoint(measured_Intensity,λ),# filling BB emission obj
+                Px1_T(initial_x), #em_poly
+                Nx1_T(undef), # emissivity
+                Nx1_T(undef), # Ic corrected emission spectrum
                 Isr, # Iₛᵤᵣ surrounding radiation exclusion
-                Lx1(undef), # r,residual vector function
-                LxP(undef),# jacobian
-                PxP(undef),# approximate hessian
-                PxP(undef),# hessian
-                VanderMatrix(SVector{L}(λ), # wavelength
-                            Val(polynomial_degree + 1), # polynomial degree (constant polynomial is zero!)
+                Nx1_T(undef), # r,residual vector function
+                NxP_T(undef),# jacobian
+                PxP_T(undef),# approximate hessian
+                PxP_T(undef),# hessian
+                VanderMatrix(SVector{N}(λ), # wavelength
+                            Val(Pm1), # polynomial degree (constant polynomial is zero!)
                             poly_type = polynomial_type # type of polynomial
                 ),
-                Px1(undef), # x_em_vec - emissivity evaluation vector
-                Px1(undef), # x_jac_vec - Jacobian evaluation vector
-                Px1(undef), # x_hess_approx - approximate Hessian evaluation vector
-                Px1(undef), # x_hess_vec - rigorous hessian evaluation vector
+                Px1_T(undef), # x_em_vec - emissivity evaluation vector
+                Px1_T(undef), # x_jac_vec - Jacobian evaluation vector
+                Px1_T(undef), # x_hess_approx - approximate Hessian evaluation vector
+                Px1_T(undef), # x_hess_vec - rigorous hessian evaluation vector
                 is_has_Iₛᵤᵣ  # is_has_Iₛᵤᵣ - flag is true if the point has surrounding radiation correction part
                 )
     end
