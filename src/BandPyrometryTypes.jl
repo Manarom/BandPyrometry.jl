@@ -245,7 +245,7 @@ EmPoint(I_measured,λ) -  I_measured is a measured spectrum
 """
 struct EmPoint{N,Nx3,T} 
     I_measured::MVector{N,T}# data to fit
-    λ:: SVector{N,T}  # wavelength vector (it is constant during the optimization)
+    λ:: MVector{N,T}  # wavelength vector (it is constant during the optimization)
     Ib::MVector{N,T} # Planck function values vector ????
     ri::MVector{N,T} # residual vector
     r::Base.RefValue{T} # discrepancy value
@@ -275,8 +275,8 @@ function EmPoint(I_measured::StaticArray{Tuple{N},T,1},λ::StaticArray{Tuple{N},
        MatType = MMatrix{N,3,T,3*N} 
 
        new{N,3*N,T}(
-            I_measured, # measured value
-            SVectType(λ),# wavelength
+            SVectType(I_measured), # measured value
+            MVectType(λ),# wavelength
             MVectType(undef),#Ib::AbstractVector# Planck function values vector
             MVectType(undef),#ri::AbstractVector  # discrepancy vector
             Ref(maxintfloat(Float64)),#r::Base.RefValue{Float64}# discrepancy value

@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.18
+# v0.20.19
 
 using Markdown
 using InteractiveUtils
@@ -17,9 +17,7 @@ macro bind(def, element)
 end
 
 # ╔═╡ 1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-using Plots,PlanckFunctions, StaticArrays, MKL,LinearAlgebra, Optimization,
-    OptimizationOptimJL, 
-    Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings, Revise,Printf, NumericalIntegration,PrettyTables, DelimitedFiles, BenchmarkTools, RecipesBase
+using Plots,PlanckFunctions, StaticArrays, MKL,LinearAlgebra, Optimization, OptimizationOptimJL, Interpolations,   PlutoUI, Polynomials, LegendrePolynomials,  Revise,Printf,PrettyTables, DelimitedFiles, BenchmarkTools,LaTeXStrings, RecipesBase
 
 # ╔═╡ 15a5265e-61bc-440d-9a7d-ff10773b78d8
 using Main.BandPyrometry #this line returns not defined error on the first Pluto run (probably, because of the Pluto running all "using"'s before the cells) just re-run this cell manually
@@ -51,7 +49,7 @@ The last line will launch the Pluto starting page in your default browser
 import PlanckFunctions as Planck
 
 # ╔═╡ af23b80d-7e36-43e0-8472-f563a823baa0
-import JCAMPDXir as JDXreader
+
 
 # ╔═╡ 255e0485-a280-4142-82dd-d76d0d3d0cca
 includet(joinpath("../src","BandPyrometry.jl")) # the package file is includet using Revise methods, thus the code of the main file can be modified
@@ -530,12 +528,10 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
-JCAMPDXir = "931eddca-b696-4dc5-beb7-a03832886454"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MKL = "33e6dc65-8f57-5167-99aa-e5a354878fb2"
-NumericalIntegration = "e7bfaba1-d571-5449-8927-abc22e82249b"
 Optimization = "7f7a1694-90dd-40f0-9382-eb1efda571ba"
 OptimizationOptimJL = "36348300-93cb-4f02-beb5-3c3902f8871e"
 PlanckFunctions = "56edaee7-e77f-43d7-994d-8307b8de0a62"
@@ -551,11 +547,9 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 [compat]
 BenchmarkTools = "~1.6.0"
 Interpolations = "~0.16.2"
-JCAMPDXir = "~1.0.0"
 LaTeXStrings = "~1.4.0"
 LegendrePolynomials = "~0.4.5"
 MKL = "~0.8.0"
-NumericalIntegration = "~0.2.0"
 Optimization = "~4.5.0"
 OptimizationOptimJL = "~0.4.3"
 PlanckFunctions = "~1.0.0"
@@ -572,9 +566,9 @@ StaticArrays = "~1.9.15"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.5"
+julia_version = "1.11.7"
 manifest_format = "2.0"
-project_hash = "8e363c9061f3aa0871b07c3c041f0ec0dc5266ae"
+project_hash = "605f30531750c279bcc6249139daa4873ed93bc2"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "7927b9af540ee964cc5d1b73293f1eb0b761a3a1"
@@ -1226,12 +1220,6 @@ git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "1.0.0"
 
-[[deps.JCAMPDXir]]
-deps = ["Dates", "Interpolations", "OrderedCollections", "Printf", "StaticArrays"]
-git-tree-sha1 = "7c52e5bd87f0078a5ba8ddd908ce04e9419b5d6d"
-uuid = "931eddca-b696-4dc5-beb7-a03832886454"
-version = "1.0.0"
-
 [[deps.JLFzf]]
 deps = ["REPL", "Random", "fzf_jll"]
 git-tree-sha1 = "82f7acdc599b65e0f8ccd270ffa1467c21cb647b"
@@ -1530,12 +1518,6 @@ version = "1.1.3"
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
-
-[[deps.NumericalIntegration]]
-deps = ["InteractiveUtils", "LinearAlgebra", "Logging", "Test"]
-git-tree-sha1 = "71a5bf35469ec57e1bfdeec7dbb5757e51949bbb"
-uuid = "e7bfaba1-d571-5449-8927-abc22e82249b"
-version = "0.2.0"
 
 [[deps.OffsetArrays]]
 git-tree-sha1 = "117432e406b5c023f665fa73dc26e79ec3630151"
@@ -2455,7 +2437,7 @@ uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
 version = "1.59.0+0"
 
 [[deps.oneTBB_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
+deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
 git-tree-sha1 = "d5a767a3bb77135a99e433afe0eb14cd7f6914c3"
 uuid = "1317d2d5-d96f-522e-a858-c73665f53c3e"
 version = "2022.0.0+0"
@@ -2516,16 +2498,16 @@ version = "1.9.2+0"
 # ╟─529b07d7-e622-4816-8de9-e31581ea96a6
 # ╟─ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
 # ╟─988274c4-ad6a-42df-aead-5f40e0000998
-# ╠═111122e9-1260-4f00-aba6-0fdf6cf04c4e
+# ╟─111122e9-1260-4f00-aba6-0fdf6cf04c4e
 # ╟─efbc4a5f-8853-47b1-8842-c77b060d2de7
 # ╟─38300c92-e5e6-4d5e-a394-aa1a47cfd757
 # ╟─8a54d856-2298-4225-81ac-23bf66f35136
 # ╟─d14c4a0d-b641-457c-b1ed-491ff047a468
-# ╠═78edb9ca-0d47-4503-8c86-175cf9cfeeba
+# ╟─78edb9ca-0d47-4503-8c86-175cf9cfeeba
 # ╟─278c2da0-b396-493e-bdcd-fc2a539780b6
 # ╟─d90da478-40b3-4677-82b9-fbfd79a72ef0
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
-# ╠═8ef42759-fb53-41af-904e-8916924415fa
+# ╟─8ef42759-fb53-41af-904e-8916924415fa
 # ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 # ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
@@ -2539,12 +2521,12 @@ version = "1.9.2+0"
 # ╟─6f17606c-e52e-4913-87f6-56190d209308
 # ╟─0232ff3c-daa9-4e86-a6c7-582d66a16cb9
 # ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
-# ╠═c947d126-092b-4b92-ab56-373d5a387908
-# ╠═fead76f5-c0b5-4fcb-a39e-c97ded034653
+# ╟─c947d126-092b-4b92-ab56-373d5a387908
+# ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
 # ╟─950a61f6-fe83-47a3-b65f-fd4b70ff12ba
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
-# ╠═0ca01e99-bf48-4e24-b937-c3863eb03f50
+# ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
 # ╟─15025715-1ff3-4e7c-8136-cc442b77528a
 # ╟─6118cebc-d18e-42cc-ac1b-aa1ad95cd719
 # ╠═a73dc68d-7e41-4748-b0bb-458d6ef73305
@@ -2553,7 +2535,7 @@ version = "1.9.2+0"
 # ╠═c0738eeb-b0ec-441e-a3ed-4ac0f053063e
 # ╟─ebc0b228-01c8-42e4-9388-8194be1dd669
 # ╟─5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
-# ╠═e9b7169f-0d75-44bb-8505-ccfde1bdce98
+# ╟─e9b7169f-0d75-44bb-8505-ccfde1bdce98
 # ╟─3f1e1a4c-48bf-44fa-a146-020dde04d2ff
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

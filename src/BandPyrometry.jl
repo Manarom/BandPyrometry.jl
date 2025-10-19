@@ -145,8 +145,7 @@ Input:
 """
     function emissivity!(bp::BandPyrometryPoint,x::AbstractVector)
         a = @view x[1:end-1] #emissivity approximation variables
-        bp.ϵ .= bp.vandermonde.v*a
-        return bp.ϵ
+        return mul!(bp.ϵ, bp.vandermonde.v,a)
     end
     """
     feval!(bp::BandPyrometryPoint,x::AbstractVector)
@@ -547,13 +546,15 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
         end
         results = solve(probl,optimizer())
         feval!(point,results.u)
-        return  point isa BandPyrometryPoint ? 
-                        (T=temperature(point),a=results.u[1:end-1],
-                        ϵ=point.vandermonde*results.u[1:end-1],
-                        res=results,
-                        optimizer=optimizer) :
-                        (T=temperature(point), res=results, optimizer=optimizer)
+        return  fitting_result(point, result, optimizer) 
+                        
     end
+    fitting_result(point::BandPyrometryPoint,results,optimizer) = (T=temperature(point),a=results.u[1:end-1],
+                                                                            ϵ=point.vandermonde*results.u[1:end-1],
+                                                                            res=results,
+                                                                            optimizer=optimizer)
+    fitting_result(point::EmPoint, results, optimizer) = (T=temperature(point), res=results, optimizer=optimizer)
+
     function fitT_default(point::EmPoint)
         probl= OptimizationProblem(OPTIM_FUN, MVector{1}([235.0]),point)
         results = solve(probl,DEFAULT_OPTIMIZER[])   
@@ -570,7 +571,7 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
         copyto!(emp.I_measured,I)
         return fitT_default(emp).T
     end
-    function (emp::EmpPoint)(I)
+    function (emp::EmPoint)(I)
         copyto!(emp.e_p.I_measured,I)
         return fitT_default(emp).T
     end
