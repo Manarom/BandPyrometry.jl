@@ -162,12 +162,13 @@ Input:
         #a = @view x[1:end-1] #emissivity approximation variables
         feval!(bp.e_p,x[end]) # refreshes planck function values
         if x!=bp.x_em_vec # x_em_vec - emissivity calculation vector
+            emissivity!(bp,x)
             if bp.is_has_Iₛᵤᵣ # has surrounding radiation correction
-                bp.Ic .= (bp.e_p.Ib .- bp.e_p.Iₛᵤᵣ).*emissivity!(bp,x) # I=(Ibb-Isur)*ϵ
+                @. bp.Ic = (bp.e_p.Ib - bp.e_p.Iₛᵤᵣ)*bp.ϵ # I=(Ibb-Isur)*ϵ
             else
-                bp.Ic .= bp.e_p.Ib.*emissivity!(bp,x) # I=Ibb*ϵ
+                @. bp.Ic = bp.e_p.Ib * bp.ϵ # I=Ibb*ϵ
             end
-            bp.x_em_vec.=x
+            bp.x_em_vec .= x
         end
         return bp.Ic
     end
@@ -184,7 +185,7 @@ Input:
 """
     function residual!(bp::BandPyrometryPoint,x::AbstractVector)
         feval!(bp,x)   # feval! calculates function value only if current x is not the same as 
-        bp.r .=bp.e_p.I_measured .- bp.Ic # measured data - calculated 
+        @. bp.r =bp.e_p.I_measured - bp.Ic # measured data - calculated 
         bp.e_p.r[] = 0.5*norm(bp.r)^2 # discrepancy value
         return bp.r # returns residual vector
     end
@@ -230,8 +231,8 @@ function jacobian!(x::AbstractVector,bp::BandPyrometryPoint) # evaluates Planck 
             J1 = @view bp.jacobian[:,1:end-1] # Jacobian without temperature derivatives
             J2 = @view bp.jacobian[:,end] # Last column of the jacobian 
             #a  = @view (x,1,end-1)
-            J1 .= bp.e_p.Ib.*bp.vandermonde.v # diag(ibb)*V
-            J2 .= bp.e_p.∇I.*emissivity!(bp,x)# 
+            J1 .= bp.e_p.Ib .* bp.vandermonde.v # diag(ibb)*V
+            J2 .= bp.e_p.∇I .* emissivity!(bp,x)# 
             bp.x_jac_vec .=x # refresh jacobian calculation vector
         end
     end   
@@ -257,7 +258,7 @@ Input:
     function grad!(g::AbstractVector,x::AbstractVector,bp::BandPyrometryPoint)
         residual!(bp,x)
         jacobian!(x,bp) # calculated Jₘ
-        g .= -transpose(bp.jacobian)*bp.r # calculates gradient ∇f = -Jₘᵀ*r
+        g .= - transpose(bp.jacobian) * bp.r # calculates gradient ∇f = -Jₘᵀ*r
         return nothing
     end
 
@@ -304,7 +305,7 @@ Input:
 """
 function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
         if x!=bp.x_hess_vec
-            hess_approx!(bp.hessian,x,bp) # refreech the approximate hessian 
+            hess_approx!(bp.hessian,x,bp) # refresh the approximate hessian 
             # and fill hessian with approximate hessian Jᵀ*J
             # refreshes second derivative of the Planck function
             ∇²!(x[end],bp.e_p) 
@@ -313,12 +314,12 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
             # V - Vandermonde matrix, I'ᴰ - first 
             # derivative diagonal matrix,
             # r - residual vector
-            last_hess_col = @view bp.hessian[1:end-1,end] 
+            last_hess_col = @view bp.hessian[1:end-1, end] 
             # view of the last column of the hessian 
             # initial formula: Hm_vec = Vᵀ*I'ᴰ*r  => transpose(V)*diagm(I')*r 
             # A*diagm(b) <=> A.*transpose(b) <=> transpose(Aᵀ.*b) 
             # Hm_vec = (V.*I')ᵀ*r
-            last_hess_col .-= transpose(bp.vandermonde.v.*bp.e_p.∇I)*bp.r
+            last_hess_col .-= transpose(bp.vandermonde.v .* bp.e_p.∇I)*bp.r
             bp.hessian[end,1:end-1] .= last_hess_col # the sample
             # only right-down corner of hessian contains the second derivative
             # hm = rᵀ*(∇²Ibb)ᴰ*V*a
@@ -546,13 +547,14 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
         end
         results = solve(probl,optimizer())
         feval!(point,results.u)
-        return  fitting_result(point, result, optimizer) 
+        return  fitting_result(point, results, optimizer) 
                         
     end
     fitting_result(point::BandPyrometryPoint,results,optimizer) = (T=temperature(point),a=results.u[1:end-1],
                                                                             ϵ=point.vandermonde*results.u[1:end-1],
                                                                             res=results,
                                                                             optimizer=optimizer)
+
     fitting_result(point::EmPoint, results, optimizer) = (T=temperature(point), res=results, optimizer=optimizer)
 
     function fitT_default(point::EmPoint)
@@ -571,7 +573,7 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
         copyto!(emp.I_measured,I)
         return fitT_default(emp).T
     end
-    function (emp::EmPoint)(I)
+    function (emp::BandPyrometryPoint)(I)
         copyto!(emp.e_p.I_measured,I)
         return fitT_default(emp).T
     end

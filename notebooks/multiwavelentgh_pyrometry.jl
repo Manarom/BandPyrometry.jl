@@ -321,6 +321,16 @@ md"Measured spectrum fitting region:"
 # ╔═╡ d14c4a0d-b641-457c-b1ed-491ff047a468
 N = 50 # number of spectral points
 
+# ╔═╡ 03a7a670-3ddd-4205-b49a-0488b55886ab
+	BENCHMARK_DATA = [1.4	0.177627029	0.746041814;
+			1.554268293	0.308975548	1.123202266;
+			1.715243902	0.476864722	1.503503265;
+			1.869512195	0.673742272	1.810258761;
+			2.030487805	0.965854253	2.043896955;
+			2.184756098	1.298184072	2.630983628;
+			2.345731707	1.55399753	2.719482727;
+			2.5	1.708743729	2.720488281];
+
 # ╔═╡ 278c2da0-b396-493e-bdcd-fc2a539780b6
 md"Select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(BandPyrometry.SUPPORTED_POLYNOMIAL_TYPES)))))"
 
@@ -328,7 +338,7 @@ md"Select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(Ba
 md"""Set the "measured" spectrum emissivity approximation coefficients:"""
 
 # ╔═╡ 22eab67b-868a-44fd-9d40-69234f1ecb43
-@bind  a PlutoUI.combine() do Child
+@bind  a_real PlutoUI.combine() do Child
 	md"""
 	a0 = $(
 		Child(Slider(-1:0.01:1,default=0.3,show_value = true))
@@ -352,7 +362,7 @@ md"""Set the "measured" spectrum emissivity approximation coefficients:"""
 end
 
 # ╔═╡ 8ef42759-fb53-41af-904e-8916924415fa
-md"Set polynomial degree : $(@bind poly_degree confirm(Select(0:6,default=3))) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
+md"Set polynomial degree : $(@bind real_poly_degree confirm(Select(0:6,default=3))) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
 
 # ╔═╡ a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 md"""
@@ -370,7 +380,14 @@ md"""
 """
 
 # ╔═╡ 321172de-dcf6-4f51-ab31-edb37b8c3983
-L"""\text{Real values of the optimization variables for "measured" thermal emission spectrum: } """
+md"""
+Real values of the optimization variables for "measured" thermal emission spectrum:  """
+
+# ╔═╡ 0232ff3c-daa9-4e86-a6c7-582d66a16cb9
+md" Use real emissivity $(@bind is_real_emissivity CheckBox(default = false))"
+
+# ╔═╡ a7861092-024a-4011-820f-79835473a281
+md" Use benchmark data $(@bind is_benchmark_data CheckBox(default = false))"
 
 # ╔═╡ 01cd1f0d-15b8-474b-a05a-eec840c54fff
 md"""
@@ -383,10 +400,10 @@ md"""
 """
 
 # ╔═╡ 36c655f8-141b-4472-96d7-01c8fd1f1515
-x_data = [a[1:poly_degree+1]...,T_to_fit];
+x_real_data = [a_real[1:real_poly_degree+1]...,T_to_fit];
 
 # ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
-L"""%$(x_data)"""
+L"""%$(x_real_data)"""
 
 # ╔═╡ 6f17606c-e52e-4913-87f6-56190d209308
 @bind  lam_region confirm(PlutoUI.combine() do Child
@@ -400,12 +417,28 @@ L"""%$(x_data)"""
 	"""
 end)
 
-# ╔═╡ 78edb9ca-0d47-4503-8c86-175cf9cfeeba
-λ = SVector{N}(collect(range(lam_region[1],lam_region[2],length=N)));
+# ╔═╡ 3b4308dc-da18-43ab-9f50-2c8bc05acb78
+begin
+	if !is_benchmark_data
+		λ = SVector{N}(collect(range(lam_region[1],lam_region[2],length=N)))
+		VVV= BandPyrometry.VanderMatrix(λ,Val(real_poly_degree + 1),poly_type=poly_type)
+		Ib = Planck.ibb.(λ,T_to_fit) # bb spectrum
+		ϵ_data= if is_real_emissivity 
+				rt_emissivity_interpolation(Vector(λ))
+			else
+				VVV*x_real_data[1:end-1]# "measured" spectrum emissivity 
+			end
+		I_data = Ib.*ϵ_data .+ noise_amplitude*Ib.*(0.5 .-rand(length(λ)))# adding noise to the "measured" spectrum
+	else
+		
+	end
+	
+end;
 
 # ╔═╡ d17a5db7-0125-48b5-9016-76da6d72c673
 begin
-	VVV= BandPyrometry.VanderMatrix(λ,Val(poly_degree + 1),poly_type=poly_type);
+	
+	
 	p_mode = plot(VVV.xi,VVV.v[:,1], label="n= "*string(0),linewidth=3)
 	for (i,V) in enumerate(eachcol(VVV.v[:,2:end]))
 		plot!(VVV.xi,V, label="n= "*string(i),linewidth=3)
@@ -416,28 +449,63 @@ begin
 	p_mode
 end
 
+# ╔═╡ 09f16e07-0f21-4bcc-a6e8-cdba3097d57b
+@bind  a_starting PlutoUI.combine() do Child
+	md"""
+	a0 = $(
+		Child(Slider(-1:0.01:1,default=0.3,show_value = true))
+	) \
+	a1 = $(
+		Child(Slider(-1:0.01:1,default=0.1,show_value = true))
+	)\
+	a2 = $(
+		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	)\
+	a3 = $(
+		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	)\
+	a4 = $(
+		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	)\
+	a5 = $(
+		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	)\
+	"""
+end
+
+# ╔═╡ 7f56174f-03f2-4996-a158-efcfc9ce9979
+md"Set polynomial degree : $(@bind poly_degree confirm(Select(0:6,default=2))) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
+
 # ╔═╡ 4f2db18c-6f48-4c41-9a53-470042decf5f
 begin 
-	p_em = plot(λ, VVV*[i for i in a[1:poly_degree+1]],label=nothing,linewidth=6)
+	p_em = plot(λ, VVV*[i for i in a_real[1:poly_degree+1]],label=nothing,linewidth=6)
 	title!(raw"""Generated "real" surface spectral emissivity""")
     xlabel!("Wavelength, μm")
 	ylabel!("ϵ")
 	p_em
 end
 
-# ╔═╡ 0232ff3c-daa9-4e86-a6c7-582d66a16cb9
-md" Use real emissivity $(@bind is_real_emissivity CheckBox(default = false))"
+# ╔═╡ acc77ec3-6afb-4e76-ad2f-ec137555d1bc
+md"""
+"Check" spectrum temperature, K = $(@bind T_starting	Slider(range(273,2573,length=1000), show_value=true,default=600))
+"""
 
-# ╔═╡ 3b4308dc-da18-43ab-9f50-2c8bc05acb78
-begin
-	Ib = Main.BandPyrometry.Planck.ibb.(λ,T_to_fit) # bb spectrum
-	ϵ_data= if is_real_emissivity 
-			rt_emissivity_interpolation(Vector(λ))
-		else
-			VVV*x_data[1:end-1]# "measured" spectrum emissivity 
-	end
-	I_data = Ib.*ϵ_data .+ noise_amplitude*Ib.*(0.5 .-rand(length(λ)))# adding noise to the "measured" spectrum
-end;
+# ╔═╡ 808f8601-90fc-4cb1-b455-46cfc11b8fc7
+begin 
+	x_starting = MVector{poly_degree + 2}(zeros(poly_degree + 2))
+	x_starting[end] = 1700.0
+	x_starting[1:end-1] .= a_starting[1:poly_degree+1]
+end
+
+# ╔═╡ 1c60da73-a088-45ac-a08d-885bb1d98dcc
+begin 
+	VV_check = BandPyrometry.VanderMatrix(λ,Val(poly_degree + 1),poly_type=poly_type)
+	Ib_check = Planck.ibb.(λ,T_starting) # bb spectrum
+	ϵ_data_check = VV_check*x_starting[1:end-1]# "measured" spectrum emissivity 
+	I_data_check = Ib_check.*ϵ_data_check
+	plot(λ,I_data,label="Real")
+	plot!(λ,I_data_check,label = "check")
+end
 
 # ╔═╡ 9016369d-bc8b-4907-bdb2-f4e81c444d30
 md"""
@@ -463,8 +531,7 @@ $(Main.BandPyrometry.optimizer_switch(optim_type,is_constraint=is_constraint,is_
 
 # ╔═╡ 6118cebc-d18e-42cc-ac1b-aa1ad95cd719
 begin 
-	x_starting = MVector{poly_degree + 2}(zeros(length(x_data)))
-	x_starting[end] = 1700.0
+	
 	band_fit =Main.BandPyrometry.BandPyrometryPoint(I_data,λ,x_starting,polynomial_type=poly_type)# creating BandPyrometryPoint from the data to be fitted, wavelength region and starting optimization variables vector x_starting
 	@time out = Main.BandPyrometry.fit_T!(band_fit,optimizer_name=optim_type,is_constraint=is_constraint,is_lagrange_constraint = false) # this function runs the optimizaiton 
 end # starting values
@@ -487,14 +554,8 @@ end
 # ╔═╡ 73c85c85-2fc4-48ac-b5f4-4c35edcf935c
 begin 
 	a_vect_fitted = out[2]
-	a_vect_real = x_data[1:end-1]
+	a_vect_real = x_real_data[1:end-1]
 end;
-
-# ╔═╡ 415ffaa1-fc30-408c-a5a2-f27bc0821506
-#band_fit.e_p(I_data/0.99)
-
-# ╔═╡ c0738eeb-b0ec-441e-a3ed-4ac0f053063e
-
 
 # ╔═╡ ebc0b228-01c8-42e4-9388-8194be1dd669
 md"""
@@ -503,7 +564,7 @@ md"""
 
 # ╔═╡ 5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
 L"""
-	\begin{bmatrix} T_{fitted} = %$(T_fitted) & T_{real} = %$(T_to_fit) & \Delta T /T = %$(abs(T_fitted-T_to_fit)/T_to_fit) \\ |\vec{a}_{fitted}| = %$(norm(a_vect_fitted)) & |\vec{a}_{real}| = %$(norm(x_data[1:end-1])) & |\vec{a}_{fitted} -\vec{a}_{real}|= %$(norm(a_vect_fitted - a_vect_real))\end{bmatrix}
+	\begin{bmatrix} T_{fitted} = %$(T_fitted) & T_{real} = %$(T_to_fit) & \Delta T /T = %$(abs(T_fitted-T_to_fit)/T_to_fit) \\ |\vec{a}_{fitted}| = %$(norm(a_vect_fitted)) & |\vec{a}_{real}| = %$(norm(x_real_data[1:end-1])) & |\vec{a}_{fitted} -\vec{a}_{real}|= %$(norm(a_vect_fitted - a_vect_real))\end{bmatrix}
 
 """
 
@@ -521,6 +582,42 @@ end
 
 # ╔═╡ 3f1e1a4c-48bf-44fa-a146-020dde04d2ff
 md"Final discrepancy value: $(Main.BandPyrometry.disc(out[4].u, band_fit ))"
+
+# ╔═╡ 027f22c1-5309-49d4-86ac-53791c2e0eaf
+begin	
+		ni = 1
+		r = 1:ni:8
+		N_bench = length(r)
+		#NPOINTS = 30
+		SV = SVector{N,Float64}
+		#lam_bench = SV(data[r,1])
+		lam_init = BENCHMARK_DATA[r,1]
+		lam_bench = SV(range(extrema(lam_init)...,N)) #linear_interpolation
+		I_interp = linear_interpolation(lam_init,BENCHMARK_DATA[r,2])(Vector(lam_bench))
+		I_meas_bench = SV(1e3*(I_interp))
+		Planck.ibb.(lam_bench,1050.0)
+
+
+		p_bench = plot(lam_bench,I_meas_bench, label = "init", markershape=:diamond)
+		T_out = Float64[]
+		e_bench = Matrix{Float64}(undef,N,7)
+		for n in 2:N_bench
+		    x_start = zeros(n)
+		    x_start[1] = 0.5
+		    x_start[end] = 1000.0
+		    bm_bench = BandPyrometry.BandPyrometryPoint(I_meas_bench,lam_bench, SVector{n,Float64}(x_start))
+		    out = BandPyrometry.fit_T!(bm_bench,
+		            optimizer_name="ParticleSwarm",
+		            is_constraint=true)
+		    push!(T_out,out[1])
+		    e_bench[:,n-1] = bm_bench.ϵ
+		    @show out[4]
+		    plot!(p_bench,lam_bench,bm_bench.Ic,label = string(n))
+		end
+		@show T_out
+		p=plot(e_bench)
+		p_bench
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -566,7 +663,7 @@ StaticArrays = "~1.9.15"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.7"
+julia_version = "1.11.5"
 manifest_format = "2.0"
 project_hash = "605f30531750c279bcc6249139daa4873ed93bc2"
 
@@ -2503,39 +2600,44 @@ version = "1.9.2+0"
 # ╟─38300c92-e5e6-4d5e-a394-aa1a47cfd757
 # ╟─8a54d856-2298-4225-81ac-23bf66f35136
 # ╟─d14c4a0d-b641-457c-b1ed-491ff047a468
-# ╟─78edb9ca-0d47-4503-8c86-175cf9cfeeba
+# ╟─03a7a670-3ddd-4205-b49a-0488b55886ab
 # ╟─278c2da0-b396-493e-bdcd-fc2a539780b6
 # ╟─d90da478-40b3-4677-82b9-fbfd79a72ef0
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
-# ╟─8ef42759-fb53-41af-904e-8916924415fa
+# ╠═8ef42759-fb53-41af-904e-8916924415fa
 # ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 # ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2
-# ╟─36c655f8-141b-4472-96d7-01c8fd1f1515
+# ╠═36c655f8-141b-4472-96d7-01c8fd1f1515
 # ╟─321172de-dcf6-4f51-ab31-edb37b8c3983
 # ╟─c4df3ad4-9f1a-414c-b02c-8161f007ccd5
+# ╟─0232ff3c-daa9-4e86-a6c7-582d66a16cb9
+# ╠═a7861092-024a-4011-820f-79835473a281
 # ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
-# ╟─3b4308dc-da18-43ab-9f50-2c8bc05acb78
+# ╠═3b4308dc-da18-43ab-9f50-2c8bc05acb78
 # ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 # ╟─6f17606c-e52e-4913-87f6-56190d209308
-# ╟─0232ff3c-daa9-4e86-a6c7-582d66a16cb9
+# ╟─09f16e07-0f21-4bcc-a6e8-cdba3097d57b
+# ╟─7f56174f-03f2-4996-a158-efcfc9ce9979
+# ╠═acc77ec3-6afb-4e76-ad2f-ec137555d1bc
+# ╟─808f8601-90fc-4cb1-b455-46cfc11b8fc7
+# ╟─1c60da73-a088-45ac-a08d-885bb1d98dcc
 # ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
 # ╟─c947d126-092b-4b92-ab56-373d5a387908
-# ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
+# ╠═fead76f5-c0b5-4fcb-a39e-c97ded034653
 # ╟─950a61f6-fe83-47a3-b65f-fd4b70ff12ba
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
 # ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
 # ╟─15025715-1ff3-4e7c-8136-cc442b77528a
 # ╟─6118cebc-d18e-42cc-ac1b-aa1ad95cd719
-# ╠═a73dc68d-7e41-4748-b0bb-458d6ef73305
-# ╠═73c85c85-2fc4-48ac-b5f4-4c35edcf935c
-# ╠═415ffaa1-fc30-408c-a5a2-f27bc0821506
-# ╠═c0738eeb-b0ec-441e-a3ed-4ac0f053063e
+# ╟─a73dc68d-7e41-4748-b0bb-458d6ef73305
+# ╟─73c85c85-2fc4-48ac-b5f4-4c35edcf935c
 # ╟─ebc0b228-01c8-42e4-9388-8194be1dd669
 # ╟─5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
 # ╟─e9b7169f-0d75-44bb-8505-ccfde1bdce98
 # ╟─3f1e1a4c-48bf-44fa-a146-020dde04d2ff
+# ╟─027f22c1-5309-49d4-86ac-53791c2e0eaf
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
