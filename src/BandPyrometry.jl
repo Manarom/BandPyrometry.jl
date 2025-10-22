@@ -71,14 +71,14 @@ Input:
     is_constraint - is box constraint problem formulation, 
     is_lagrange_constraint - use Lagrange constraints (supported only by IPNewton)
 """
-    function optimizer_switch(name::String;is_constraint::Bool=false,
+    function optimizer_switch(name::String;is_box_constraint::Bool=false,
                 is_lagrange_constraint::Bool=false)
             if is_lagrange_constraint
                 name = filter(x -> ==(name,x),support_lagrange_constraints)
                 default_ = optim_dic[support_lagrange_constraints[1]]
                 return length(name)>=1 ? get(optim_dic,name[1],default_ ) :
                                                                     default_            
-            elseif is_constraint
+            elseif is_box_constraint
                 name = filter(x -> ==(name,x),support_constraint_optimizers)
                 return length(name)>=1 ? get(optim_dic,name[1],optim_dic["Default"]) :
                 optim_dic["Default"]
@@ -93,15 +93,19 @@ Input:
 Evaluates box-constraint of the problem
 Evaluates box-constraint of the problem
 """
-    function box_constraints(bp::BandPyrometryPoint) 
+    function evaluate_box_constraints(bp::BandPyrometryPoint, emissivity_range::B,temperature_range::B) where B <: Union{Nothing,AbstractVector} 
         # method calculates box constraints 
         # of the feasible region (dumb version)
             lb = copy(bp.x)
             ub = copy(bp.x)
-            lb[1:end-1].=-1.0
-            ub[1:end-1].=1.0
-            lb[end] =20.0 # 20 Kelvins limit for the temperature
-            ub[end] = 5000.0
+            (lb_all,ub_all) = isnothing(emissivity_range) ? (-1.0,1.0) : (emissivity_range[1], emissivity_range[2])
+            lb[1:end-1].= lb_all
+            ub[1:end-1].= ub_all
+            if isnothing(emissivity_range) 
+                (lb[end], ub[end]) = isnothing(temperature_range) ? (20.0,5000.0) : (temperature_range[1],temperature_range[2])# 20 Kelvins limit for the temperature
+            else
+                
+            end
         return (lb=lb,ub=ub)
     end
     
@@ -331,7 +335,9 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
     end
 
     # EMISSION POINT METHODS
-    box_constraints(::EmPoint) = (lb=[20.0],ub=[5000.0]) # limits on the BB temperature
+    function evaluate_box_constraints(point::EmPoint,emissivity_range, temperature_constraint::Union{AbstractVector,Nothing} = nothing) 
+        return isnothing(temperature_constraint) ? ([20.0],[5000.0]) : (temperature_constraint[1], temperature_constraint[2]) # limits on the BB temperature
+    end
     feval!(e::EmPoint,T::AbstractArray) = feval!(e,T[end])
     """
     feval!(e::EmPoint,t::Float64)
@@ -513,14 +519,14 @@ Returns:
 """
 function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
             optimizer_name::String="Default",
-            is_constraint::Bool=false,
-            is_lagrange_constraint::Bool=false)
+            is_box_constraint::Bool=false,
+            is_lagrange_constraint::Bool=false, emissivity_range::B=nothing, temperature_range::B=nothing) where B <: Union{AbstractVector,Nothing}
             
             !(optimizer_name == "Default")  || return fitT_default(point)
 
 
             optimizer = optimizer_switch(optimizer_name,
-                                    is_constraint = is_constraint,
+                                    is_box_constraint = is_box_constraint,
                                     is_lagrange_constraint = is_lagrange_constraint)
         fun = is_lagrange_constraint ? LAGRANGE_OPTIM_FUN : OPTIM_FUN
         # by default all derivatives are supported
@@ -530,17 +536,19 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
             starting_vector = copy(point.x);
         end
         if is_lagrange_constraint
+            (lb,ub) = evaluate_lagrange_constraints(point,emissivity_range,temperature_range)
             probl= OptimizationProblem(fun, 
                             starting_vector,
                             point, 
-                            lcons = [0.0,0.0], # both min and max of emissivity should be not smaller than zero
-                            ucons = [1.0,1.0]) # both min and max should be higher than one        
-        elseif is_constraint
-            bx = box_constraints(point)
+                            lcons = lb, # both min and max of emissivity should be not smaller than zero
+                            ucons = ub) # both min and max should be higher than one        
+        elseif is_box_constraint
+            (lb,ub) = evaluate_box_constraints(point, emissivity_range,temperature_range)
             probl= OptimizationProblem(fun, 
                             starting_vector,
-                            point,lb=bx.lb, ub=bx.ub)
-        else
+                            point,
+                            lb=lb, ub=ub)
+        else # unconstraint
             probl= OptimizationProblem(fun, 
                                 starting_vector,
                                 point)           
