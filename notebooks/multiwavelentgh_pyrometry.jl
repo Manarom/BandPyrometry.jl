@@ -133,16 +133,14 @@ _______________________
 
 As far as the `blackbody` thermal radiation energy strongly depends on temperature, this quantity can be used to measure the temperature of a real surface. This is the general idea of partial radiation pyrometry: **measure intensity to get the temperature**. 
 
- Small package [RadiationPyrometers.jl](https://github.com/Manarom/RadiationPyrometers.jl) provides several function to work with `virtual` partial radiation pyrometers.
-
-Figure shows various pyrometers available in `RadiationPyrometers.jl` together with their spectral tange:
+Figure shows various typical partial radiation pyrometers available in `RadiationPyrometers.jl` together with their spectral tange:
 
 ![GitHub image](https://github.com/Manarom/RadiationPyrometers.jl/blob/main/notebooks/Pyrometers.png?raw=true)
 """
 
 # ╔═╡ 9b08b767-7e8f-4483-9f2f-226022ce10e4
 md"""
-	It is interesting to look how various pyrometers (with their emissivity set to one) `measure` the temperature of a real surface. The following figure shows the real surface thermal emission intensity and several common pyrometers types working regions. In the legend their `measured` temperature is shown. The `mesured` temperature for each pyrometer type is obtained by fitting the blackbody power to the real surface power both integrated over pyrometer's working spectral range.  
+	The legend of the figure above shows the `measured` temperature for emissivity set to one for several common pyrometers types.  Spectral regions are shown with different colours. This figure was generated using [RadiationPyrometers.jl](https://github.com/Manarom/RadiationPyrometers.jl), a small packahe, which provides several function to work with `virtual` partial radiation pyrometers. More details on this picture are available in  `RadiationPyrometers.jl` package description.
 	"""
 
 # ╔═╡ 712828a7-fb54-42e6-95fc-233243190f59
@@ -153,7 +151,7 @@ md"""
 	#### I.III. Multiwavelength pyrometry
 	_______________________
 
-	Unlike classical partial radiation pyrometry, which requires setting a constant emissivity in some relatively narrow wavelength region, the **multiwavelength pyrometry** allows one to obtain the temperature of a surface without knowing the emissivity. More about multiwavelength pyrometry can be found e.g. in [Multi-spectral pyrometry—a review](https://iopscience.iop.org/article/10.1088/1361-6501/aa7b4b) 
+	Unlike classical partial radiation pyrometry, which requires setting a constant emissivity in some relatively narrow wavelength region, the **multiwavelength pyrometry**  in theory, allows one to obtain the temperature of a surface without knowing the emissivity. More about multiwavelength pyrometry can be found e.g. in [Multi-spectral pyrometry—a review](https://iopscience.iop.org/article/10.1088/1361-6501/aa7b4b). 
 
 	In order to achieve this goal, the **multiwavelength pyrometry** assumes that the dependence of emissivity on wavelength in some spectral range can be described by some relatively small number (``N``) of parameters. Hence, if you have measured thermal radiation intensity at relatively large number (``M``) of wavelengths, and if ``M>N+1``, you can formulate the optimization problem in space of ``N+1`` optimization variables viz ``\vec{x}= \begin{bmatrix} a_0 , \dots,  a_{N-1} , T\end{bmatrix}``, here `` \begin{bmatrix} a_0 , \dots,  a_{N-1}  \end{bmatrix}`` are ``N``  emissivity approximation coefficients, and the ``(N+1)``'th optimization variable ``T`` is the temperature.	The **multiwavelength pyrometry** optimization problem has several features that can be utilized in order to obtain a computationally-effective algorithm:
 
@@ -240,7 +238,7 @@ All basis vectors are stored in a structure called `VanderMatrix`, this type:
 
 2. The resulting emissivity can be calculated as a product of `VanderMatrix` and the vector of emissivity approximation polynomial coefficients vector: ``\vec{\epsilon}=V\cdot\vec{a}``
 
-Independent variable vector ``\lambda`` is stored in normalized (in order to fit withing the range of -1...1) form, `VanderMatrix` also stores all data needed to return the original  ``\lambda`` vector. Matrix ``V`` can  be used to fit (in a least-square sense) by solving the overdetermined system of equations: ``\vec{a}= V^{\dagger} \cdot \vec{\epsilon}``, where  []^{\dagger} means pseudo-inverse. The package implements this in  `polyfit` function (show docs) $(@bind show_polyfit_docs CheckBox(default=false)). 
+Independent variable vector ``\lambda`` is stored in normalized (in order to fit withing the range of -1...1) form, `VanderMatrix` also stores all data needed to return the original  ``\lambda`` vector. Matrix ``V`` can  be used to fit (in a least-square sense) by solving the overdetermined system of equations: ``\vec{a}= V^{\dagger} \cdot \vec{\epsilon}``, where  ``[]^{\dagger}`` means pseudo-inverse. The package implements this in  `polyfit` function (show docs) $(@bind show_polyfit_docs CheckBox(default=false)). 
 """
 
 # ╔═╡ ae970ce5-fc5d-40d8-9f08-5dce0f99a509
@@ -672,7 +670,7 @@ StaticArrays = "~1.9.15"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.7"
+julia_version = "1.11.5"
 manifest_format = "2.0"
 project_hash = "605f30531750c279bcc6249139daa4873ed93bc2"
 
@@ -2588,7 +2586,7 @@ version = "1.9.2+0"
 # ╟─03d76e64-ebf4-432b-b9be-d4cb26275f55
 # ╟─8a066ee5-80e9-462f-9a61-15851468aa63
 # ╟─9b08b767-7e8f-4483-9f2f-226022ce10e4
-# ╠═712828a7-fb54-42e6-95fc-233243190f59
+# ╟─712828a7-fb54-42e6-95fc-233243190f59
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
@@ -2600,7 +2598,7 @@ version = "1.9.2+0"
 # ╟─c47637c6-b243-4d8b-8234-40c68608939c
 # ╟─d55793f5-45ff-4968-b2e1-8b846de8b91f
 # ╟─da6d5178-c083-4baa-91c3-e62f735bf808
-# ╟─ae970ce5-fc5d-40d8-9f08-5dce0f99a509
+# ╠═ae970ce5-fc5d-40d8-9f08-5dce0f99a509
 # ╟─529b07d7-e622-4816-8de9-e31581ea96a6
 # ╟─ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
 # ╟─988274c4-ad6a-42df-aead-5f40e0000998

@@ -3,21 +3,23 @@ using LinearAlgebra,Interpolations,Polynomials,LegendrePolynomials,StaticArrays
 
 abstract type AbstractPolyWrapper{P,V} end
 
-struct TrigPolyWrapper{P} <: AbstractPolyWrapper{P,Val{:trig}}
+struct TrigPolyWrapper{P} <: AbstractPolyWrapper{P,:trig}
     coeffs::MVector{P,Float64}
 end
-struct LegPolyWrapper{P}  <: AbstractPolyWrapper{P,Val{:leg}}
+struct LegPolyWrapper{P}  <: AbstractPolyWrapper{P,:leg}
     coeffs::MVector{P,Float64}
 end
-struct StandPolyWrapper{P}  <: AbstractPolyWrapper{P,Val{:stand}} 
+struct StandPolyWrapper{P}  <: AbstractPolyWrapper{P,:stand} 
     coeffs::MVector{P,Float64}
 end
-struct ChebPolyWrapper{P}  <: AbstractPolyWrapper{P,Val{:chebT}}
+struct ChebPolyWrapper{P}  <: AbstractPolyWrapper{P,:chebT}
     coeffs::MVector{P,Float64}
 end
 
 (::Type{T})(x::Vector) where T<:AbstractPolyWrapper = T{length(x)}(MVector{length(x)}(x))
 name(::AbstractPolyWrapper{N,V}) where {N,V} = V
+degree(::AbstractPolyWrapper{N,V}) where {N,V} = N - 1
+parnumber(::AbstractPolyWrapper{N,V}) where {N,V} = N
 
 const SUPPORTED_POLYNOMIAL_TYPES = Base.ImmutableDict(
                 :stand=> StandPolyWrapper,#Standard basis polynomials from Polynomials.Polynomial,
@@ -32,15 +34,9 @@ eval_poly(poly::StandPolyWrapper,x) = Polynomials.Polynomial(poly.coeffs)(x)
 eval_poly(poly::ChebPolyWrapper,x) = Polynomials.ChebyshevT(poly.coeffs)(x)
 eval_poly(::LegPolyWrapper,degree,x) = LegendrePolynomials.Pl(x,degree)
 function eval_poly(::TrigPolyWrapper,degree,x) 
-     if degree==0
-        return 1
-     end  
+     degree != 0 || return 1
      n = 1 + floor(degree/2) 
-     if isodd(degree)
-        return sin(n*pi*x)
-     else
-        return cos(n*pi*x)
-     end
+     return isodd(degree) ? sin(n*pi*x) : cos(n*pi*x)
 end
 function (poly::Union{StandPolyWrapper,ChebPolyWrapper})(x::Number)
     return eval_poly(poly,x)
@@ -54,14 +50,16 @@ end
     make it consistent with Polynomials.jl 
     TrigPolyWrapper simple type for trigonometric function polynomils
 """
-function (poly::Union{LegPolyWrapper,TrigPolyWrapper})(x::Number)
+function (poly::Union{LegPolyWrapper{N},TrigPolyWrapper{N}})(x::Number) where N
     #LegendrePolynomials.Pl(x,l) - computes Legendre polynomial of degree l at point x 
-    res = 0.0
-    for (i,coeff) ∈ enumerate(poly.coeffs)
+    #=res = 0.0
+    for i ∈ 1:N
+        coeff = poly.coeffs[i]
         coeff != 0.0 || continue
-        res += coeff*eval_poly(poly,i-1,x)
+        res += coeff*eval_poly(poly, i - 1,x)
     end
-    return res
+    return res =#
+    return sum(ntuple(i -> poly.coeffs[i]*eval_poly(poly,i - 1,x),N))
 end
 """
     VanderMatrix{M <: SMatrix , R <: SMatrix, V <: SVector}
@@ -76,7 +74,7 @@ Structure VanderMatrix has the following fields:
     xi - normalized vector 
     poly_type  - polynomial type name (nothing depends on this name)
 """
-struct VanderMatrix{N,CN,T,NxCN,CNxCN} #M <: SMatrix , R <: SMatrix, V <: SVector}
+struct VanderMatrix{N,CN,T,NxCN,CNxCN,P} #M <: SMatrix , R <: SMatrix, V <: SVector}
     v::SMatrix{N,CN,T,NxCN} # matrix of approximating functions 
     v_unnorm::SMatrix{N,CN,T,NxCN} # unnormalized vandermatrix used to convert fitted parameters if necessarys
     # QR factorization matrices
@@ -85,7 +83,6 @@ struct VanderMatrix{N,CN,T,NxCN,CNxCN} #M <: SMatrix , R <: SMatrix, V <: SVecto
     x_first::T # first element of the initial array
     x_last::T # normalizing coefficient 
     xi::SVector{N,T} # normalized vector-column 
-    poly_type::Symbol
 end# struct spec
 
 """
@@ -101,16 +98,15 @@ Input:
 
 """
 function VanderMatrix(x::StaticArray{Tuple{N},T,1},
-                      ::Val{CN};
-                      poly_type::Symbol = :stand,
-                    ) where {N,CN,T}
-
+                      #::Val{CN},
+                      PolyWrapper::Type{P} # = StandPolyWrapper{CN}
+                    ) where {N, T, P <:AbstractPolyWrapper{CN,PN}} where {CN,PN}
             @assert issorted(x) "The x-vector must be sorted in ascending order"
             @assert allunique(x) "All x-values must be unique"
             #@assert P >= 0 "Degree of polynomial must be greater or equal zero"
-            @assert haskey(SUPPORTED_POLYNOMIAL_TYPES,poly_type) "Polynomial type must be member of $(keys(SUPPORTED_POLYNOMIAL_TYPES))"# polynomial must be of supported type
+            #@assert haskey(SUPPORTED_POLYNOMIAL_TYPES,poly_type) "Polynomial type must be member of $(keys(SUPPORTED_POLYNOMIAL_TYPES))"# polynomial must be of supported type
             
-            PolyWrapper = SUPPORTED_POLYNOMIAL_TYPES[poly_type]
+            #PolyWrapper = SUPPORTED_POLYNOMIAL_TYPES[poly_type]
             # CN = P + 1 # number of columns
             (_xi,x_first,x_last) = normalize_x(x)
            
@@ -128,14 +124,13 @@ function VanderMatrix(x::StaticArray{Tuple{N},T,1},
             _V = MatrixType(V)
             (Q,R) = qr(_V)
             # {MatrixType,RMatrixType,VectorType,PolyWrapper}
-            VanderMatrix{N,CN,T,NxCN,CNxCN}(_V,# Vandermonde matrix
+            VanderMatrix{N,CN,T,NxCN,CNxCN,PolyWrapper}(_V,# Vandermonde matrix
                 MatrixType(Vunnorm), #unnormalized vandermatrix
                 MatrixType(Q),
                 RMatrixType(R),
                 x_first, # first element of the initial array
                 x_last, # normalizing coefficient 
                 VectorType(_xi),  
-                poly_type
             )
 end
 
@@ -177,15 +172,24 @@ VanderMatrix object can be directly multiplyed by a vector
 """
 Base.:*(V::VanderMatrix,a::AbstractVector) =V.v*a 
 """
-    polyfit(V::VanderMatrix,x::T,y::T) where T<:AbstractVector
+    polyfit(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
 
 Fits data x - coordinates, y - values using the VanderMatrix
-basis function
+basis function (this coefficients for normalized x-vector)
+```julia
+    (a,y_fitted, gf) = polyfit(V,x,y)
+    y_fitted =  V.v*a # V.v - is the vandermonde matrix
+    # for normalized x, which has all values within [-1,1] range
+    # if a = [a₁ , ..., aₙ], 
+    # e.g if V is for standard basis:
+    (xnorm,) = normalize_x(x) # returns vector 
+    # y_fitted = a₁ + a₂xnorm + ... + aₙxnormⁿ⁻¹
+```
 
 Input:
     x - coordinates, [Nx0]
     y - values, [Nx0]
-returns tuple with vector of polynomial coefficints, values of y_fitted at x points
+returns tuple with vector of polynomial coefficients, values of y_fitted at x points
 and the norm of goodness of fit     
 """
 function polyfit(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
@@ -195,6 +199,18 @@ function polyfit(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:
     goodness_fit = norm(yi .- y_fit)
     return  (a, y_fit, goodness_fit) 
 end
+"""
+    polyfitn(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
+
+Fits data x - coordinates, y - values using the VanderMatrix
+basis function (coefficients for unnormalized x-vector)
+
+Input:
+    x - coordinates, [Nx0]
+    y - values, [Nx0]
+returns tuple with vector of polynomial coefficients, values of y_fitted at x points
+and the norm of goodness of fit  
+"""
 function polyfitn(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
     yi =  !is_the_same_x(V,x) ? linear_interpolation(x,y)(denormalize_x(V)) : y
     (Q,R) = qr(V.v_unnorm)
@@ -203,6 +219,20 @@ function polyfitn(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<
     goodness_fit = norm(yi .- y_fit)
     return  (a, y_fit, goodness_fit) 
 end
+
+#=function polyval(V::VanderMatrix{N,CN,T},xi::Vector{T}) where {N,CN,T}
+
+    if is_the_same_x(V,xi)
+        return 
+    else
+
+    end
+    VanderMatrix(x::StaticArray{Tuple{N},T,1},
+                      ::Val{CN};
+                      poly_type::Symbol = :stand,
+                    ) where {N,CN,T}
+end=#
+
 """
     normalize_x(x::AbstractVector)
 
@@ -412,4 +442,8 @@ end
 function temperature(bpp::BandPyrometryPoint)
     return bpp.e_p.Tib[]
 end
-
+pointsnumber(::Union{EmPoint{N},BandPyrometryPoint{N}}) where N = N
+parnumber(::BandPyrometryPoint{N, Nx3, P}) where  {N, Nx3, P} = P
+parnumber(::EmPoint) = 1
+emissivity(p::BandPyrometryPoint) = copy(p.ϵ)
+#emissivity(p::BandPyrometryPoint,λ::AbstractVector) = 

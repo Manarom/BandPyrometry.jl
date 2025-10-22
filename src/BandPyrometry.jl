@@ -43,6 +43,7 @@ module BandPyrometry
                             "LBFGS"=>LBFGS,
                             "IPNewton"=>IPNewton) # list of supported optimizers
     const DEFAULT_OPTIMIZER = Ref(LBFGS())
+    const DEFAULT_TEMPERATURE_RANGE = Ref((20.0,3000.0)) # default temperture range used for bounded optimization
     """
     Optimizers supporting box-constraint optimization
     """                        
@@ -93,7 +94,7 @@ Input:
 Evaluates box-constraint of the problem
 Evaluates box-constraint of the problem
 """
-    function evaluate_box_constraints(bp::BandPyrometryPoint, emissivity_range::B,temperature_range::B) where B <: Union{Nothing,AbstractVector} 
+    function evaluate_box_constraints(bp::BandPyrometryPoint{N, Nx3, P, NxP, PxP, Pm1, NxPm1, Pm1xPm1, T}, emissivity_range::B,temperature_range::C) where {N, Nx3, P, NxP, PxP, Pm1, NxPm1, Pm1xPm1, T, B <: Union{Nothing,NTuple{2,T}},C <: Union{Nothing,NTuple{2,T}} }
         # method calculates box constraints 
         # of the feasible region (dumb version)
             lb = copy(bp.x)
@@ -101,14 +102,14 @@ Evaluates box-constraint of the problem
             (lb_all,ub_all) = isnothing(emissivity_range) ? (-1.0,1.0) : (emissivity_range[1], emissivity_range[2])
             lb[1:end-1].= lb_all
             ub[1:end-1].= ub_all
-            if isnothing(emissivity_range) 
-                (lb[end], ub[end]) = isnothing(temperature_range) ? (20.0,5000.0) : (temperature_range[1],temperature_range[2])# 20 Kelvins limit for the temperature
-            else
-                
-            end
+            (lb[end], ub[end]) = isnothing(temperature_range) ? extract_temperature_range(bp,emissivity_range) : (temperature_range[1],temperature_range[2])
         return (lb=lb,ub=ub)
     end
+    extract_temperature_range(::BandPyrometryPoint,::Nothing) = DEFAULT_TEMPERATURE_RANGE[]
     
+    function extract_temperature_range(p::BandPyrometryPoint,emissivity_range)
+
+    end
     """
     em_cons!(constraint_value::AbstractArray,
                             x::AbstractVector, 
@@ -335,9 +336,10 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
     end
 
     # EMISSION POINT METHODS
-    function evaluate_box_constraints(point::EmPoint,emissivity_range, temperature_constraint::Union{AbstractVector,Nothing} = nothing) 
-        return isnothing(temperature_constraint) ? ([20.0],[5000.0]) : (temperature_constraint[1], temperature_constraint[2]) # limits on the BB temperature
+    function evaluate_box_constraints(::EmPoint{N, Nx3, T},emissivity_range::B=nothing, temperature_constraint::C = nothing) where {N, Nx3, T, B<:Union{NTuple{2,T},Nothing},C<:Union{NTuple{2,T},Nothing} }
+        return isnothing(temperature_constraint) ? DEFAULT_TEMPERATURE_RANGE[] : (temperature_constraint[1], temperature_constraint[2]) # limits on the BB temperature
     end
+
     feval!(e::EmPoint,T::AbstractArray) = feval!(e,T[end])
     """
     feval!(e::EmPoint,t::Float64)
