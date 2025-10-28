@@ -381,6 +381,9 @@ md"""
 md"""
 Real values of the optimization variables for "measured" thermal emission spectrum:  """
 
+# ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
+L"""%$(x_real_data)"""
+
 # ╔═╡ 0232ff3c-daa9-4e86-a6c7-582d66a16cb9
 md" Use real emissivity $(@bind is_real_emissivity CheckBox(default = false))"
 
@@ -394,9 +397,6 @@ md"""
 
 # ╔═╡ 36c655f8-141b-4472-96d7-01c8fd1f1515
 x_real_data = [a_real[1:real_poly_degree+1]...,T_to_fit];
-
-# ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
-L"""%$(x_real_data)"""
 
 # ╔═╡ 6f17606c-e52e-4913-87f6-56190d209308
 @bind  lam_region confirm(PlutoUI.combine() do Child

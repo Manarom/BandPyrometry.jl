@@ -92,23 +92,22 @@ Input:
     box_constraints(bp::BandPyrometryPoint)
 
 Evaluates box-constraint of the problem
-Evaluates box-constraint of the problem
 """
-    function evaluate_box_constraints(bp::BandPyrometryPoint{N, Nx3, P, NxP, PxP, Pm1, NxPm1, Pm1xPm1, T}, emissivity_range::B,temperature_range::C) where {N, Nx3, P, NxP, PxP, Pm1, NxPm1, Pm1xPm1, T, B <: Union{Nothing,NTuple{2,T}},C <: Union{Nothing,NTuple{2,T}} }
+    function evaluate_box_constraints(bp::BandPyrometryPoint{N, Nx3, P, NxP, PxP, Pm1, NxPm1, Pm1xPm1, T}; emissivity_range::B = nothing,temperature_range::C=nothing) where {N, Nx3, P, NxP, PxP, Pm1, NxPm1, Pm1xPm1, T, B <: Union{Nothing,NTuple{2,T}},C <: Union{Nothing,NTuple{2,T}} }
         # method calculates box constraints 
         # of the feasible region (dumb version)
             lb = copy(bp.x)
             ub = copy(bp.x)
-            (lb_all,ub_all) = isnothing(emissivity_range) ? (-1.0,1.0) : (emissivity_range[1], emissivity_range[2])
-            lb[1:end-1].= lb_all
-            ub[1:end-1].= ub_all
-            (lb[end], ub[end]) = isnothing(temperature_range) ? extract_temperature_range(bp,emissivity_range) : (temperature_range[1],temperature_range[2])
+            (lb_all,ub_all) = isnothing(emissivity_range) ? (-1.0,1.0) : (first(emissivity_range), last(emissivity_range))
+            lb[1:end-1] .= lb_all
+            ub[1:end-1] .= ub_all
+            (lb[end], ub[end]) = isnothing(temperature_range) ? extract_temperature_range(bp,emissivity_range) : (first(temperature_range),las(temperature_range))
         return (lb=lb,ub=ub)
     end
     extract_temperature_range(::BandPyrometryPoint,::Nothing) = DEFAULT_TEMPERATURE_RANGE[]
-    
-    function extract_temperature_range(p::BandPyrometryPoint,emissivity_range)
-
+ 
+    function extract_temperature_range(p::BandPyrometryPoint,emissivity_range::NTuple{2,T}) where T
+        return ( last(emissivity_range) |> p.e_p, first(emissivity_range) |> p.e_p) # the lower and the upper limits on temperature
     end
     """
     em_cons!(constraint_value::AbstractArray,
@@ -579,11 +578,18 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
         feval!(point,results.u)
         return (T=temperature(point), res=results, optimizer=DEFAULT_OPTIMIZER[])                 
     end
-    function (emp::EmPoint)(I) 
+    function (emp::EmPoint)(I::AbstractVector) 
         copyto!(emp.I_measured,I)
         return fitT_default(emp).T
     end
-    function (emp::BandPyrometryPoint)(I)
+    function (emp::EmPoint)(eps::Number) 
+        emp.I_measured ./= eps # dividing by emissivity 
+        # copyto!(emp.I_measured,I)
+        T =  fitT_default(emp).T
+        emp.I_measured .*= eps
+        return T
+    end
+    function (emp::BandPyrometryPoint)(I::AbstractVector)
         copyto!(emp.e_p.I_measured,I)
         return fitT_default(emp).T
     end

@@ -2,7 +2,7 @@
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "5656a676a40ff686278cb9d340f39dc09b141011"
+project_hash = "a240f24fe508355d785bc17ae7b4ddada0f31c7a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "27cecae79e5cc9935255f90c53bb831cc3c870d7"
@@ -117,6 +117,12 @@ version = "1.1.0"
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
 
+[[deps.Bernstein]]
+deps = ["ComputedFieldTypes", "GrundmannMoeller", "LinearAlgebra", "Random", "StaticArrays", "Test"]
+git-tree-sha1 = "312825ebd7807dffe3e91c8b9debe555be39054b"
+uuid = "e9b0fb4c-9cb7-4f61-9c14-701a41c684d7"
+version = "1.0.2"
+
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
 git-tree-sha1 = "e4c6a16e77171a5f5e25e9646617ab1c276c5607"
@@ -161,6 +167,12 @@ weakdeps = ["InverseFunctions"]
 
     [deps.CompositionsBase.extensions]
     CompositionsBaseInverseFunctionsExt = "InverseFunctions"
+
+[[deps.ComputedFieldTypes]]
+deps = ["Test"]
+git-tree-sha1 = "c77875b634a10dee1b3701c92f993bf8dc1dee02"
+uuid = "459fdd68-db75-56b8-8c15-d717a790f88e"
+version = "0.1.0"
 
 [[deps.ConsoleProgressMonitor]]
 deps = ["Logging", "ProgressMeter"]
@@ -407,6 +419,12 @@ git-tree-sha1 = "83cf05ab16a73219e5f6bd1bdfa9848fa24ac627"
 uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
 version = "0.2.0"
 
+[[deps.GrundmannMoeller]]
+deps = ["LinearAlgebra", "StaticArrays", "Test"]
+git-tree-sha1 = "e264cf5f081091e4af712a911d3b620567c565e3"
+uuid = "36aa67b7-9d79-4e90-bbc0-05abd90a007e"
+version = "0.1.2"
+
 [[deps.IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
 git-tree-sha1 = "ec1debd61c300961f98064cfb21287613ad7f303"
@@ -436,14 +454,11 @@ version = "0.16.2"
 git-tree-sha1 = "a779299d77cd080bf77b97535acecd73e1c5e5cb"
 uuid = "3587e190-3f89-42d0-90ee-14403ec27112"
 version = "0.1.17"
+weakdeps = ["Dates", "Test"]
 
     [deps.InverseFunctions.extensions]
     InverseFunctionsDatesExt = "Dates"
     InverseFunctionsTestExt = "Test"
-
-    [deps.InverseFunctions.weakdeps]
-    Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[deps.IrrationalConstants]]
 git-tree-sha1 = "b2d91fe939cae05960e760110b328288867b5758"
@@ -1118,6 +1133,11 @@ deps = ["LeftChildRightSiblingTrees", "Logging", "Markdown", "Printf", "Progress
 git-tree-sha1 = "f133fab380933d042f6796eda4e130272ba520ca"
 uuid = "5d786b92-1e48-4d6f-9151-6b4477ca9bed"
 version = "0.1.7"
+
+[[deps.Test]]
+deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
+uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+version = "1.11.0"
 
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
