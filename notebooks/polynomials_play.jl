@@ -29,10 +29,10 @@ includet(raw"E:\JULIA\JULIA_DEPOT\dev\BandPyrometry.jl\src\PolynomialWrappers.jl
 x = SVector{50}(collect(range(-1,1,50)));
 
 # ╔═╡ 1b15f3f8-fd8e-43c5-8c21-0b6fca139427
-md"Polynomial degree $(@bind degree Slider(0:30,show_value = true,default = 3))"
+md"Polynomial degree $(@bind polydegree Slider(0:30,show_value = true,default = 3))"
 
 # ╔═╡ 81edb295-c20f-47a9-8a6f-d21e475df6a9
-PolyType = Main.SUPPORTED_POLYNOMIAL_TYPES[poly_type]{degree + 1,Float64}
+PolyType = Main.SUPPORTED_POLYNOMIAL_TYPES[poly_type]{polydegree + 1,Float64}
 
 # ╔═╡ 2fac89c2-0c26-48c4-babc-3979363a85e4
 V = Main.VanderMatrix(x,PolyType);
@@ -80,7 +80,7 @@ end
 end
 
 # ╔═╡ 3b475ddd-be05-4c56-9b28-68a808fc6e11
-a_real =SVector{degree + 1}(a[1:degree + 1])
+a_real =SVector{polydegree + 1}(a[1:polydegree + 1])
 
 # ╔═╡ fd446c33-d439-439f-bd0a-f36770856cd2
 md" Bernstein degree $(@bind bern_degree Select(1:50,default = degree))"
@@ -110,7 +110,7 @@ end;
 bern_coeffs
 
 # ╔═╡ 36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
-Vstand = Main.VanderMatrix(x,Main.StandPolyWrapper{degree + 1,Float64});
+Vstand = Main.VanderMatrix(x,Main.StandPolyWrapper{polydegree + 1,Float64});
 
 # ╔═╡ 1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
 fit_res = Main.polyfitn(Vstand,Vector(x),Vector(y_bern))
@@ -1473,7 +1473,7 @@ version = "1.9.2+0"
 # ╟─d20e7502-fa03-4448-84f4-dc46acf52c9b
 # ╟─381fd867-f404-40e5-a270-ae98f50bf9b5
 # ╟─2d6c4a0f-6ad6-4200-bad3-1e59261ae6db
-# ╟─1b15f3f8-fd8e-43c5-8c21-0b6fca139427
+# ╠═1b15f3f8-fd8e-43c5-8c21-0b6fca139427
 # ╟─81edb295-c20f-47a9-8a6f-d21e475df6a9
 # ╟─2fac89c2-0c26-48c4-babc-3979363a85e4
 # ╟─307cc5c6-28d0-46a5-a4ff-fff8b8f5a59a
