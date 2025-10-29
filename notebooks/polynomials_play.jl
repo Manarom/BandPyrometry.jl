@@ -29,7 +29,7 @@ includet(raw"E:\JULIA\JULIA_DEPOT\dev\BandPyrometry.jl\src\PolynomialWrappers.jl
 x = SVector{50}(collect(range(-1,1,50)));
 
 # ╔═╡ 1b15f3f8-fd8e-43c5-8c21-0b6fca139427
-md"Polynomial degree $(@bind polydegree Slider(0:30,show_value = true,default = 3))"
+md"Polynomial degree $(@bind polydegree Select(0:30,default = 3))"
 
 # ╔═╡ 81edb295-c20f-47a9-8a6f-d21e475df6a9
 PolyType = Main.SUPPORTED_POLYNOMIAL_TYPES[poly_type]{polydegree + 1,Float64}
@@ -38,13 +38,16 @@ PolyType = Main.SUPPORTED_POLYNOMIAL_TYPES[poly_type]{polydegree + 1,Float64}
 V = Main.VanderMatrix(x,PolyType);
 
 # ╔═╡ 307cc5c6-28d0-46a5-a4ff-fff8b8f5a59a
-begin 
+#=begin 
 	p = plot(title = "Monomials",legend=:top,legend_columns=2, background_color_legend=RGBA(1, 1, 1, 0.0),foreground_color_legend=nothing)
 	for (i,c) in enumerate(eachcol(V.v_unnorm))
 		plot!(p,x,c,label = string(i - 1),linewidth = 2)
 	end
 	p
-end
+end=#
+
+# ╔═╡ c6dfdffe-8dd7-4264-9b75-c435c5bbf941
+plot(V)
 
 # ╔═╡ 56554cd8-e858-43d8-b6ef-7593d044920c
 @bind  a PlutoUI.combine() do Child
@@ -1473,10 +1476,11 @@ version = "1.9.2+0"
 # ╟─d20e7502-fa03-4448-84f4-dc46acf52c9b
 # ╟─381fd867-f404-40e5-a270-ae98f50bf9b5
 # ╟─2d6c4a0f-6ad6-4200-bad3-1e59261ae6db
-# ╠═1b15f3f8-fd8e-43c5-8c21-0b6fca139427
+# ╟─1b15f3f8-fd8e-43c5-8c21-0b6fca139427
 # ╟─81edb295-c20f-47a9-8a6f-d21e475df6a9
 # ╟─2fac89c2-0c26-48c4-babc-3979363a85e4
 # ╟─307cc5c6-28d0-46a5-a4ff-fff8b8f5a59a
+# ╟─c6dfdffe-8dd7-4264-9b75-c435c5bbf941
 # ╟─56554cd8-e858-43d8-b6ef-7593d044920c
 # ╠═3b475ddd-be05-4c56-9b28-68a808fc6e11
 # ╟─14ef768c-7039-4f34-862d-f58acf89e7d6

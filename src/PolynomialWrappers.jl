@@ -325,3 +325,18 @@ end
     dpi-->600
     return t->m.(t)
 end
+
+
+#p = plot(title = "Monomials",legend=:top,legend_columns=2, background_color_legend=RGBA(1, 1, 1, 0.0),foreground_color_legend=nothing)
+@recipe function f(V::VanderMatrix{N,CN,T,NxCN,CNxCN,P}) where {N,CN,T,NxCN,CNxCN,P}
+    for (i,c) in enumerate(eachcol(V.v))
+        @series begin 
+            label:="$(i)"    
+            linewidth:=2
+            fillrange:=0
+            fillalpha:=0.3
+            markershape:=:none
+            (V.xi, c)
+        end
+    end
+end
