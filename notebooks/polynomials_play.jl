@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.19
+# v0.20.20
 
 using Markdown
 using InteractiveUtils
@@ -17,7 +17,7 @@ macro bind(def, element)
 end
 
 # ╔═╡ bbfef040-b3cd-11f0-20ca-a5cbafbafd95
-using Revise,Plots,StaticArrays,Polynomials,Interpolations, RecipesBase, LegendrePolynomials, PlutoUI
+using Revise,Plots,StaticArrays,Polynomials,Interpolations, RecipesBase, LegendrePolynomials, PlutoUI, LinearAlgebra
 
 # ╔═╡ d20e7502-fa03-4448-84f4-dc46acf52c9b
 includet(raw"E:\JULIA\JULIA_DEPOT\dev\BandPyrometry.jl\src\PolynomialWrappers.jl")
@@ -26,10 +26,10 @@ includet(raw"E:\JULIA\JULIA_DEPOT\dev\BandPyrometry.jl\src\PolynomialWrappers.jl
 @bind poly_type Select(collect(keys(Main.SUPPORTED_POLYNOMIAL_TYPES)))
 
 # ╔═╡ 2d6c4a0f-6ad6-4200-bad3-1e59261ae6db
-x = SVector{50}(collect(range(0,1,50)));
+x = SVector{50}(collect(range(-1,1,50)));
 
 # ╔═╡ 1b15f3f8-fd8e-43c5-8c21-0b6fca139427
-md"Polynomial degree $(@bind degree Slider(0:12,show_value = true,default = 3))"
+md"Polynomial degree $(@bind degree Slider(0:30,show_value = true,default = 3))"
 
 # ╔═╡ 81edb295-c20f-47a9-8a6f-d21e475df6a9
 PolyType = Main.SUPPORTED_POLYNOMIAL_TYPES[poly_type]{degree + 1,Float64}
@@ -39,9 +39,9 @@ V = Main.VanderMatrix(x,PolyType);
 
 # ╔═╡ 307cc5c6-28d0-46a5-a4ff-fff8b8f5a59a
 begin 
-	p = plot()
-	for c in eachcol(V.v_unnorm)
-		plot!(p,x,c)
+	p = plot(title = "Monomials",legend=:top,legend_columns=2, background_color_legend=RGBA(1, 1, 1, 0.0),foreground_color_legend=nothing)
+	for (i,c) in enumerate(eachcol(V.v_unnorm))
+		plot!(p,x,c,label = string(i - 1),linewidth = 2)
 	end
 	p
 end
@@ -82,11 +82,32 @@ end
 # ╔═╡ 3b475ddd-be05-4c56-9b28-68a808fc6e11
 a_real =SVector{degree + 1}(a[1:degree + 1])
 
+# ╔═╡ fd446c33-d439-439f-bd0a-f36770856cd2
+md" Bernstein degree $(@bind bern_degree Select(1:50,default = degree))"
+
+# ╔═╡ 342c4189-1164-4c0f-a4c9-029c8720caea
+if PolyType <: Main.BernsteinPolyWrapper || PolyType <: Main.BernsteinSymPolyWrapper
+	Main.bern_max(PolyType,1)
+	Main.bern_max_values(Main.VanderMatrix(x,PolyType))
+	Main.bern_max_locations(Main.VanderMatrix(x,PolyType))
+end
+
 # ╔═╡ faaa4542-2066-49fc-b978-a6a45a4cca4e
 begin 
 	y_bern = V.v_unnorm*a_real
 	sum(eachcol(V.v_unnorm)) # checking normalization
 end;
+
+# ╔═╡ 67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
+begin # bernsteinfit block
+	Bern_Type = Main.BernsteinSymPolyWrapper{bern_degree + 1,Float64}
+	bern_vander_mat = Main.VanderMatrix(x,Bern_Type)
+	(bern_coeffs,bern_fit) = Main.polyfitn(bern_vander_mat,Vector(x),Vector(y_bern))
+	ber_max_ocations = Main.bern_max_locations(bern_vander_mat)
+end;
+
+# ╔═╡ 14ef768c-7039-4f34-862d-f58acf89e7d6
+bern_coeffs
 
 # ╔═╡ 36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
 Vstand = Main.VanderMatrix(x,Main.StandPolyWrapper{degree + 1,Float64});
@@ -96,27 +117,31 @@ fit_res = Main.polyfitn(Vstand,Vector(x),Vector(y_bern))
 
 # ╔═╡ c0418e2e-a6b6-4af5-a639-6d13952c88de
 begin 
-	plot(x,fit_res[2])
-	plot!(x,y_bern)
+	ppp = plot(x,fit_res[2], label = "initial function")
+	plot!(ppp,x,y_bern,label = "fitted function")
+	scatter!(ppp,ber_max_ocations,bern_coeffs, label = "bernstein polynomial coefficients")
 end
 
-# ╔═╡ 67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
-Main.polyfitn(Main.VanderMatrix(x,PolyType),Vector(x),Vector(y_bern))
-
-# ╔═╡ 342c4189-1164-4c0f-a4c9-029c8720caea
-Main.bern_max(PolyType,1)
-
-# ╔═╡ f67cf3fe-446b-4beb-a949-6c5445488f5f
-Main.bern_max_values(Main.VanderMatrix(x,PolyType))
-
-# ╔═╡ b97c1a87-84e6-46b0-91c3-d7d198e38117
-Main.bern_max_locations(Main.VanderMatrix(x,PolyType))
+# ╔═╡ 8e492f7d-b959-4635-b524-feb48ba5f139
+begin 
+	NNN = 60
+	XXX = SVector{NNN}(collect(range(-1.0,1.0,NNN)))
+	V_stand = Main.VanderMatrix(XXX,Main.StandPolyWrapper{NNN,Float64})
+	V_leg = Main.VanderMatrix(XXX,Main.LegPolyWrapper{NNN,Float64})
+	V_bern2 = Main.VanderMatrix(XXX,Main.BernsteinSymPolyWrapper{NNN,Float64})
+	p_spectra = plot()
+	for V in (V_stand,V_leg,V_bern2)
+		plot!(p_spectra, svd(V.v).S, label = string(Main.poly_name(V)))
+	end
+	p_spectra
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
@@ -141,7 +166,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "f18742872613d69b35aa80e748924bd0fe8956cf"
+project_hash = "b801dfb943f2e53e70d9a8a4790a8d3ca6398f1e"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
@@ -1444,23 +1469,24 @@ version = "1.9.2+0"
 """
 
 # ╔═╡ Cell order:
-# ╟─bbfef040-b3cd-11f0-20ca-a5cbafbafd95
+# ╠═bbfef040-b3cd-11f0-20ca-a5cbafbafd95
 # ╟─d20e7502-fa03-4448-84f4-dc46acf52c9b
 # ╟─381fd867-f404-40e5-a270-ae98f50bf9b5
 # ╟─2d6c4a0f-6ad6-4200-bad3-1e59261ae6db
 # ╟─1b15f3f8-fd8e-43c5-8c21-0b6fca139427
-# ╟─3b475ddd-be05-4c56-9b28-68a808fc6e11
 # ╟─81edb295-c20f-47a9-8a6f-d21e475df6a9
 # ╟─2fac89c2-0c26-48c4-babc-3979363a85e4
-# ╠═307cc5c6-28d0-46a5-a4ff-fff8b8f5a59a
+# ╟─307cc5c6-28d0-46a5-a4ff-fff8b8f5a59a
 # ╟─56554cd8-e858-43d8-b6ef-7593d044920c
-# ╟─c0418e2e-a6b6-4af5-a639-6d13952c88de
+# ╠═3b475ddd-be05-4c56-9b28-68a808fc6e11
+# ╟─14ef768c-7039-4f34-862d-f58acf89e7d6
+# ╠═c0418e2e-a6b6-4af5-a639-6d13952c88de
+# ╟─fd446c33-d439-439f-bd0a-f36770856cd2
+# ╟─67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
+# ╠═342c4189-1164-4c0f-a4c9-029c8720caea
 # ╟─faaa4542-2066-49fc-b978-a6a45a4cca4e
 # ╟─36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
-# ╠═1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
-# ╠═67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
-# ╠═342c4189-1164-4c0f-a4c9-029c8720caea
-# ╠═f67cf3fe-446b-4beb-a949-6c5445488f5f
-# ╠═b97c1a87-84e6-46b0-91c3-d7d198e38117
+# ╟─1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
+# ╟─8e492f7d-b959-4635-b524-feb48ba5f139
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

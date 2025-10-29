@@ -40,8 +40,10 @@ struct BernsteinPolyWrapper{P,T} <: AbstractPolyWrapper{P,T,:bernstein}
 end=#
 (::Type{P})(x::Vector{T}) where {P<:AbstractPolyWrapper,T} = P{length(x),T}(MVector{length(x)}(x))
 (::Type{P})(x::NTuple{N,T}) where {P<:AbstractPolyWrapper,T,N} = P{N,T}(MVector(x))
-name(::AbstractPolyWrapper{N,T,V}) where {N,T,V} = V
-poly_degree(::AbstractPolyWrapper{N,T,V}) where {N,T,V} = N - 1
+poly_name(::P) where P<: AbstractPolyWrapper{N,T,V} where {N,T,V} = V
+poly_name(::Type{P}) where P<: AbstractPolyWrapper{N,T,V} where {N,T,V} = V
+poly_degree(::AbstractPolyWrapper{N}) where {N} = N - 1
+poly_degree(::Type{P}) where P<:AbstractPolyWrapper{N} where {N} = N - 1
 parnumber(::AbstractPolyWrapper{N,T,V}) where {N,T,V} = N
 
 
@@ -78,9 +80,13 @@ Returns Bernstein's monomial (maximum_value, maximum_location) tuple
 """
 function bern_max(::Type{BernsteinPolyWrapper{D,T}},k::Int) where {D,T}
     d = D - 1
-    return (^(k,k)* ^(d,-Float64(d))*^(d-k,d-k)*binomial(d,k), k/d)
+    return (^(k,k)* ^(d, -T(d))*^(d-k,d-k)*binomial(d,k), k/d)
 end
-
+function bern_max(::Type{BernsteinSymPolyWrapper{D,T}},k::Int,a::T=-1.0,b::T=1.0) where {D,T}
+    d = D - 1
+    s = b - a
+    return (^(k,k)* ^(d,-T(d))*^(d-k,d-k)*binomial(d,k), s*k/d + a)
+end
 """
 (poly::Union{LegPolyWrapper,TrigPolyWrapper})(x::Number)
 
@@ -89,7 +95,7 @@ end
     make it consistent with Polynomials.jl 
     TrigPolyWrapper simple type for trigonometric function polynomils
 """
-function (poly::Union{LegPolyWrapper{N},TrigPolyWrapper{N},BernsteinPolyWrapper{N}})(x::Number) where N
+function (poly::Union{LegPolyWrapper{N},TrigPolyWrapper{N},BernsteinPolyWrapper{N},BernsteinSymPolyWrapper{N}})(x::Number) where N
     #LegendrePolynomials.Pl(x,l) - computes Legendre polynomial of degree l at point x 
     #=res = 0.0
     for i ∈ 1:N
@@ -128,8 +134,8 @@ end# struct spec
 
 Returns a vector of maximal values of Bernstein basis polynomial basis for particular VanderMatrix
 """
-bern_max_values(::VanderMatrix{N,CN,T,NxCN,CNxCN,P}) where {N,CN,T,NxCN,CNxCN,P<:BernsteinPolyWrapper{CN}} = [bern_max(P,i)[1] for i in 0:CN-1]
-bern_max_locations(::VanderMatrix{N,CN,T,NxCN,CNxCN,P}) where {N,CN,T,NxCN,CNxCN,P<:BernsteinPolyWrapper{CN}} = [bern_max(P,i)[2] for i in 0:CN-1]
+bern_max_values(::VanderMatrix{N,CN,T,NxCN,CNxCN,P}) where {N,CN,T,NxCN,CNxCN,P<:Union{BernsteinPolyWrapper{CN},BernsteinSymPolyWrapper{CN}}} = [bern_max(P,i)[1] for i in 0:CN-1]
+bern_max_locations(::VanderMatrix{N,CN,T,NxCN,CNxCN,P}) where {N,CN,T,NxCN,CNxCN,P<:Union{BernsteinPolyWrapper{CN},BernsteinSymPolyWrapper{CN}}} = [bern_max(P,i)[2] for i in 0:CN-1]
 """
     VanderMatrix(x::StaticArray{Tuple{N},T,1},
                       PolyWrapper::Type{P} # = StandPolyWrapper{CN}
@@ -177,7 +183,7 @@ function VanderMatrix(x::StaticArray{Tuple{N},T,1},
                 VectorType(_xi),  
             )
 end
-
+poly_name(::VanderMatrix{N,CN,T,NxCN,CNxCN,P}) where {N,CN,T,NxCN,CNxCN,P} = poly_name(P)
 """
     _fill_vander!(V, poly_obj::AbstractPolyWrapper,xi)
 
