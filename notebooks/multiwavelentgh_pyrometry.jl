@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.19
+# v0.20.20
 
 using Markdown
 using InteractiveUtils
@@ -381,9 +381,6 @@ md"""
 md"""
 Real values of the optimization variables for "measured" thermal emission spectrum:  """
 
-# ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
-L"""%$(x_real_data)"""
-
 # ╔═╡ 0232ff3c-daa9-4e86-a6c7-582d66a16cb9
 md" Use real emissivity $(@bind is_real_emissivity CheckBox(default = false))"
 
@@ -397,6 +394,9 @@ md"""
 
 # ╔═╡ 36c655f8-141b-4472-96d7-01c8fd1f1515
 x_real_data = [a_real[1:real_poly_degree+1]...,T_to_fit];
+
+# ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
+L"""%$(x_real_data)"""
 
 # ╔═╡ 6f17606c-e52e-4913-87f6-56190d209308
 @bind  lam_region confirm(PlutoUI.combine() do Child
@@ -2590,14 +2590,14 @@ version = "1.9.2+0"
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
-# ╟─cbaf05db-3265-4e2d-8ea4-759442f798e0
+# ╠═cbaf05db-3265-4e2d-8ea4-759442f798e0
 # ╟─c2b82e9d-cae8-465c-bca0-160599e06102
 # ╟─478c8bb8-aa3c-4afe-b787-4924525858fa
 # ╟─0831fddd-d2db-4ada-b293-00848d3673fb
 # ╟─4accbaec-4e08-43d3-8f36-2217b9394e86
 # ╟─c47637c6-b243-4d8b-8234-40c68608939c
 # ╟─d55793f5-45ff-4968-b2e1-8b846de8b91f
-# ╟─da6d5178-c083-4baa-91c3-e62f735bf808
+# ╠═da6d5178-c083-4baa-91c3-e62f735bf808
 # ╠═ae970ce5-fc5d-40d8-9f08-5dce0f99a509
 # ╟─529b07d7-e622-4816-8de9-e31581ea96a6
 # ╟─ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
@@ -2612,7 +2612,7 @@ version = "1.9.2+0"
 # ╟─d90da478-40b3-4677-82b9-fbfd79a72ef0
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
 # ╠═8ef42759-fb53-41af-904e-8916924415fa
-# ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
+# ╠═a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 # ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2

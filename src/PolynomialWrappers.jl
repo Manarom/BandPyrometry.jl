@@ -328,13 +328,19 @@ end
 
 
 #p = plot(title = "Monomials",legend=:top,legend_columns=2, background_color_legend=RGBA(1, 1, 1, 0.0),foreground_color_legend=nothing)
-@recipe function f(V::VanderMatrix{N,CN,T,NxCN,CNxCN,P}) where {N,CN,T,NxCN,CNxCN,P}
+@recipe function f(V::VanderMatrix{N,CN,T,NxCN,CNxCN,P}; infill::Bool = true) where {N,CN,T,NxCN,CNxCN,P}
     for (i,c) in enumerate(eachcol(V.v))
         @series begin 
             label:="$(i)"    
             linewidth:=2
-            fillrange:=0
-            fillalpha:=0.3
+            legend := :top
+            legend_columns :=2
+
+            foreground_color_legend :=nothing
+            if infill
+                fillrange:=0
+                fillalpha:=0.3
+            end
             markershape:=:none
             (V.xi, c)
         end

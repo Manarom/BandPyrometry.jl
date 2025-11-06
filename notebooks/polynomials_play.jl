@@ -17,37 +17,84 @@ macro bind(def, element)
 end
 
 # ╔═╡ bbfef040-b3cd-11f0-20ca-a5cbafbafd95
-using Revise,Plots,StaticArrays,Polynomials,Interpolations, RecipesBase, LegendrePolynomials, PlutoUI, LinearAlgebra
+using Revise,Plots,StaticArrays,Polynomials,Interpolations, RecipesBase, LegendrePolynomials, PlutoUI, LinearAlgebra, PrettyTables
 
 # ╔═╡ d20e7502-fa03-4448-84f4-dc46acf52c9b
 includet(raw"E:\JULIA\JULIA_DEPOT\dev\BandPyrometry.jl\src\PolynomialWrappers.jl")
 
-# ╔═╡ 381fd867-f404-40e5-a270-ae98f50bf9b5
-@bind poly_type Select(collect(keys(Main.SUPPORTED_POLYNOMIAL_TYPES)))
+# ╔═╡ f240500d-1198-49f7-b043-beea86a248c7
+md"""
+	## Bernstein polynomial basis
 
-# ╔═╡ 2d6c4a0f-6ad6-4200-bad3-1e59261ae6db
-x = SVector{50}(collect(range(-1,1,50)));
+	"""
+
+# ╔═╡ c8102be0-6f8f-406e-9f18-45f462116602
+md"""
+Each polynomial basis has a set of basis functions (monomials):
+
+``\begin{bmatrix} \phi_0(x) , \dots,  \phi_n(x) \end{bmatrix}`` 
+
+E.g. for standard polynomial basis:  ``\phi_k = x^{k}``
+
+Vandermonde matrix stores basis vectors for selected polynomial type and degreee  - columns of matrix: 
+
+``V= \begin{bmatrix} \vec{\phi_0} , \dots,  \vec{\phi_n} \end{bmatrix}`` - Vandermonde matrix
+"""
+
+# ╔═╡ 381fd867-f404-40e5-a270-ae98f50bf9b5
+md"Select polynomial basis type $(@bind poly_type Select(collect(keys(Main.SUPPORTED_POLYNOMIAL_TYPES)),default = :stand))"
 
 # ╔═╡ 1b15f3f8-fd8e-43c5-8c21-0b6fca139427
 md"Polynomial degree $(@bind polydegree Select(0:30,default = 3))"
 
 # ╔═╡ 81edb295-c20f-47a9-8a6f-d21e475df6a9
-PolyType = Main.SUPPORTED_POLYNOMIAL_TYPES[poly_type]{polydegree + 1,Float64}
+begin 
+	NPOINTS = 80
+	x = SVector{NPOINTS}(collect(range(-1,1,NPOINTS)));
+	PolyType = Main.SUPPORTED_POLYNOMIAL_TYPES[poly_type]{polydegree + 1,Float64}
+	V = Main.VanderMatrix(x,PolyType)
+end;
 
-# ╔═╡ 2fac89c2-0c26-48c4-babc-3979363a85e4
-V = Main.VanderMatrix(x,PolyType);
+# ╔═╡ 0dbf180e-8b27-4be7-8747-e424f37e2e50
+md" Show infilled ? $(@bind isinfilled CheckBox(default = true))"
 
-# ╔═╡ 307cc5c6-28d0-46a5-a4ff-fff8b8f5a59a
-#=begin 
-	p = plot(title = "Monomials",legend=:top,legend_columns=2, background_color_legend=RGBA(1, 1, 1, 0.0),foreground_color_legend=nothing)
-	for (i,c) in enumerate(eachcol(V.v_unnorm))
-		plot!(p,x,c,label = string(i - 1),linewidth = 2)
-	end
-	p
-end=#
+# ╔═╡ a6381315-af21-4117-beed-6e3f7b8b8ca9
+md"""
+The following figure shows basis functions (Vandermonde matrix columns) for polynomial of type **$(poly_type)**
+"""
 
 # ╔═╡ c6dfdffe-8dd7-4264-9b75-c435c5bbf941
-plot(V)
+plot(V,infill= isinfilled)
+
+# ╔═╡ e243649b-b920-4ca3-b2f3-6e9b5ada13c9
+md"""
+Bernstein polynomyal basis of degree ``n`` has the following set of basis functions (monomials):
+
+``\beta_{k}^{n}(x) = (\begin{matrix} n \\ k \end{matrix}) x^k(1-x)^{n-k}`` - Bernstein basis function for ``x \in [0...1]`` , ``k \in [0...n]``.
+
+``(\begin{matrix} n \\ k \end{matrix}) = \frac {n!}{(n - k)!k!}``
+
+Main features of bernstein monomials:
+
+* ``\beta_{k}^{n}(x)`` is a polynomial of degree ``n``. Roughly speaking, all Bernstein monomial have the same `units`
+
+* each monomial has a single maximum with the value of ``max(\beta_{k}^{n}(x)) = k^k \cdot n^n \cdot (n-k)^{n-k} \cdot (\begin{matrix} n \\ k \end{matrix})`` located at  ``argmax(\beta_{k}^{n}(x)) = \frac{k}{n}``
+
+
+
+"""
+
+# ╔═╡ 11e6d0b5-7c9c-40a2-8332-03872391db28
+md"""
+
+* All bernstein monomial sum to one: ``\Sigma_{k=0}^{n} \beta_{k}^{n}(x) = 1``. This means that each row of Vandermonde matrix sums to one: ``\Sigma V[i,:] = 1``, hence ``\Sigma_{i,j} V[i,j] = M`` where M is the number of rows (size of x vector)
+"""
+
+# ╔═╡ 14ef768c-7039-4f34-862d-f58acf89e7d6
+md"""
+Bernstein polynomial approximation coefficients:
+
+"""
 
 # ╔═╡ 56554cd8-e858-43d8-b6ef-7593d044920c
 @bind  a PlutoUI.combine() do Child
@@ -79,14 +126,28 @@ plot(V)
 	a8 = $(
 		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
 	)\
+	a9 = $(
+		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	)\
+		a10 = $(
+		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	)\
 	"""
 end
 
 # ╔═╡ 3b475ddd-be05-4c56-9b28-68a808fc6e11
-a_real =SVector{polydegree + 1}(a[1:polydegree + 1])
+a_real =SVector{polydegree + 1}(a[1:polydegree + 1]);
+
+# ╔═╡ 8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
+md"Add noise $(@bind noise_amplitude Slider(0.0:1e-2:1, default =  0.0, show_value = true))"
 
 # ╔═╡ fd446c33-d439-439f-bd0a-f36770856cd2
-md" Bernstein degree $(@bind bern_degree Select(1:50,default = degree))"
+md" Bernstein degree $(@bind bern_degree Select(1:50,default = 10))"
+
+# ╔═╡ eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
+md"""
+The following table and figure show Bernstein monomial of degree $(@bind sub_monomial_degree Select(0:bern_degree))  fitting using standard basis polynomial
+"""
 
 # ╔═╡ 342c4189-1164-4c0f-a4c9-029c8720caea
 if PolyType <: Main.BernsteinPolyWrapper || PolyType <: Main.BernsteinSymPolyWrapper
@@ -97,7 +158,7 @@ end
 
 # ╔═╡ faaa4542-2066-49fc-b978-a6a45a4cca4e
 begin 
-	y_bern = V.v_unnorm*a_real
+	y_bern = (1.0 .+ noise_amplitude*rand(NPOINTS)).*(V*a_real)
 	sum(eachcol(V.v_unnorm)) # checking normalization
 end;
 
@@ -109,8 +170,26 @@ begin # bernsteinfit block
 	ber_max_ocations = Main.bern_max_locations(bern_vander_mat)
 end;
 
-# ╔═╡ 14ef768c-7039-4f34-862d-f58acf89e7d6
-bern_coeffs
+# ╔═╡ 1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
+begin 
+	stand_bas = Main.VanderMatrix(x,Main.StandPolyWrapper{bern_degree + 1, Float64})
+	(standart_basis_bern_monomial_fit,) = Main.polyfitn(stand_bas,Vector(x),Vector(bern_vander_mat.v[:,sub_monomial_degree +1]))
+	plot(x,bern_vander_mat.v[:,sub_monomial_degree +1],label="Bernstein monomial $(sub_monomial_degree)")
+	plot!(x,stand_bas*standart_basis_bern_monomial_fit,label = "stand basis fit")
+end
+
+# ╔═╡ bf5df253-2d64-470b-8592-e93a6bcd144a
+pretty_table(HTML,transpose(standart_basis_bern_monomial_fit) , title = "Standard basis polynomial fitting",column_labels = ["a_$(i)" for i in 0:length(standart_basis_bern_monomial_fit) - 1])
+
+# ╔═╡ bb55121f-9e67-446d-bf4f-4fc3dfe48062
+sum(bern_vander_mat.v)
+
+# ╔═╡ 0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
+begin 
+	function_values_at_bernstein_location = linear_interpolation(x,y_bern)(ber_max_ocations)
+	delta = function_values_at_bernstein_location - bern_coeffs
+	pretty_table(HTML,hcat(ber_max_ocations,bern_coeffs,function_values_at_bernstein_location,100*delta./function_values_at_bernstein_location) ,column_labels = ["Coordinate", "Bernstein coefficient", "Function value", "delta/F, %"], title = "Bernstein polynomial fitting")
+end
 
 # ╔═╡ 36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
 Vstand = Main.VanderMatrix(x,Main.StandPolyWrapper{polydegree + 1,Float64});
@@ -120,8 +199,8 @@ fit_res = Main.polyfitn(Vstand,Vector(x),Vector(y_bern))
 
 # ╔═╡ c0418e2e-a6b6-4af5-a639-6d13952c88de
 begin 
-	ppp = plot(x,fit_res[2], label = "initial function")
-	plot!(ppp,x,y_bern,label = "fitted function")
+	ppp = plot(x,fit_res[2], label = "fitted function" )
+	plot!(ppp,x,y_bern,label = "initial function")
 	scatter!(ppp,ber_max_ocations,bern_coeffs, label = "bernstein polynomial coefficients")
 end
 
@@ -148,6 +227,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
@@ -158,6 +238,7 @@ LegendrePolynomials = "~0.4.5"
 Plots = "~1.41.1"
 PlutoUI = "~0.7.72"
 Polynomials = "~4.1.0"
+PrettyTables = "~3.1.0"
 RecipesBase = "~1.3.4"
 Revise = "~3.9.0"
 StaticArrays = "~1.9.15"
@@ -169,7 +250,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "b801dfb943f2e53e70d9a8a4790a8d3ca6398f1e"
+project_hash = "028a3846739c9858772a1bd978ce6cae6f25c638"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
@@ -329,6 +410,11 @@ git-tree-sha1 = "439e35b0b36e2e5881738abc8857bd92ad6ff9a8"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.6.3"
 
+[[deps.Crayons]]
+git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
+uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
+version = "4.1.1"
+
 [[deps.DataAPI]]
 git-tree-sha1 = "abe83f3a2f1b857aac70ef8b269080af17764bbe"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
@@ -339,6 +425,11 @@ deps = ["OrderedCollections"]
 git-tree-sha1 = "6c72198e6a101cccdd4c9731d3985e904ba26037"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 version = "0.19.1"
+
+[[deps.DataValueInterfaces]]
+git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
+uuid = "e2d170a0-9d28-54be-80f0-106bbe20a464"
+version = "1.0.0"
 
 [[deps.Dates]]
 deps = ["Printf"]
@@ -540,6 +631,11 @@ version = "0.16.2"
 git-tree-sha1 = "b2d91fe939cae05960e760110b328288867b5758"
 uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
 version = "0.2.6"
+
+[[deps.IteratorInterfaceExtensions]]
+git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
+uuid = "82899510-4779-5014-852e-03e436cf321d"
+version = "1.0.0"
 
 [[deps.JLFzf]]
 deps = ["REPL", "Random", "fzf_jll"]
@@ -935,6 +1031,12 @@ git-tree-sha1 = "0f27480397253da18fe2c12a4ba4eb9eb208bf3d"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.5.0"
 
+[[deps.PrettyTables]]
+deps = ["Crayons", "LaTeXStrings", "Markdown", "PrecompileTools", "Printf", "REPL", "Reexport", "StringManipulation", "Tables"]
+git-tree-sha1 = "6b8e2f0bae3f678811678065c09571c1619da219"
+uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
+version = "3.1.0"
+
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -1133,6 +1235,12 @@ git-tree-sha1 = "2c962245732371acd51700dbb268af311bddd719"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 version = "0.34.6"
 
+[[deps.StringManipulation]]
+deps = ["PrecompileTools"]
+git-tree-sha1 = "725421ae8e530ec29bcbdddbe91ff8053421d023"
+uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
+version = "0.4.1"
+
 [[deps.StyledStrings]]
 uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 version = "1.11.0"
@@ -1146,6 +1254,18 @@ version = "7.7.0+0"
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 version = "1.0.3"
+
+[[deps.TableTraits]]
+deps = ["IteratorInterfaceExtensions"]
+git-tree-sha1 = "c06b2f539df1c6efa794486abfb6ed2022561a39"
+uuid = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
+version = "1.0.1"
+
+[[deps.Tables]]
+deps = ["DataAPI", "DataValueInterfaces", "IteratorInterfaceExtensions", "OrderedCollections", "TableTraits"]
+git-tree-sha1 = "f2c1efbc8f3a609aadf318094f8fc5204bdaf344"
+uuid = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
+version = "1.12.1"
 
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
@@ -1472,18 +1592,27 @@ version = "1.9.2+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═bbfef040-b3cd-11f0-20ca-a5cbafbafd95
+# ╟─bbfef040-b3cd-11f0-20ca-a5cbafbafd95
 # ╟─d20e7502-fa03-4448-84f4-dc46acf52c9b
+# ╟─f240500d-1198-49f7-b043-beea86a248c7
+# ╟─c8102be0-6f8f-406e-9f18-45f462116602
 # ╟─381fd867-f404-40e5-a270-ae98f50bf9b5
-# ╟─2d6c4a0f-6ad6-4200-bad3-1e59261ae6db
 # ╟─1b15f3f8-fd8e-43c5-8c21-0b6fca139427
 # ╟─81edb295-c20f-47a9-8a6f-d21e475df6a9
-# ╟─2fac89c2-0c26-48c4-babc-3979363a85e4
-# ╟─307cc5c6-28d0-46a5-a4ff-fff8b8f5a59a
+# ╟─0dbf180e-8b27-4be7-8747-e424f37e2e50
+# ╟─a6381315-af21-4117-beed-6e3f7b8b8ca9
 # ╟─c6dfdffe-8dd7-4264-9b75-c435c5bbf941
-# ╟─56554cd8-e858-43d8-b6ef-7593d044920c
-# ╠═3b475ddd-be05-4c56-9b28-68a808fc6e11
+# ╟─3b475ddd-be05-4c56-9b28-68a808fc6e11
+# ╟─e243649b-b920-4ca3-b2f3-6e9b5ada13c9
+# ╟─eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
+# ╟─bf5df253-2d64-470b-8592-e93a6bcd144a
+# ╟─1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
+# ╠═11e6d0b5-7c9c-40a2-8332-03872391db28
+# ╟─bb55121f-9e67-446d-bf4f-4fc3dfe48062
 # ╟─14ef768c-7039-4f34-862d-f58acf89e7d6
+# ╟─0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
+# ╟─56554cd8-e858-43d8-b6ef-7593d044920c
+# ╟─8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
 # ╠═c0418e2e-a6b6-4af5-a639-6d13952c88de
 # ╟─fd446c33-d439-439f-bd0a-f36770856cd2
 # ╟─67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
@@ -1491,6 +1620,6 @@ version = "1.9.2+0"
 # ╟─faaa4542-2066-49fc-b978-a6a45a4cca4e
 # ╟─36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
 # ╟─1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
-# ╟─8e492f7d-b959-4635-b524-feb48ba5f139
+# ╠═8e492f7d-b959-4635-b524-feb48ba5f139
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
