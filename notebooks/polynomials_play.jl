@@ -24,28 +24,63 @@ includet(raw"E:\JULIA\JULIA_DEPOT\dev\BandPyrometry.jl\src\PolynomialWrappers.jl
 
 # ╔═╡ f240500d-1198-49f7-b043-beea86a248c7
 md"""
-	## Bernstein polynomial basis
+## Bernstein polynomial basis
 
-	"""
+#### Introduction
+
+A common problem in constrained nonlinear optimization is converting nonlinear constraints applied to some function of the optimization variables into box constraints on the optimization variables themselves. Simply, converting nonlinear constraints to box constraints is necessary.
+
+For example, in multiwavelength pyrometry, the measured signal can be approximated as a product of two functions: one (spectral emissivity) is linear with respect to the optimization variables, while the other (`blackbody` thermal emission spectrum) is nonlinear.
+
+`` \vec{x}^*=argmin\{F(\vec{x})\}`` - optimization problem
+
+``F(\vec{x})=\sum_{i=1}^{M}[y_i - I_{bb}(\lambda_i,T) \cdot (\sum_{k=0}^{n}a_k \cdot \phi_k(λ_i))]^2``  - discrepancy function
+
+``\vec{x} = [\vec{a},T]^t`` - optimization variables vector, ``T`` is the temperature,  ``\vec{a}`` - coefficients of emissivity approximation, ``I_{bb}(\lambda_i,T)`` - blackbody thermal emission spectrum, ``y_i``  - measured intensity.
+
+``\epsilon(λ)=\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ)`` - spectral emissivity is a linear combination of some basis functions ``\phi_n(λ)``
+
+There is a physical constraint on the emissivity, which follows from the fact that real object cannot emit more radiation than the blackbody:
+
+``\epsilon(\lambda) \in (0...1)`` for the whole spectral range.
+
+Sometimes, the region of emissivity variation can be narrowed; for example, it may be known that, for a particular material, the emissivity lies within the range of ``[\epsilon_a ... \epsilon_b]``. The question is how to convert the emissivity variation region to the emissivity approximation coefficients ``\vec{a}`` variation.
+
+System of inequalities of contraints on emissivity:  
+
+``\vec{\epsilon_a} \leq \vec{\epsilon} \leq \vec{\epsilon_b}``
+
+Should be somehow converted to inequality constraints on emissivity approximation variables:
+
+``\vec{a_a} \leq \vec{a} \leq \vec{a_b}``
+
+This problem can be solved using the Bernstein polynomial basis.
+
+\
+"""
 
 # ╔═╡ c8102be0-6f8f-406e-9f18-45f462116602
 md"""
+#### Matrix form of polynomial approximation
+
 Each polynomial basis has a set of basis functions (monomials):
 
 ``\begin{bmatrix} \phi_0(x) , \dots,  \phi_n(x) \end{bmatrix}`` 
 
 E.g. for standard polynomial basis:  ``\phi_k = x^{k}``
 
-Vandermonde matrix stores basis vectors for selected polynomial type and degreee  - columns of matrix: 
+Columns of Vandermonde matrix (``V``) are the polynomial basis functions evaluated at coordinates ``x``, thus number of columns in ``V`` is equal to the `degree of polynomial + 1`: 
 
 ``V= \begin{bmatrix} \vec{\phi_0} , \dots,  \vec{\phi_n} \end{bmatrix}`` - Vandermonde matrix
+
+\
 """
 
 # ╔═╡ 381fd867-f404-40e5-a270-ae98f50bf9b5
-md"Select polynomial basis type $(@bind poly_type Select(collect(keys(Main.SUPPORTED_POLYNOMIAL_TYPES)),default = :stand))"
+md"Select polynomial basis type for the initial function $(@bind poly_type Select(collect(keys(Main.SUPPORTED_POLYNOMIAL_TYPES)),default = :stand))"
 
 # ╔═╡ 1b15f3f8-fd8e-43c5-8c21-0b6fca139427
-md"Polynomial degree $(@bind polydegree Select(0:30,default = 3))"
+md"Initial function polynomial degree $(@bind polydegree Select(0:30,default = 3))"
 
 # ╔═╡ 81edb295-c20f-47a9-8a6f-d21e475df6a9
 begin 
@@ -64,30 +99,57 @@ The following figure shows basis functions (Vandermonde matrix columns) for poly
 """
 
 # ╔═╡ c6dfdffe-8dd7-4264-9b75-c435c5bbf941
-plot(V,infill= isinfilled)
+plot(V,infill= isinfilled, title = "Basis functions for $(poly_type) polynomial bassis")
 
 # ╔═╡ e243649b-b920-4ca3-b2f3-6e9b5ada13c9
 md"""
-Bernstein polynomyal basis of degree ``n`` has the following set of basis functions (monomials):
+### Bernstein polynomial basis
+
+Bernstein polynomial basis of degree ``n`` has the following set of ``n + 1`` basis functions (monomials):
 
 ``\beta_{k}^{n}(x) = (\begin{matrix} n \\ k \end{matrix}) x^k(1-x)^{n-k}`` - Bernstein basis function for ``x \in [0...1]`` , ``k \in [0...n]``.
 
 ``(\begin{matrix} n \\ k \end{matrix}) = \frac {n!}{(n - k)!k!}``
+"""
 
-Main features of bernstein monomials:
+# ╔═╡ 7d6bf89c-4a52-4ed3-93ba-08c9f972c7a4
+md"""
+For general case, when ``x \in [a,b]``
 
-* ``\beta_{k}^{n}(x)`` is a polynomial of degree ``n``. Roughly speaking, all Bernstein monomial have the same `units`
+``\beta_{k}^{n}(x) = (\begin{matrix} n \\ k \end{matrix}) (\frac {x - a}{b - a})^k(\frac {b-x}{b-a})^{n-k}`` - Bernstein basis function for ``x \in [a...b]`` , ``k \in [0...n]`` 
 
-* each monomial has a single maximum with the value of ``max(\beta_{k}^{n}(x)) = k^k \cdot n^n \cdot (n-k)^{n-k} \cdot (\begin{matrix} n \\ k \end{matrix})`` located at  ``argmax(\beta_{k}^{n}(x)) = \frac{k}{n}``
+In the following, all formulas will be provided for ``x \in [0...1]`` basis, because of simplicity, but for calculations, symmetric Bernstein (**bernsteinsym** in selection dropdown) basis (``x \in [-1...1]``) was used because of the ransge ``[-1...1]`` is more natural for other polynomial bases, like Legendre and Chebyshev polynomials
+"""
 
+# ╔═╡ 52c7978a-c51b-40ac-9604-0485ff469141
+md"""
+Main features of B polynomial basis:
+
+1. Each monomial ``\beta_{k}^{n}(x)`` is a polynomial of degree ``n``. Roughly speaking, all B monomial have the same `units`
+
+2. Each monomial has a single maximum with the value and location governed by ``n`` and ``k``:
+
+B-basis function ``\beta_{k}^{n}(x)`` has maximum ``max(\beta_{k}^{n}(x)) = k^k \cdot n^n \cdot (n-k)^{n-k} \cdot (\begin{matrix} n \\ k \end{matrix})`` is located at  
+
+``argmax(\beta_{k}^{n}(x)) = \frac{k}{n}``
+
+3. All monomials for some coordinate sums to one: 
+``\Sigma_{k=0}^{n} \beta_{k}^{n}(x) = 1``. 
 
 
 """
 
-# ╔═╡ 11e6d0b5-7c9c-40a2-8332-03872391db28
-md"""
+# ╔═╡ 54e44992-423e-4ebb-92e6-2af89b52e7f7
+md"The third property means that each row of Vandermonde matrix sums to one: ``\Sigma_i V[i,:] = 1``, hence ``\Sigma_{i,j} V[i,j] = M`` ,  M is the number of rows (size of x vector)"
 
-* All bernstein monomial sum to one: ``\Sigma_{k=0}^{n} \beta_{k}^{n}(x) = 1``. This means that each row of Vandermonde matrix sums to one: ``\Sigma V[i,:] = 1``, hence ``\Sigma_{i,j} V[i,j] = M`` where M is the number of rows (size of x vector)
+# ╔═╡ facb5dae-3ee9-4380-8c92-0e94c93c84bc
+md"""
+Now, consider the expantion of function ``f(x)``  in Bernstein polynomial basis of degree ``n``:
+
+``f(x) = \Sigma_{k=0}^{n} a_k \beta_k^n(x)``
+
+``\vec{f} = V \vec{a}`` - here ``\vec{f}`` is the vector of function values evaluated at ``\vec{x}`` coordinates.
+(the least-square solution of this systemof equations is ``\vec{a} = V^{\dagger}\vec{f}``, where ``V^{\dagger}`` is pseudo-inverse)
 """
 
 # ╔═╡ 14ef768c-7039-4f34-862d-f58acf89e7d6
@@ -97,40 +159,43 @@ Bernstein polynomial approximation coefficients:
 """
 
 # ╔═╡ 56554cd8-e858-43d8-b6ef-7593d044920c
+
 @bind  a PlutoUI.combine() do Child
 	md"""
-	a0 = $(
-		Child(Slider(-1:0.01:1,default=0.3,show_value = true))
+	Coefficients of f(x) function, ``f(x) = \Sigma_{k=0}^{n} a_k\phi_k^n``, where n=$(polydegree) and ``\phi_k^n`` are the basis functions for $(poly_type) basis
+	
+	``a_0`` = $(
+		Child(Slider(-1:0.001:1,default=0.3,show_value = true))
 	) \
-	a1 = $(
-		Child(Slider(-1:0.01:1,default=0.1,show_value = true))
+	``a_1`` = $(
+		Child(Slider(-1:0.001:1,default=0.1,show_value = true))
 	)\
-	a2 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	``a_2`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
 	)\
-	a3 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	``a_3`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
 	)\
-	a4 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	``a_4`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
 	)\
-	a5 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	``a_5`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
 	)\
-	a6 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	``a_6`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
 	)\
-	a7 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	``a_7`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
 	)\
-	a8 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	``a_8`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
 	)\
-	a9 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	``a_9`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
 	)\
-		a10 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	``a_{10}`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
 	)\
 	"""
 end
@@ -141,12 +206,36 @@ a_real =SVector{polydegree + 1}(a[1:polydegree + 1]);
 # ╔═╡ 8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
 md"Add noise $(@bind noise_amplitude Slider(0.0:1e-2:1, default =  0.0, show_value = true))"
 
+# ╔═╡ 67918393-0efb-4c8a-a291-3d86f7853cce
+md"""
+##### Figure shows the following plots: 
+1. Initial function ``f(x)`` (which is summation of monomials of basis $poly_type of degree $polydegree)
+2. The result of ``f(x)`` fitting using B-polynomial basis: ``\Sigma_{k=0}^na_k\beta_k^n``
+3. Scattered points are the values of ``a_k`` vs the locations of corresponding monomials ``\beta_k^n``
+"""
+
+# ╔═╡ 7e1bcb20-a71a-4e9b-b797-dea6922f4cf8
+md" Fix axes limits $(@bind fix_limits CheckBox(false))"
+
 # ╔═╡ fd446c33-d439-439f-bd0a-f36770856cd2
-md" Bernstein degree $(@bind bern_degree Select(1:50,default = 10))"
+md" Bernstein fitting bassis degree $(@bind bern_degree Select(1:50,default = 10))"
 
 # ╔═╡ eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
 md"""
-The following table and figure show Bernstein monomial of degree $(@bind sub_monomial_degree Select(0:bern_degree))  fitting using standard basis polynomial
+The following table and figure show B monomial of number $(@bind sub_monomial_degree Select(0:bern_degree)) for B-basis of degree $(bern_degree) fitting using standard basis polynomial
+"""
+
+# ╔═╡ 4349710e-529b-4036-8986-6140292457c2
+md"""
+##### It is clearly visible that the values of B-polynomials coefficients tend to the values of function itself!
+-----------------------
+The oposite is also true, if the initial function is a linear cobination of B-monomials, than the value of function in the vicinity of the corresponding monomial maxima location can be adjusted by adjusting the value of the coefficient (to check - set the polynomial bassis type of the initial function to **bernsteinsym** and use sliders)
+"""
+
+# ╔═╡ a842e84c-2566-4ef2-8801-2dcd489e2f37
+md"""
+Bernstein polynomial optimization  with constraints
+
 """
 
 # ╔═╡ 342c4189-1164-4c0f-a4c9-029c8720caea
@@ -154,7 +243,7 @@ if PolyType <: Main.BernsteinPolyWrapper || PolyType <: Main.BernsteinSymPolyWra
 	Main.bern_max(PolyType,1)
 	Main.bern_max_values(Main.VanderMatrix(x,PolyType))
 	Main.bern_max_locations(Main.VanderMatrix(x,PolyType))
-end
+end;
 
 # ╔═╡ faaa4542-2066-49fc-b978-a6a45a4cca4e
 begin 
@@ -170,25 +259,35 @@ begin # bernsteinfit block
 	ber_max_ocations = Main.bern_max_locations(bern_vander_mat)
 end;
 
+# ╔═╡ bb55121f-9e67-446d-bf4f-4fc3dfe48062
+md" ``\Sigma_{i,j} V[i,j] =`` $(sum(bern_vander_mat.v)) 
+
+Is the summation of B Vandermonde matrix over all values for x with $(length(x))  points"
+
+# ╔═╡ 3280488d-efef-4833-ae37-6ea534f50df4
+plot([sum(c) for c in  eachcol(bern_vander_mat.v)],label=nothing, marker = :diamond, title = " Σ of V columns vs column index $(2/bern_degree)")
+
 # ╔═╡ 1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
 begin 
 	stand_bas = Main.VanderMatrix(x,Main.StandPolyWrapper{bern_degree + 1, Float64})
 	(standart_basis_bern_monomial_fit,) = Main.polyfitn(stand_bas,Vector(x),Vector(bern_vander_mat.v[:,sub_monomial_degree +1]))
 	plot(x,bern_vander_mat.v[:,sub_monomial_degree +1],label="Bernstein monomial $(sub_monomial_degree)")
-	plot!(x,stand_bas*standart_basis_bern_monomial_fit,label = "stand basis fit")
+	plot!(x,stand_bas*standart_basis_bern_monomial_fit,label = "Standard basis fit")
 end
 
 # ╔═╡ bf5df253-2d64-470b-8592-e93a6bcd144a
 pretty_table(HTML,transpose(standart_basis_bern_monomial_fit) , title = "Standard basis polynomial fitting",column_labels = ["a_$(i)" for i in 0:length(standart_basis_bern_monomial_fit) - 1])
-
-# ╔═╡ bb55121f-9e67-446d-bf4f-4fc3dfe48062
-sum(bern_vander_mat.v)
 
 # ╔═╡ 0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
 begin 
 	function_values_at_bernstein_location = linear_interpolation(x,y_bern)(ber_max_ocations)
 	delta = function_values_at_bernstein_location - bern_coeffs
 	pretty_table(HTML,hcat(ber_max_ocations,bern_coeffs,function_values_at_bernstein_location,100*delta./function_values_at_bernstein_location) ,column_labels = ["Coordinate", "Bernstein coefficient", "Function value", "delta/F, %"], title = "Bernstein polynomial fitting")
+end
+
+# ╔═╡ 4f9826a0-0b80-440d-9933-2c51bf901f07
+if fix_limits
+	lim_vals = (0.9*minimum(bern_coeffs), 1.1*maximum(bern_coeffs))
 end
 
 # ╔═╡ 36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
@@ -199,22 +298,27 @@ fit_res = Main.polyfitn(Vstand,Vector(x),Vector(y_bern))
 
 # ╔═╡ c0418e2e-a6b6-4af5-a639-6d13952c88de
 begin 
-	ppp = plot(x,fit_res[2], label = "fitted function" )
-	plot!(ppp,x,y_bern,label = "initial function")
-	scatter!(ppp,ber_max_ocations,bern_coeffs, label = "bernstein polynomial coefficients")
+	
+	ppp = plot(x,y_bern,label = "initial function f(x)")
+	!fix_limits || ylims!(ppp,lim_vals)
+	plot!(ppp,x,fit_res[2], label = "fitted function Σaᵢβᵢ" )
+	scatter!(ppp,ber_max_ocations,bern_coeffs, label = " aᵢ values located at B-monomials maxima")
+	
+	ppp
 end
 
 # ╔═╡ 8e492f7d-b959-4635-b524-feb48ba5f139
 begin 
-	NNN = 60
+	NNN = 10
 	XXX = SVector{NNN}(collect(range(-1.0,1.0,NNN)))
 	V_stand = Main.VanderMatrix(XXX,Main.StandPolyWrapper{NNN,Float64})
 	V_leg = Main.VanderMatrix(XXX,Main.LegPolyWrapper{NNN,Float64})
 	V_bern2 = Main.VanderMatrix(XXX,Main.BernsteinSymPolyWrapper{NNN,Float64})
 	p_spectra = plot()
 	for V in (V_stand,V_leg,V_bern2)
-		plot!(p_spectra, svd(V.v).S, label = string(Main.poly_name(V)))
+		plot!(p_spectra, svd(V.v).S, label = string(Main.poly_name(V)),linewidth= 3,markersize=8,marker=:auto,markeralpha=0.5)
 	end
+	title!(p_spectra,"Singular values spectra for various polynomial bases")
 	p_spectra
 end
 
@@ -1604,22 +1708,31 @@ version = "1.9.2+0"
 # ╟─c6dfdffe-8dd7-4264-9b75-c435c5bbf941
 # ╟─3b475ddd-be05-4c56-9b28-68a808fc6e11
 # ╟─e243649b-b920-4ca3-b2f3-6e9b5ada13c9
+# ╟─7d6bf89c-4a52-4ed3-93ba-08c9f972c7a4
+# ╟─52c7978a-c51b-40ac-9604-0485ff469141
+# ╟─54e44992-423e-4ebb-92e6-2af89b52e7f7
+# ╟─bb55121f-9e67-446d-bf4f-4fc3dfe48062
+# ╟─3280488d-efef-4833-ae37-6ea534f50df4
 # ╟─eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
 # ╟─bf5df253-2d64-470b-8592-e93a6bcd144a
 # ╟─1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
-# ╠═11e6d0b5-7c9c-40a2-8332-03872391db28
-# ╟─bb55121f-9e67-446d-bf4f-4fc3dfe48062
+# ╟─facb5dae-3ee9-4380-8c92-0e94c93c84bc
 # ╟─14ef768c-7039-4f34-862d-f58acf89e7d6
 # ╟─0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
 # ╟─56554cd8-e858-43d8-b6ef-7593d044920c
 # ╟─8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
-# ╠═c0418e2e-a6b6-4af5-a639-6d13952c88de
+# ╟─67918393-0efb-4c8a-a291-3d86f7853cce
+# ╟─c0418e2e-a6b6-4af5-a639-6d13952c88de
+# ╟─7e1bcb20-a71a-4e9b-b797-dea6922f4cf8
+# ╟─4f9826a0-0b80-440d-9933-2c51bf901f07
 # ╟─fd446c33-d439-439f-bd0a-f36770856cd2
+# ╟─4349710e-529b-4036-8986-6140292457c2
+# ╠═a842e84c-2566-4ef2-8801-2dcd489e2f37
 # ╟─67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
-# ╠═342c4189-1164-4c0f-a4c9-029c8720caea
+# ╟─342c4189-1164-4c0f-a4c9-029c8720caea
 # ╟─faaa4542-2066-49fc-b978-a6a45a4cca4e
 # ╟─36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
 # ╟─1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
-# ╠═8e492f7d-b959-4635-b524-feb48ba5f139
+# ╟─8e492f7d-b959-4635-b524-feb48ba5f139
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

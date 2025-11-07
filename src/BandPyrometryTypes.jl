@@ -160,7 +160,7 @@ function BandPyrometryPoint(measured_Intensity::StaticArray{Tuple{N},T,1},
                 PxP_T(undef),# approximate hessian
                 PxP_T(undef),# hessian
                 VanderMatrix(SVector{N}(λ), # wavelength
-                            PolyTypeAbs{Pm1}
+                            PolyTypeAbs{Pm1,T}
                 ),
                 Px1_T(undef), # x_em_vec - emissivity evaluation vector
                 Px1_T(undef), # x_jac_vec - Jacobian evaluation vector

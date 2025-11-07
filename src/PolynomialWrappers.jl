@@ -328,7 +328,7 @@ end
 
 
 #p = plot(title = "Monomials",legend=:top,legend_columns=2, background_color_legend=RGBA(1, 1, 1, 0.0),foreground_color_legend=nothing)
-@recipe function f(V::VanderMatrix{N,CN,T,NxCN,CNxCN,P}; infill::Bool = true) where {N,CN,T,NxCN,CNxCN,P}
+@recipe function f(V::VanderMatrix{N,CN,T,NxCN,CNxCN,P}; infill = true) where {N,CN,T,NxCN,CNxCN,P}
     for (i,c) in enumerate(eachcol(V.v))
         @series begin 
             label:="$(i)"    

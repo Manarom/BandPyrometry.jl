@@ -48,9 +48,6 @@ The last line will launch the Pluto starting page in your default browser
 # ╔═╡ 6c087f1c-052d-4efa-9fca-3a7e3fdbb8c2
 import PlanckFunctions as Planck
 
-# ╔═╡ af23b80d-7e36-43e0-8472-f563a823baa0
-
-
 # ╔═╡ 255e0485-a280-4142-82dd-d76d0d3d0cca
 includet(joinpath("../src","BandPyrometry.jl")) # the package file is includet using Revise methods, thus the code of the main file can be modified
 
@@ -231,6 +228,7 @@ To approximate the emissivity `BandPyrometry.jl`  uses several polynomial bases:
 * Chebyshev basis (from [`Polynomials.jl`](https://juliamath.github.io/Polynomials.jl/stable/) package)
 * Legendre polynomials (from [`LegendrePolynoials.jl`](https://jishnub.github.io/LegendrePolynomials.jl/stable/) package)
 * Trigonometric basis: ``\phi_n(λ) = sin(\pi \cdot n \lambda)``  for odd n, and  ``\phi_n(λ) = cos(\pi \cdot n \lambda)`` for even n
+* Bernstein basis of degree ``D``: ``\phi_{k}^{n}(\lambda) = (\begin{matrix} n \\ k \end{matrix}) (\frac {\lambda - a}{b - a})^k(\frac {b-\lambda}{b-a})^{n-k}`` - Bernstein basis function for ``\lambda \in [\lambda_a...\lambda_b]`` , ``k \in [0...n]`` , ``a = -1``, ``b = 1``
 
 All basis vectors are stored in a structure called `VanderMatrix`, this type: 
 
@@ -257,21 +255,22 @@ show_polyfit_docs ? @doc(BandPyrometry.polyfit) : nothing
 	"""
 end
 
-# ╔═╡ ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
-md"Select the polynomial type = $(@bind em_approx_poly_type Select(collect(keys(BandPyrometry.SUPPORTED_POLYNOMIAL_TYPES))))"
+# ╔═╡ 5880b468-64ec-4efa-9f6a-c39ecb090440
+md"Select polynomial basis type $(@bind em_approx_poly_type Select(collect(keys(BandPyrometry.SUPPORTED_POLYNOMIAL_TYPES)),default = :stand))"
 
 # ╔═╡ 988274c4-ad6a-42df-aead-5f40e0000998
 md"Set polynomial degree : $(@bind poly_fit_degree Select(0:10,default=3)) (the polynomial degree = numer of basis functions - 1, thus, zero order polynomial is an all-units vector)"
 
 # ╔═╡ 111122e9-1260-4f00-aba6-0fdf6cf04c4e
 begin 
-	N1 = 50
+	N1 = 25
 	λ_fit_vec = collect(range(λ_fit_vand...,length=N1)) 
 	rt_emissivity_data = readdlm("real_surface_emissivity.txt") # loading file, actually this file is two-column data with no headers, but this is ok
 	rt_emissivity_interpolation = linear_interpolation(rt_emissivity_data[:,1],rt_emissivity_data[:,2],extrapolation_bc = Interpolations.Flat())
 	
 	interpolated_values =rt_emissivity_interpolation(λ_fit_vec) # interpolating data at λ points
-	Vander_test = BandPyrometry.VanderMatrix(SVector{N1}(λ_fit_vec),Val(poly_fit_degree + 1), poly_type=em_approx_poly_type) # creating new matrix 
+	PolyType = BandPyrometry.SUPPORTED_POLYNOMIAL_TYPES[em_approx_poly_type]{poly_fit_degree + 1,Float64}
+	Vander_test = BandPyrometry.VanderMatrix(SVector{N1}(λ_fit_vec),PolyType) # creating new matrix 
 	(a_fit_check,fitted_value,goodness_of_fit) = BandPyrometry.polyfit(Vander_test,λ_fit_vec,interpolated_values)# fitting polynomial coefficients
 	plot(rt_emissivity_data[:,1],rt_emissivity_data[:,2],label = "ϵ real")
 	scatter!(λ_fit_vec,fitted_value, label="ϵ fitted")
@@ -330,7 +329,7 @@ N = 50 # number of spectral points
 			2.5	1.708743729	2.720488281];
 
 # ╔═╡ 278c2da0-b396-493e-bdcd-fc2a539780b6
-md"Select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(BandPyrometry.SUPPORTED_POLYNOMIAL_TYPES)))))"
+md"Select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(BandPyrometry.SUPPORTED_POLYNOMIAL_TYPES)),default = :bernsteinsym)))"
 
 # ╔═╡ d90da478-40b3-4677-82b9-fbfd79a72ef0
 md"""Set the "measured" spectrum emissivity approximation coefficients:"""
@@ -468,7 +467,10 @@ md"""
 begin
 	if !is_benchmark_data
 		λ = SVector{N}(collect(range(lam_region[1],lam_region[2],length=N)))
-		VVV= BandPyrometry.VanderMatrix(λ,Val(real_poly_degree + 1),poly_type=poly_type)
+
+		RealPolyType = BandPyrometry.SUPPORTED_POLYNOMIAL_TYPES[poly_type]{real_poly_degree + 1,Float64}
+		
+		VVV= BandPyrometry.VanderMatrix(λ,RealPolyType)
 		Ib = Planck.ibb.(λ,T_to_fit) # bb spectrum
 		ϵ_data= if is_real_emissivity 
 				rt_emissivity_interpolation(Vector(λ))
@@ -507,13 +509,18 @@ end
 
 # ╔═╡ 1c60da73-a088-45ac-a08d-885bb1d98dcc
 begin 
-	VV_check = BandPyrometry.VanderMatrix(λ,Val(poly_degree + 1),poly_type=poly_type)
+	CheckType = BandPyrometry.SUPPORTED_POLYNOMIAL_TYPES[poly_type]{poly_degree + 1,Float64}
+		
+	VV_check = BandPyrometry.VanderMatrix(λ,CheckType)
 	Ib_check = Planck.ibb.(λ,T_starting) # bb spectrum
 	ϵ_data_check = VV_check*x_starting[1:end-1]# "measured" spectrum emissivity 
 	I_data_check = Ib_check.*ϵ_data_check
 	plot(λ,I_data,label="Real")
-	plot!(λ,I_data_check,label = "check")
+	plot!(λ,I_data_check,label = "check",title = "Spectral intensity",xlabel="Wavelength,μm",ylabel = "I")
 end
+
+# ╔═╡ 08cad9ec-ce1c-4c2e-9758-58a1988cd1d3
+plot(λ,ϵ_data_check,title= "Spectral emissivity",xlabel = "wavelength, μm", ylabel = "ϵ")
 
 # ╔═╡ c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 md"""Choose the optimization method $(@bind optim_type confirm(Select(["NelderMead","BFGS","GradientDescent", "LBFGS","NewtonTrustRegion","ParticleSwarm","Newton","IPNewton" ])))"""
@@ -528,7 +535,7 @@ is_constraint = constraint_type=="constraint";
 md"""
 Selected optimization method is $(optim_type)
 the actual optimizer is
-$(Main.BandPyrometry.optimizer_switch(optim_type,is_constraint=is_constraint,is_lagrange_constraint = false)) 
+$(Main.BandPyrometry.optimizer_switch(optim_type,is_box_constraint=is_constraint,is_lagrange_constraint = false)) 
 """
 # this function returns the methods which was actually used (some methods from optim_type list does not support constraints)
 
@@ -2572,10 +2579,9 @@ version = "1.9.2+0"
 
 # ╔═╡ Cell order:
 # ╟─30743a02-c643-4bdc-837e-b97299f9520a
-# ╠═1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-# ╠═6c087f1c-052d-4efa-9fca-3a7e3fdbb8c2
-# ╠═af23b80d-7e36-43e0-8472-f563a823baa0
-# ╠═255e0485-a280-4142-82dd-d76d0d3d0cca
+# ╟─1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
+# ╟─6c087f1c-052d-4efa-9fca-3a7e3fdbb8c2
+# ╟─255e0485-a280-4142-82dd-d76d0d3d0cca
 # ╟─15a5265e-61bc-440d-9a7d-ff10773b78d8
 # ╟─171409eb-22b5-4bc5-a8e2-eac0932a24f3
 # ╟─d442014a-20e6-4be4-ac7f-f13de329dec5
@@ -2590,17 +2596,17 @@ version = "1.9.2+0"
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
-# ╠═cbaf05db-3265-4e2d-8ea4-759442f798e0
+# ╟─cbaf05db-3265-4e2d-8ea4-759442f798e0
 # ╟─c2b82e9d-cae8-465c-bca0-160599e06102
 # ╟─478c8bb8-aa3c-4afe-b787-4924525858fa
 # ╟─0831fddd-d2db-4ada-b293-00848d3673fb
 # ╟─4accbaec-4e08-43d3-8f36-2217b9394e86
 # ╟─c47637c6-b243-4d8b-8234-40c68608939c
 # ╟─d55793f5-45ff-4968-b2e1-8b846de8b91f
-# ╠═da6d5178-c083-4baa-91c3-e62f735bf808
-# ╠═ae970ce5-fc5d-40d8-9f08-5dce0f99a509
+# ╟─da6d5178-c083-4baa-91c3-e62f735bf808
+# ╟─ae970ce5-fc5d-40d8-9f08-5dce0f99a509
 # ╟─529b07d7-e622-4816-8de9-e31581ea96a6
-# ╟─ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
+# ╟─5880b468-64ec-4efa-9f6a-c39ecb090440
 # ╟─988274c4-ad6a-42df-aead-5f40e0000998
 # ╟─111122e9-1260-4f00-aba6-0fdf6cf04c4e
 # ╟─efbc4a5f-8853-47b1-8842-c77b060d2de7
@@ -2611,20 +2617,21 @@ version = "1.9.2+0"
 # ╟─278c2da0-b396-493e-bdcd-fc2a539780b6
 # ╟─d90da478-40b3-4677-82b9-fbfd79a72ef0
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
-# ╠═8ef42759-fb53-41af-904e-8916924415fa
-# ╠═a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
+# ╟─8ef42759-fb53-41af-904e-8916924415fa
+# ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
 # ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2
-# ╠═36c655f8-141b-4472-96d7-01c8fd1f1515
+# ╟─36c655f8-141b-4472-96d7-01c8fd1f1515
 # ╟─321172de-dcf6-4f51-ab31-edb37b8c3983
 # ╟─c4df3ad4-9f1a-414c-b02c-8161f007ccd5
 # ╟─0232ff3c-daa9-4e86-a6c7-582d66a16cb9
-# ╠═a7861092-024a-4011-820f-79835473a281
+# ╟─a7861092-024a-4011-820f-79835473a281
 # ╟─3b4308dc-da18-43ab-9f50-2c8bc05acb78
 # ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 # ╟─6f17606c-e52e-4913-87f6-56190d209308
 # ╟─2ef835b8-f62b-4254-9337-e7aa4d44c584
+# ╟─08cad9ec-ce1c-4c2e-9758-58a1988cd1d3
 # ╟─09f16e07-0f21-4bcc-a6e8-cdba3097d57b
 # ╟─7f56174f-03f2-4996-a158-efcfc9ce9979
 # ╟─acc77ec3-6afb-4e76-ad2f-ec137555d1bc
@@ -2637,9 +2644,9 @@ version = "1.9.2+0"
 # ╟─950a61f6-fe83-47a3-b65f-fd4b70ff12ba
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
-# ╠═0ca01e99-bf48-4e24-b937-c3863eb03f50
+# ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
 # ╟─15025715-1ff3-4e7c-8136-cc442b77528a
-# ╟─6118cebc-d18e-42cc-ac1b-aa1ad95cd719
+# ╠═6118cebc-d18e-42cc-ac1b-aa1ad95cd719
 # ╟─a73dc68d-7e41-4748-b0bb-458d6ef73305
 # ╟─73c85c85-2fc4-48ac-b5f4-4c35edcf935c
 # ╟─ebc0b228-01c8-42e4-9388-8194be1dd669
