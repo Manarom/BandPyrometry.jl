@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.20
+# v0.20.19
 
 using Markdown
 using InteractiveUtils
@@ -439,7 +439,7 @@ Starting optimization variables vector:
 end
 
 # ╔═╡ 7f56174f-03f2-4996-a158-efcfc9ce9979
-md"Set polynomial degree : $(@bind poly_degree confirm(Select(0:6,default=2))) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
+md"Set polynomial degree : $(@bind poly_degree Select(0:6,default=2)) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
 
 # ╔═╡ acc77ec3-6afb-4e76-ad2f-ec137555d1bc
 md"""
@@ -451,6 +451,7 @@ begin
 	x_starting = MVector{poly_degree + 2}(zeros(poly_degree + 2))
 	x_starting[end] = 1700.0
 	x_starting[1:end-1] .= a_starting[1:poly_degree+1]
+	x_starting
 end
 
 # ╔═╡ 9016369d-bc8b-4907-bdb2-f4e81c444d30
@@ -677,7 +678,7 @@ StaticArrays = "~1.9.15"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.5"
+julia_version = "1.11.7"
 manifest_format = "2.0"
 project_hash = "605f30531750c279bcc6249139daa4873ed93bc2"
 
@@ -2640,7 +2641,7 @@ version = "1.9.2+0"
 # ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
 # ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
 # ╟─c947d126-092b-4b92-ab56-373d5a387908
-# ╠═fead76f5-c0b5-4fcb-a39e-c97ded034653
+# ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
 # ╟─950a61f6-fe83-47a3-b65f-fd4b70ff12ba
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
