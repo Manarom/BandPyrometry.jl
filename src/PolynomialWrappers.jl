@@ -16,6 +16,7 @@ for (_poly_name, _PolyType) in  POLY_NAMES_TYPES_DICT
         coeffs::MVector{P,T}
     end
 end
+
 const SUPPORTED_POLYNOMIAL_TYPES = Base.ImmutableDict([k=>eval(d) for (k,d) in  POLY_NAMES_TYPES_DICT]...)
                 #=:stand=> StandPolyWrapper,#Standard basis polynomials from Polynomials.Polynomial,
                 :chebT=> ChebPolyWrapper,# Chebyshev polynomials from Polynomials.ChebyshevT,
@@ -150,30 +151,19 @@ Input:
 function VanderMatrix(x::StaticArray{Tuple{N},T,1},
                       PolyWrapper::Type{P} # = StandPolyWrapper{CN}
                     ) where {N, T, P <:AbstractPolyWrapper{CN,PN}} where {CN,PN}
-            #@assert issorted(x) "The x-vector must be sorted in ascending order"
-            #@assert allunique(x) "All x-values must be unique"
-            #@assert P >= 0 "Degree of polynomial must be greater or equal zero"
-            #@assert haskey(SUPPORTED_POLYNOMIAL_TYPES,poly_type) "Polynomial type must be member of $(keys(SUPPORTED_POLYNOMIAL_TYPES))"# polynomial must be of supported type
-            
-            #PolyWrapper = SUPPORTED_POLYNOMIAL_TYPES[poly_type]
-            # CN = P + 1 # number of columns
             (_xi,x_first,x_last) = normalize_x(x)
-           
             V = Matrix{T}(undef,N,CN) 
             Vunnorm = Matrix{T}(undef,N,CN)  # T{length(x)}(MVector{length(x)}(x))
             poly_obj = PolyWrapper(MVector{CN}(zeros(CN)))
             _fill_vander!(V, poly_obj,_xi)
-            #!(PolyWrapper <: StandPolyWrapper) ||
             _fill_vander!(Vunnorm, poly_obj,x)
             NxCN =  N*CN     
             MatrixType  = SMatrix{N, CN, T,NxCN}
             CNxCN =  CN * CN
             RMatrixType = SMatrix{CN, CN, T,CNxCN}
             VectorType = SVector{N,T}
-
             _V = MatrixType(V)
             (Q,R) = qr(_V)
-            # {MatrixType,RMatrixType,VectorType,PolyWrapper}
             VanderMatrix{N,CN,T,NxCN,CNxCN,PolyWrapper}(_V,# Vandermonde matrix
                 MatrixType(Vunnorm), #unnormalized vandermatrix
                 MatrixType(Q),
@@ -270,19 +260,6 @@ function polyfitn(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<
     return  (a, y_fit, goodness_fit) 
 end
 
-#=function polyval(V::VanderMatrix{N,CN,T},xi::Vector{T}) where {N,CN,T}
-
-    if is_the_same_x(V,xi)
-        return 
-    else
-
-    end
-    VanderMatrix(x::StaticArray{Tuple{N},T,1},
-                      ::Val{CN};
-                      poly_type::Symbol = :stand,
-                    ) where {N,CN,T}
-end=#
-
 """
     normalize_x(x::AbstractVector)
 
@@ -318,7 +295,18 @@ function triplicate_columns(a::AbstractVector,T)
     return T(repeat(a,1,3))
 end
 
+"""
+    fill_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
+                val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P<:BernsteinSymPolyWrapper}
 
+Evaluates box-boundaries for polynomial coefficients for `BernsteinSymPolyWrapper` 
+polynomial basis
+"""
+function fill_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
+                val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P<:BernsteinSymPolyWrapper}
+    fill!(lb,first(val_bounds))
+    fill!(ub,last(val_bounds))
+end
 @recipe function f(m::AbstractPolyWrapper)
     minorgrid--> true
     gridlinewidth-->2

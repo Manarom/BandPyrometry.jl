@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.19
+# v0.20.20
 
 using Markdown
 using InteractiveUtils
@@ -338,7 +338,7 @@ md"""Set the "measured" spectrum emissivity approximation coefficients:"""
 @bind  a_real PlutoUI.combine() do Child
 	md"""
 	a0 = $(
-		Child(Slider(-1:0.01:1,default=0.3,show_value = true))
+		Child(Slider(-1:0.01:1,default=0.6,show_value = true))
 	) \
 	a1 = $(
 		Child(Slider(-1:0.01:1,default=0.1,show_value = true))
@@ -397,18 +397,6 @@ x_real_data = [a_real[1:real_poly_degree+1]...,T_to_fit];
 # ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
 L"""%$(x_real_data)"""
 
-# ╔═╡ 6f17606c-e52e-4913-87f6-56190d209308
-@bind  lam_region confirm(PlutoUI.combine() do Child
-	md"""
-	λₘᵢₙ ,μm = $(
-		Child(Slider(0.01:0.1:30,default=8.0,show_value = true))
-	) \
-	λₘₐₓ ,μm = $(
-		Child(Slider(0.0:0.1:30,default=13.0,show_value = true))
-	) 
-	"""
-end)
-
 # ╔═╡ 2ef835b8-f62b-4254-9337-e7aa4d44c584
 md"""
 Starting optimization variables vector:
@@ -439,7 +427,7 @@ Starting optimization variables vector:
 end
 
 # ╔═╡ 7f56174f-03f2-4996-a158-efcfc9ce9979
-md"Set polynomial degree : $(@bind poly_degree Select(0:6,default=2)) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
+md"Set polynomial degree : $(@bind poly_degree Select(0:15,default=2)) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
 
 # ╔═╡ acc77ec3-6afb-4e76-ad2f-ec137555d1bc
 md"""
@@ -461,8 +449,20 @@ md"""
 
 # ╔═╡ 01cd1f0d-15b8-474b-a05a-eec840c54fff
 md"""
-	add noise to the "measured" spectrum = $(@bind noise_amplitude  Slider(0.0:0.0001:0.1,show_value = true))
+	add noise to the "measured" spectrum = $(@bind noise_amplitude  Slider(0.0:0.0001:0.5,default = 0.0,show_value = true))
 	"""
+
+# ╔═╡ 6f17606c-e52e-4913-87f6-56190d209308
+@bind  lam_region confirm(PlutoUI.combine() do Child
+	md"""
+	λₘᵢₙ ,μm = $(
+		Child(Slider(0.01:0.1:30,default=8.0,show_value = true))
+	) \
+	λₘₐₓ ,μm = $(
+		Child(Slider(0.0:0.1:30,default=13.0,show_value = true))
+	) 
+	"""
+end)
 
 # ╔═╡ 3b4308dc-da18-43ab-9f50-2c8bc05acb78
 begin
@@ -532,6 +532,25 @@ md"""Choose the optimization method $(@bind optim_type confirm(Select(["NelderMe
 # ╔═╡ 0ca01e99-bf48-4e24-b937-c3863eb03f50
 is_constraint = constraint_type=="constraint";
 
+# ╔═╡ c01d5d8c-06f7-42b2-b845-e3ec0e82078e
+md"""
+Spectral emissivity range:
+
+
+ϵₗ = $(@bind eps_lower confirm(Slider(0:1e-3:1,show_value = true,default = 0.1)))
+
+ϵᵣ = $(@bind eps_upper confirm(Slider(0:1e-3:1,show_value = true,default = 0.99)))
+"""
+
+# ╔═╡ c9253144-b8c6-4a24-98d4-3faa4175d96a
+md"""
+Constraint temperature: $(@bind is_temp_constr CheckBox(false))
+
+Tₗ = $(@bind t_lower confirm(Slider(300:1.0:5000,show_value = true,default = 500)))
+
+Tᵣ = $(@bind t_upper confirm(Slider(300:1.0:5000,show_value = true,default = 1500)))
+"""
+
 # ╔═╡ 15025715-1ff3-4e7c-8136-cc442b77528a
 md"""
 Selected optimization method is $(optim_type)
@@ -544,7 +563,13 @@ $(Main.BandPyrometry.optimizer_switch(optim_type,is_box_constraint=is_constraint
 begin 
 	
 	band_fit =Main.BandPyrometry.BandPyrometryPoint(I_data,λ,x_starting,polynomial_type=poly_type)# creating BandPyrometryPoint from the data to be fitted, wavelength region and starting optimization variables vector x_starting
-	@time out = Main.BandPyrometry.fit_T!(band_fit,optimizer_name=optim_type,is_lagrange_constraint = false) # this function runs the optimizaiton is_box_constraint=is_constraint,
+	e_range = (eps_lower,eps_upper)
+	t_range = is_temp_constr ? (t_lower,t_upper) : nothing
+	@time out = Main.BandPyrometry.fit_T!(band_fit,optimizer_name=optim_type,
+										  is_lagrange_constraint = false,
+										 is_box_constraint = is_constraint,
+										 emissivity_range = e_range,
+										 temperature_range = t_range) # this function runs the optimizaiton is_box_constraint=is_constraint,
 end # starting values
 
 # ╔═╡ 950a61f6-fe83-47a3-b65f-fd4b70ff12ba
@@ -561,6 +586,12 @@ begin
 	xlabel!("Wavelength, μm") 
 	ylabel!("Emission intensity")
 end
+
+# ╔═╡ 095cbaa2-9dfd-45d9-81a2-c075f7ba4838
+(lb1,ub1) = Main.BandPyrometry.evaluate_box_constraints(band_fit, e_range,t_range)
+
+# ╔═╡ 37bb17b2-03f5-497a-b5c4-4464c271c8ae
+band_fit.vandermonde
 
 # ╔═╡ 73c85c85-2fc4-48ac-b5f4-4c35edcf935c
 begin 
@@ -678,7 +709,7 @@ StaticArrays = "~1.9.15"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.7"
+julia_version = "1.11.5"
 manifest_format = "2.0"
 project_hash = "605f30531750c279bcc6249139daa4873ed93bc2"
 
@@ -2582,7 +2613,7 @@ version = "1.9.2+0"
 # ╟─30743a02-c643-4bdc-837e-b97299f9520a
 # ╟─1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
 # ╟─6c087f1c-052d-4efa-9fca-3a7e3fdbb8c2
-# ╟─255e0485-a280-4142-82dd-d76d0d3d0cca
+# ╠═255e0485-a280-4142-82dd-d76d0d3d0cca
 # ╟─15a5265e-61bc-440d-9a7d-ff10773b78d8
 # ╟─171409eb-22b5-4bc5-a8e2-eac0932a24f3
 # ╟─d442014a-20e6-4be4-ac7f-f13de329dec5
@@ -2630,28 +2661,32 @@ version = "1.9.2+0"
 # ╟─a7861092-024a-4011-820f-79835473a281
 # ╟─3b4308dc-da18-43ab-9f50-2c8bc05acb78
 # ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
-# ╟─6f17606c-e52e-4913-87f6-56190d209308
 # ╟─2ef835b8-f62b-4254-9337-e7aa4d44c584
 # ╟─08cad9ec-ce1c-4c2e-9758-58a1988cd1d3
 # ╟─09f16e07-0f21-4bcc-a6e8-cdba3097d57b
+# ╟─1c60da73-a088-45ac-a08d-885bb1d98dcc
 # ╟─7f56174f-03f2-4996-a158-efcfc9ce9979
 # ╟─acc77ec3-6afb-4e76-ad2f-ec137555d1bc
 # ╟─808f8601-90fc-4cb1-b455-46cfc11b8fc7
-# ╟─1c60da73-a088-45ac-a08d-885bb1d98dcc
 # ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
 # ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
+# ╟─6f17606c-e52e-4913-87f6-56190d209308
 # ╟─c947d126-092b-4b92-ab56-373d5a387908
 # ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
-# ╟─950a61f6-fe83-47a3-b65f-fd4b70ff12ba
+# ╠═950a61f6-fe83-47a3-b65f-fd4b70ff12ba
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
 # ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
+# ╟─c01d5d8c-06f7-42b2-b845-e3ec0e82078e
+# ╟─c9253144-b8c6-4a24-98d4-3faa4175d96a
 # ╟─15025715-1ff3-4e7c-8136-cc442b77528a
-# ╠═6118cebc-d18e-42cc-ac1b-aa1ad95cd719
+# ╟─6118cebc-d18e-42cc-ac1b-aa1ad95cd719
 # ╟─a73dc68d-7e41-4748-b0bb-458d6ef73305
+# ╟─095cbaa2-9dfd-45d9-81a2-c075f7ba4838
+# ╟─37bb17b2-03f5-497a-b5c4-4464c271c8ae
 # ╟─73c85c85-2fc4-48ac-b5f4-4c35edcf935c
-# ╟─ebc0b228-01c8-42e4-9388-8194be1dd669
-# ╟─5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
+# ╠═ebc0b228-01c8-42e4-9388-8194be1dd669
+# ╠═5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
 # ╟─e9b7169f-0d75-44bb-8505-ccfde1bdce98
 # ╟─3f1e1a4c-48bf-44fa-a146-020dde04d2ff
 # ╟─027f22c1-5309-49d4-86ac-53791c2e0eaf

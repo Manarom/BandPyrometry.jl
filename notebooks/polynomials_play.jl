@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.19
+# v0.20.20
 
 using Markdown
 using InteractiveUtils
@@ -20,8 +20,8 @@ end
 using Revise,Plots,StaticArrays,Polynomials,Interpolations, RecipesBase, LegendrePolynomials, PlutoUI, LinearAlgebra, PrettyTables, Optimization,OptimizationOptimJL
 
 # ╔═╡ d20e7502-fa03-4448-84f4-dc46acf52c9b
-#includet(raw"E:\JULIA\JULIA_DEPOT\dev\BandPyrometry.jl\src\PolynomialWrappers.jl")
-includet(raw"D:\JuliaDepoth\dev\BandPyrometry\src\PolynomialWrappers.jl")
+includet(raw"E:\JULIA\JULIA_DEPOT\dev\BandPyrometry.jl\src\PolynomialWrappers.jl")
+#includet(raw"D:\JuliaDepoth\dev\BandPyrometry\src\PolynomialWrappers.jl")
 
 # ╔═╡ f240500d-1198-49f7-b043-beea86a248c7
 md"""
@@ -33,11 +33,11 @@ A common problem in constrained nonlinear optimization is converting nonlinear c
 
 For example, in multiwavelength pyrometry, the measured signal can be approximated as a product of two functions: one (spectral emissivity) is linear with respect to the optimization variables, while the other (`blackbody` thermal emission spectrum) is nonlinear.
 
-`` \vec{x}^*=argmin\{F(\vec{x})\}`` - optimization problem
+`` \vec{b}^*=argmin\{F(\vec{b})\}`` - optimization problem
 
-``F(\vec{x})=\sum_{i=1}^{M}[y_i - I_{bb}(\lambda_i,T) \cdot (\sum_{k=0}^{n}a_k \cdot \phi_k(λ_i))]^2``  - discrepancy function
+``F(\vec{b})=\sum_{i=1}^{M}[y_i - I_{bb}(\lambda_i,T) \cdot (\sum_{k=0}^{n}a_k \cdot \phi_k(λ_i))]^2``  - discrepancy function
 
-``\vec{x} = [\vec{a},T]^t`` - optimization variables vector, ``T`` is the temperature,  ``\vec{a}`` - coefficients of emissivity approximation, ``I_{bb}(\lambda_i,T)`` - blackbody thermal emission spectrum, ``y_i``  - measured intensity.
+``\vec{b} = [\vec{a},T]^t`` - optimization variables vector, ``T`` is the temperature,  ``\vec{a}`` - coefficients of emissivity approximation, ``I_{bb}(\lambda_i,T)`` - blackbody thermal emission spectrum, ``y_i``  - measured intensity.
 
 ``\epsilon(λ)=\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ)`` - spectral emissivity is a linear combination of some basis functions ``\phi_n(λ)``
 
@@ -124,17 +124,17 @@ In the following, all formulas will be provided for ``x \in [0...1]`` basis, bec
 
 # ╔═╡ 52c7978a-c51b-40ac-9604-0485ff469141
 md"""
-Main features of B polynomial basis:
+### Main features of B-polynomial basis:
 
-1. Each monomial ``\beta_{k}^{n}(x)`` is a polynomial of degree ``n``. Roughly speaking, all B monomial have the same `units`
+1. Each B-monomial ``\beta_{k}^{n}(x)`` is a polynomial of degree ``n``. 
 
-2. Each monomial has a single maximum with the value and location governed by ``n`` and ``k``:
+Roughly speaking, all B-monomial have the same `units`
 
-B-basis function ``\beta_{k}^{n}(x)`` has maximum ``max(\beta_{k}^{n}(x)) = k^k \cdot n^n \cdot (n-k)^{n-k} \cdot (\begin{matrix} n \\ k \end{matrix})`` is located at  
+2. Each B-monomial has a single maximum with the value and location governed by ``n`` and ``k``.
 
-``argmax(\beta_{k}^{n}(x)) = \frac{k}{n}``
+B-basis function ``\beta_{k}^{n}(x)``  maximum value is ``max(\beta_{k}^{n}(x)) = k^k \cdot n^n \cdot (n-k)^{n-k} \cdot (\begin{matrix} n \\ k \end{matrix})``. It is located  at coordinate:  ``argmax(\beta_{k}^{n}(x)) = \frac{k}{n}``
 
-3. All monomials for some coordinate sums to one: 
+3. The summation over all B-monomials within any B-basis set  gives one for any coordinate ``x``: 
 ``\Sigma_{k=0}^{n} \beta_{k}^{n}(x) = 1``. 
 
 
@@ -207,6 +207,12 @@ a_real =SVector{polydegree + 1}(a[1:polydegree + 1]);
 # ╔═╡ 8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
 md"Add noise $(@bind noise_amplitude Slider(0.0:1e-2:1, default =  0.0, show_value = true))"
 
+# ╔═╡ faaa4542-2066-49fc-b978-a6a45a4cca4e
+begin 
+	y_bern = (1.0 .+ noise_amplitude*rand(NPOINTS)).*(V*a_real)
+	sum(eachcol(V.v_unnorm)) # checking normalization
+end;
+
 # ╔═╡ 67918393-0efb-4c8a-a291-3d86f7853cce
 md"""
 ##### Figure shows the following plots: 
@@ -223,8 +229,47 @@ md" Bernstein fitting basis degree $(@bind bern_degree Select(1:50,default = 10)
 
 # ╔═╡ eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
 md"""
-The following table and figure show B monomial of number $(@bind sub_monomial_degree Select(0:bern_degree)) for B-basis of degree $(bern_degree) fitting using standard basis polynomial
+The following table and figure show  $(@bind sub_monomial_degree Select(0:bern_degree))'th B-monomial for B-basis of degree $(bern_degree) fitting using standard basis polynomial
 """
+
+# ╔═╡ 67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
+begin # bernsteinfit block
+	Bern_Type = Main.BernsteinSymPolyWrapper{bern_degree + 1,Float64}
+	bern_vander_mat = Main.VanderMatrix(x,Bern_Type)
+	(bern_coeffs,bern_fit) = Main.polyfitn(bern_vander_mat,Vector(x),Vector(y_bern))
+	ber_max_ocations = Main.bern_max_locations(bern_vander_mat)
+end;
+
+# ╔═╡ bb55121f-9e67-446d-bf4f-4fc3dfe48062
+md" ``\Sigma_{i,j} V[i,j] =`` $(sum(bern_vander_mat.v)) 
+
+Is the summation of B Vandermonde matrix over all values for x with $(length(x))  points"
+
+# ╔═╡ 3280488d-efef-4833-ae37-6ea534f50df4
+plot([sum(c) for c in  eachcol(bern_vander_mat.v)],label=nothing, marker = :diamond, title = " Σ of V columns vs column index")
+
+# ╔═╡ 1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
+begin 
+	stand_bas = Main.VanderMatrix(x,Main.StandPolyWrapper{bern_degree + 1, Float64})
+	(standart_basis_bern_monomial_fit,) = Main.polyfitn(stand_bas,Vector(x),Vector(bern_vander_mat.v[:,sub_monomial_degree +1]))
+	plot(x,bern_vander_mat.v[:,sub_monomial_degree +1],label="Bernstein monomial $(sub_monomial_degree)")
+	plot!(x,stand_bas*standart_basis_bern_monomial_fit,label = "Standard basis fit")
+end
+
+# ╔═╡ bf5df253-2d64-470b-8592-e93a6bcd144a
+pretty_table(HTML,transpose(standart_basis_bern_monomial_fit) , title = "Standard basis polynomial fitting",column_labels = ["a_$(i)" for i in 0:length(standart_basis_bern_monomial_fit) - 1])
+
+# ╔═╡ 0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
+begin 
+	function_values_at_bernstein_location = linear_interpolation(x,y_bern)(ber_max_ocations)
+	delta = function_values_at_bernstein_location - bern_coeffs
+	pretty_table(HTML,hcat(ber_max_ocations,bern_coeffs,function_values_at_bernstein_location,100*delta./function_values_at_bernstein_location) ,column_labels = ["Coordinate", "Bernstein coefficient", "Function value", "delta/F, %"], title = "Bernstein polynomial fitting")
+end
+
+# ╔═╡ 4f9826a0-0b80-440d-9933-2c51bf901f07
+if fix_limits
+	lim_vals = (0.9*minimum(bern_coeffs), 1.1*maximum(bern_coeffs))
+end
 
 # ╔═╡ 4349710e-529b-4036-8986-6140292457c2
 md"""
@@ -314,19 +359,19 @@ end
 # ╔═╡ d66a01ba-6040-4935-b36b-065015a0510c
 @bind  a_lb PlutoUI.combine() do Child
 	md"""
-	Coefficients of f(x) function lower boundary g(x), ``f(x) \ge g(x)``
+	Coefficients of f(x) function lower boundary g(x), ``g(x) \le f(x) ``
 	
 	``a_0`` = $(
-		Child(Slider(-3:0.001:3,default=0.3,show_value = true))
+		Child(Slider(-3:0.001:3,default=0.1,show_value = true))
 	) \
 	``a_1`` = $(
 		Child(Slider(-3:0.001:3,default=0.1,show_value = true))
 	)\
 	``a_2`` = $(
-		Child(Slider(-3:0.001:3,default=0.2,show_value = true))
+		Child(Slider(-3:0.001:3,default=0.1,show_value = true))
 	)\
 	``a_3`` = $(
-		Child(Slider(-3:0.001:3,default=0.2,show_value = true))
+		Child(Slider(-3:0.001:3,default=0.1,show_value = true))
 	)
 	"""
 end
@@ -338,25 +383,28 @@ end
 	q(x), ``f(x) \le q(x)``
 	
 	``a_0`` = $(
-		Child(Slider(-3:0.001:3,default=0.3,show_value = true))
+		Child(Slider(-3:0.001:3,default=0.8,show_value = true))
 	) \
 	``a_1`` = $(
-		Child(Slider(-3:0.001:3,default=0.1,show_value = true))
+		Child(Slider(-3:0.001:3,default=0.8,show_value = true))
 	)\
 	``a_2`` = $(
-		Child(Slider(-3:0.001:3,default=0.2,show_value = true))
+		Child(Slider(-3:0.001:3,default=0.8,show_value = true))
 	)\
 	``a_3`` = $(
-		Child(Slider(-3:0.001:3,default=0.2,show_value = true))
+		Child(Slider(-3:0.001:3,default=0.8,show_value = true))
 	)
 	"""
 end
 
 # ╔═╡ 46a3593e-9653-49e8-8f11-b39b61176897
 begin
-	y_bern_noisy = (1.0 .+ 0.5*rand(NPOINTS)).*(V*[a_f...]);
-	
 	Bound_Type = Main.BernsteinSymPolyWrapper{length(a_lb),Float64}
+	v_data = Main.VanderMatrix(x,Bound_Type)
+	a_f_vect = [a_f...]
+	y_bern_noisy = (1.0 .+ 0.8*rand(NPOINTS)).*(v_data*a_f_vect);
+	
+	
 	bound_vander_mat = Main.VanderMatrix(x,Bound_Type)
 	a_lb_vect = [a_lb...]
 	a_ub_vect = [a_ub...]
@@ -367,21 +415,22 @@ md"Use constraints $(@bind is_constraint CheckBox(false))"
 
 # ╔═╡ 5cfef29e-4687-46b2-89d0-97c7579e198e
 md"""
-	Select optimizer $(@bind optimizer Select([ParticleSwarm()=>"Particle swarm",NelderMead()=>"Nelder-Mead"] ))
+	Select optimizer $(@bind optimizer Select([ParticleSwarm()=>"Particle swarm",NelderMead()=>"Nelder-Mead",LBFGS()=>"LBFGS"] ))
 	"""
 
 # ╔═╡ 106d13d1-5310-4a9f-a688-778351c56a9f
 begin 
 	fun_optim = (x,_)  -> sum( t->^(t,2) , y_bern_noisy .- bound_vander_mat*x)
 	fun_opt = OptimizationFunction(fun_optim,AutoForwardDiff()) 
+	starting_vector =0.5*(  a_ub_vect .+ a_lb_vect )
 	probl = if is_constraint
 	 OptimizationProblem(fun_opt, 
-                            a_lb_vect,
+                            starting_vector,
                             lb = a_lb_vect, # both min and max of emissivity should 
                             ub = a_ub_vect) # both min and max should be higher than 
 	else
 			 OptimizationProblem(fun_opt, 
-                            a_lb_vect) 
+                            starting_vector) 
 	end
 	a_solve = solve(probl,optimizer)
 	
@@ -397,11 +446,12 @@ begin
 	plot!(pp_b,x,bound_vander_mat*a_solve,linewidth=3,label = "fitting results")
 	plot!(pp_b,x,bound_vander_mat*a_ub_vect,label="upper bound",linewidth=3,linecolor=:red)
 	scatter!(pp_b,bern_coeffs_locations,a_ub_vect,markercolor=:red,label ="ub coeffs", markersize = 6)
-	scatter!(pp_b,bern_coeffs_locations,a_solve,markercolor=:black,markerstype=:diamond,markersize = 8, label = "actual coefficients")
+	scatter!(pp_b,bern_coeffs_locations,a_solve,markercolor=:black,markerstype=:diamond,markersize = 8, label = "fitted aᵢ")
 end
 
-# ╔═╡ 735381a2-0664-44a1-ada1-5803f9f8f6a9
-bern_coeffs_locations
+# ╔═╡ 6aea3077-0fd9-47ab-8da6-30ef3fc46bda
+begin pretty_table(HTML,hcat(a_f_vect,a_lb_vect,a_solve,a_ub_vect) ,column_labels = ["Data coeffs", "Lower bound", "Fitted coeffs", "Upper bound"], title = "Constraint optimization")
+end
 
 # ╔═╡ 342c4189-1164-4c0f-a4c9-029c8720caea
 if PolyType <: Main.BernsteinPolyWrapper || PolyType <: Main.BernsteinSymPolyWrapper
@@ -410,50 +460,8 @@ if PolyType <: Main.BernsteinPolyWrapper || PolyType <: Main.BernsteinSymPolyWra
 	Main.bern_max_locations(Main.VanderMatrix(x,PolyType))
 end;
 
-# ╔═╡ faaa4542-2066-49fc-b978-a6a45a4cca4e
-begin 
-	y_bern = (1.0 .+ noise_amplitude*rand(NPOINTS)).*(V*a_real)
-	sum(eachcol(V.v_unnorm)) # checking normalization
-end;
-
-# ╔═╡ 67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
-begin # bernsteinfit block
-	Bern_Type = Main.BernsteinSymPolyWrapper{bern_degree + 1,Float64}
-	bern_vander_mat = Main.VanderMatrix(x,Bern_Type)
-	(bern_coeffs,bern_fit) = Main.polyfitn(bern_vander_mat,Vector(x),Vector(y_bern))
-	ber_max_ocations = Main.bern_max_locations(bern_vander_mat)
-end;
-
-# ╔═╡ bb55121f-9e67-446d-bf4f-4fc3dfe48062
-md" ``\Sigma_{i,j} V[i,j] =`` $(sum(bern_vander_mat.v)) 
-
-Is the summation of B Vandermonde matrix over all values for x with $(length(x))  points"
-
-# ╔═╡ 3280488d-efef-4833-ae37-6ea534f50df4
-plot([sum(c) for c in  eachcol(bern_vander_mat.v)],label=nothing, marker = :diamond, title = " Σ of V columns vs column index $(2/bern_degree)")
-
-# ╔═╡ 1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
-begin 
-	stand_bas = Main.VanderMatrix(x,Main.StandPolyWrapper{bern_degree + 1, Float64})
-	(standart_basis_bern_monomial_fit,) = Main.polyfitn(stand_bas,Vector(x),Vector(bern_vander_mat.v[:,sub_monomial_degree +1]))
-	plot(x,bern_vander_mat.v[:,sub_monomial_degree +1],label="Bernstein monomial $(sub_monomial_degree)")
-	plot!(x,stand_bas*standart_basis_bern_monomial_fit,label = "Standard basis fit")
-end
-
-# ╔═╡ bf5df253-2d64-470b-8592-e93a6bcd144a
-pretty_table(HTML,transpose(standart_basis_bern_monomial_fit) , title = "Standard basis polynomial fitting",column_labels = ["a_$(i)" for i in 0:length(standart_basis_bern_monomial_fit) - 1])
-
-# ╔═╡ 0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
-begin 
-	function_values_at_bernstein_location = linear_interpolation(x,y_bern)(ber_max_ocations)
-	delta = function_values_at_bernstein_location - bern_coeffs
-	pretty_table(HTML,hcat(ber_max_ocations,bern_coeffs,function_values_at_bernstein_location,100*delta./function_values_at_bernstein_location) ,column_labels = ["Coordinate", "Bernstein coefficient", "Function value", "delta/F, %"], title = "Bernstein polynomial fitting")
-end
-
-# ╔═╡ 4f9826a0-0b80-440d-9933-2c51bf901f07
-if fix_limits
-	lim_vals = (0.9*minimum(bern_coeffs), 1.1*maximum(bern_coeffs))
-end
+# ╔═╡ a365088c-4239-4068-9367-d070b1ad8fce
+a_lb
 
 # ╔═╡ 36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
 Vstand = Main.VanderMatrix(x,Main.StandPolyWrapper{polydegree + 1,Float64});
@@ -486,6 +494,9 @@ begin
 	title!(p_spectra,"Singular values spectra for various polynomial bases")
 	p_spectra
 end
+
+# ╔═╡ ebc42c78-90d4-4a49-84c1-93afa4a3f8d9
+md" a = $(@bind scr Scrubbable(20.0,default = 10))"
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -521,7 +532,7 @@ StaticArrays = "~1.9.15"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.7"
+julia_version = "1.11.5"
 manifest_format = "2.0"
 project_hash = "316477323e648157a297c8b1cf9911848f3635e7"
 
@@ -2405,8 +2416,8 @@ version = "1.9.2+0"
 """
 
 # ╔═╡ Cell order:
-# ╟─bbfef040-b3cd-11f0-20ca-a5cbafbafd95
-# ╟─d20e7502-fa03-4448-84f4-dc46acf52c9b
+# ╠═bbfef040-b3cd-11f0-20ca-a5cbafbafd95
+# ╠═d20e7502-fa03-4448-84f4-dc46acf52c9b
 # ╟─f240500d-1198-49f7-b043-beea86a248c7
 # ╟─c8102be0-6f8f-406e-9f18-45f462116602
 # ╟─381fd867-f404-40e5-a270-ae98f50bf9b5
@@ -2422,8 +2433,8 @@ version = "1.9.2+0"
 # ╟─54e44992-423e-4ebb-92e6-2af89b52e7f7
 # ╟─bb55121f-9e67-446d-bf4f-4fc3dfe48062
 # ╟─3280488d-efef-4833-ae37-6ea534f50df4
-# ╟─eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
 # ╟─bf5df253-2d64-470b-8592-e93a6bcd144a
+# ╟─eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
 # ╟─1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
 # ╟─facb5dae-3ee9-4380-8c92-0e94c93c84bc
 # ╟─14ef768c-7039-4f34-862d-f58acf89e7d6
@@ -2431,6 +2442,7 @@ version = "1.9.2+0"
 # ╟─56554cd8-e858-43d8-b6ef-7593d044920c
 # ╟─c0418e2e-a6b6-4af5-a639-6d13952c88de
 # ╟─8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
+# ╟─faaa4542-2066-49fc-b978-a6a45a4cca4e
 # ╟─67918393-0efb-4c8a-a291-3d86f7853cce
 # ╟─7e1bcb20-a71a-4e9b-b797-dea6922f4cf8
 # ╟─4f9826a0-0b80-440d-9933-2c51bf901f07
@@ -2444,16 +2456,17 @@ version = "1.9.2+0"
 # ╟─616b871e-3229-4cb2-a60e-e9044485a330
 # ╟─d66a01ba-6040-4935-b36b-065015a0510c
 # ╟─76c60a39-9d68-4765-b698-7c1943572be8
+# ╟─6aea3077-0fd9-47ab-8da6-30ef3fc46bda
 # ╟─68e6ca68-e895-4f4f-a2a0-945422827e22
 # ╟─46a3593e-9653-49e8-8f11-b39b61176897
 # ╟─c8f1e2f2-cefb-4009-8c08-2574e1e6846a
 # ╟─5cfef29e-4687-46b2-89d0-97c7579e198e
 # ╟─106d13d1-5310-4a9f-a688-778351c56a9f
-# ╟─735381a2-0664-44a1-ada1-5803f9f8f6a9
 # ╟─342c4189-1164-4c0f-a4c9-029c8720caea
-# ╟─faaa4542-2066-49fc-b978-a6a45a4cca4e
+# ╠═a365088c-4239-4068-9367-d070b1ad8fce
 # ╟─36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
 # ╟─1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
 # ╟─8e492f7d-b959-4635-b524-feb48ba5f139
+# ╠═ebc42c78-90d4-4a49-84c1-93afa4a3f8d9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
