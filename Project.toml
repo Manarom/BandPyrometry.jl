@@ -6,6 +6,7 @@ version = "0.1.0"
 [deps]
 Bernstein = "e9b0fb4c-9cb7-4f61-9c14-701a41c684d7"
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -20,6 +21,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 Bernstein = "1.0.2"
+Distributions = "0.25.122"
 OrderedCollections = "1.8.0"
 PlanckFunctions = "1.0.0"
 RecipesBase = "1.3.4"

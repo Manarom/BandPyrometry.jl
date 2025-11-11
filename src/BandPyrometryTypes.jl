@@ -171,14 +171,12 @@ function BandPyrometryPoint(measured_Intensity::StaticArray{Tuple{N},T,1},
     end
 end
 
-function temperature(emp::EmPoint)
-    return emp.Tib[]
-end
-function temperature(bpp::BandPyrometryPoint)
-    return bpp.e_p.Tib[]
-end
+temperature(emp::EmPoint) = emp.Tib[]
+temperature(bp::BandPyrometryPoint) = bp.e_p.Tib[]
+
 pointsnumber(::Union{EmPoint{N},BandPyrometryPoint{N}}) where N = N
 parnumber(::BandPyrometryPoint{N, Nx3, P}) where  {N, Nx3, P} = P
 parnumber(::EmPoint) = 1
+degrees_of_freedom(p::Union{EmPoint,BandPyrometryPoint}) = pointsnumber(p) - parnumber(p)
 emissivity(p::BandPyrometryPoint) = copy(p.ϵ)
 #emissivity(p::BandPyrometryPoint,λ::AbstractVector) = 

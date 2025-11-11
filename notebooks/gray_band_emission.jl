@@ -23,7 +23,7 @@ using StaticArrays,
 	OptimizationOptimJL,BenchmarkTools, 
 	LinearAlgebra, Interpolations,Printf,
 	MKL, LegendrePolynomials, Revise,
-	Polynomials, ForwardDiff,Revise, LaTeXStrings, PrettyTables
+	Polynomials, ForwardDiff,Revise, LaTeXStrings, PrettyTables, RecipesBase, Distributions
 
 # ╔═╡ 500f0cb0-bf70-11ee-19a8-35930e422cab
 md"""
@@ -219,18 +219,13 @@ if is_zero_order_run
 		
 		em_point_zo = BP.EmPoint(MVector{POINTS_NUMBER}(Imeas), SVector{POINTS_NUMBER}(collect(lam))) # emissivity point 
 		
-		
-		#em_prob_zo= OptimizationProblem(OptimizationFunction(BP.disc,grad=BP.grad!), [235.0],em_point_zo);# optimization problem with Empoint implementation
-		em_sol_zo = BP.fit_T!(em_point_zo,  optimizer_name = zero_order_method[1]) #solve(em_prob_zo,  zero_order_method[2]()) 
+		em_sol_zo = BP.fit_T!(em_point_zo,  optimizer_name = zero_order_method[1])
 
 	end
 end;
 
 # ╔═╡ dd0b1fbb-c56f-4ac8-8ad8-57d6add2ddcc
 is_zero_order_run ? md"Tres direct = $( sol_zo.u[])" : nothing
-
-# ╔═╡ ccdce2ef-cbc9-4339-ab8b-7eaab5479c97
-is_zero_order_run ? md"Tres EmPoint =  $( em_sol_zo.T)" : nothing
 
 # ╔═╡ 88dd837e-bb77-4ec4-87d8-1134b0f741ce
 md"show zero order output = $(@bind is_zero_order_out  CheckBox())"
@@ -311,9 +306,6 @@ end
 # ╔═╡ 6974f06e-e0a9-48aa-ac4b-3c2b55b13734
 is_first_order_run ? md"Tres direct implementation= $( sol_fo.u[])" : nothing
 
-# ╔═╡ ab8d29d4-e221-4223-b5a8-dda4e2a32c0f
-is_first_order_run ? md"Tres EmPoint= $( em_sol_fo.T)" : nothing
-
 # ╔═╡ 608f923e-c327-4252-a245-49ada28cc874
 md"show first order output = $(@bind is_first_order_out  CheckBox())"
 
@@ -387,9 +379,6 @@ end
 
 # ╔═╡ c2071134-3355-4479-a2d7-55d2141bb7ff
 is_second_order_run ? md"Tres direct implementation= $( sol_so.u[])" : nothing
-
-# ╔═╡ d0afa1de-101b-4eea-b4c3-75d2b4bc27d9
-is_second_order_run ? md"Tres EmPoint= $( em_sol_so.T)" : nothing
 
 # ╔═╡ 70f59af9-f609-4b9b-b23e-606bc3b2efa2
 md"show second order output = $(@bind is_second_order_out  CheckBox())"
@@ -504,10 +493,23 @@ end
 # ╔═╡ c8b5b09b-789e-4c3c-bb88-8fc7e297b099
 #savefig(bench_plot,"performance_empoint.png")
 
+# ╔═╡ 8175d7bb-b9c4-4fa4-83fb-463f4af3bc79
+show_with_error(p) = """$( BP.temperature(p) ) ±    $(BP.fitting_error(p)[])"""
+
+# ╔═╡ ccdce2ef-cbc9-4339-ab8b-7eaab5479c97
+is_zero_order_run ? md"Tres EmPoint =  $( show_with_error(em_point_zo))" : nothing
+
+# ╔═╡ ab8d29d4-e221-4223-b5a8-dda4e2a32c0f
+is_first_order_run ? md"Tres EmPoint= $(  show_with_error(em_point_fo) )" : nothing
+
+# ╔═╡ d0afa1de-101b-4eea-b4c3-75d2b4bc27d9
+is_second_order_run ? md"Tres EmPoint= $( show_with_error(em_point_so) )" : nothing
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
@@ -522,11 +524,13 @@ PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 BenchmarkTools = "~1.6.0"
+Distributions = "~0.25.122"
 ForwardDiff = "~1.2.1"
 Interpolations = "~0.16.2"
 LaTeXStrings = "~1.4.0"
@@ -539,6 +543,7 @@ Plots = "~1.41.1"
 PlutoUI = "~0.7.71"
 Polynomials = "~4.1.0"
 PrettyTables = "~2.4.0"
+RecipesBase = "~1.3.4"
 Revise = "~3.9.0"
 StaticArrays = "~1.9.15"
 """
@@ -549,7 +554,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "dac1a389d78190ccba2760c2b918988c0c672806"
+project_hash = "abdb23fe2355fff3a634ed36482c22863973a28a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "7927b9af540ee964cc5d1b73293f1eb0b761a3a1"
@@ -924,6 +929,22 @@ deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 version = "1.11.0"
 
+[[deps.Distributions]]
+deps = ["AliasTables", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns"]
+git-tree-sha1 = "3bc002af51045ca3b47d2e1787d6ce02e68b943a"
+uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
+version = "0.25.122"
+
+    [deps.Distributions.extensions]
+    DistributionsChainRulesCoreExt = "ChainRulesCore"
+    DistributionsDensityInterfaceExt = "DensityInterface"
+    DistributionsTestExt = "Test"
+
+    [deps.Distributions.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    DensityInterface = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
+    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
 [[deps.DocStringExtensions]]
 git-tree-sha1 = "7442a5dfe1ebb773c29cc2962a8980f47221d76c"
 uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
@@ -1137,6 +1158,12 @@ deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "f923f9a774fcf3f5cb761bfa43aeadd689714813"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "8.5.1+0"
+
+[[deps.HypergeometricFunctions]]
+deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
+git-tree-sha1 = "68c173f4f449de5b438ee67ed0c9c748dc31a2ec"
+uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
+version = "0.3.28"
 
 [[deps.Hyperscript]]
 deps = ["Test"]
@@ -1786,6 +1813,18 @@ git-tree-sha1 = "e1d5e16d0f65762396f9ca4644a5f4ddab8d452b"
 uuid = "e99dba38-086e-5de3-a5b1-6e4c66e897c3"
 version = "6.8.2+1"
 
+[[deps.QuadGK]]
+deps = ["DataStructures", "LinearAlgebra"]
+git-tree-sha1 = "9da16da70037ba9d701192e27befedefb91ec284"
+uuid = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+version = "2.11.2"
+
+    [deps.QuadGK.extensions]
+    QuadGKEnzymeExt = "Enzyme"
+
+    [deps.QuadGK.weakdeps]
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+
 [[deps.REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets", "StyledStrings", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
@@ -1874,6 +1913,18 @@ weakdeps = ["Distributed"]
 
     [deps.Revise.extensions]
     DistributedExt = "Distributed"
+
+[[deps.Rmath]]
+deps = ["Random", "Rmath_jll"]
+git-tree-sha1 = "5b3d50eb374cea306873b371d3f8d3915a018f0b"
+uuid = "79098fc4-a85e-5d69-aa6a-4863f24498fa"
+version = "0.9.0"
+
+[[deps.Rmath_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "58cdd8fb2201a6267e1db87ff148dd6c1dbd8ad8"
+uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
+version = "0.5.1+0"
 
 [[deps.RuntimeGeneratedFunctions]]
 deps = ["ExprTools", "SHA", "Serialization"]
@@ -2063,6 +2114,17 @@ deps = ["AliasTables", "DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunc
 git-tree-sha1 = "2c962245732371acd51700dbb268af311bddd719"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 version = "0.34.6"
+
+[[deps.StatsFuns]]
+deps = ["HypergeometricFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
+git-tree-sha1 = "91f091a8716a6bb38417a6e6f274602a19aaa685"
+uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
+version = "1.5.2"
+weakdeps = ["ChainRulesCore", "InverseFunctions"]
+
+    [deps.StatsFuns.extensions]
+    StatsFunsChainRulesCoreExt = "ChainRulesCore"
+    StatsFunsInverseFunctionsExt = "InverseFunctions"
 
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
@@ -2418,7 +2480,7 @@ uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
 version = "1.59.0+0"
 
 [[deps.oneTBB_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
+deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
 git-tree-sha1 = "d5a767a3bb77135a99e433afe0eb14cd7f6914c3"
 uuid = "1317d2d5-d96f-522e-a858-c73665f53c3e"
 version = "2022.0.0+0"
@@ -2469,9 +2531,9 @@ version = "1.9.2+0"
 # ╟─3a16c8c8-17d9-4c36-9bc1-99a081a32c33
 # ╟─05c7a161-4346-4464-b41f-66ca7b3e149d
 # ╟─a0b68a76-8eb0-43af-927a-2ffc1abcea98
-# ╠═a9214e4c-5467-4cca-81b3-059590b121b7
-# ╠═ae5738ce-9c29-42f3-8b9c-a465c8bf2952
-# ╠═c52a950c-c15e-4188-a5ce-1ba3100d43b9
+# ╟─a9214e4c-5467-4cca-81b3-059590b121b7
+# ╟─ae5738ce-9c29-42f3-8b9c-a465c8bf2952
+# ╟─c52a950c-c15e-4188-a5ce-1ba3100d43b9
 # ╟─f3013bb6-eab2-4256-b244-ac3cd272cc42
 # ╟─9bc6c540-53c8-4a4d-9194-629d9e0277ca
 # ╟─fad07c97-14ee-4df8-9914-72309fa55d24
@@ -2484,7 +2546,7 @@ version = "1.9.2+0"
 # ╟─88dd837e-bb77-4ec4-87d8-1134b0f741ce
 # ╟─ede76282-d27a-41a2-ac92-101c26129346
 # ╟─6cc50dda-bb5c-4138-a520-973e8dae3df0
-# ╠═8c13923d-612b-44d5-8046-bf4aa4bc175e
+# ╟─8c13923d-612b-44d5-8046-bf4aa4bc175e
 # ╟─1bbc82eb-16e3-47a2-814a-0a69bd803c75
 # ╟─3dbcfc6b-c246-4550-8917-cda75f9c436d
 # ╟─7a4e3653-ee72-404c-a849-0e4c389b65f5
@@ -2508,24 +2570,25 @@ version = "1.9.2+0"
 # ╟─7b32578c-de60-47fa-ae3f-628bb1c887ba
 # ╟─95d1107f-07c5-4c31-904a-1471cb51ad33
 # ╟─631a1822-5bf0-4713-b048-a17b93bfa66e
-# ╠═ae12d403-1149-426e-ab13-5afc5e5615d9
-# ╠═c2071134-3355-4479-a2d7-55d2141bb7ff
-# ╠═d0afa1de-101b-4eea-b4c3-75d2b4bc27d9
+# ╟─ae12d403-1149-426e-ab13-5afc5e5615d9
+# ╟─c2071134-3355-4479-a2d7-55d2141bb7ff
+# ╟─d0afa1de-101b-4eea-b4c3-75d2b4bc27d9
 # ╟─70f59af9-f609-4b9b-b23e-606bc3b2efa2
-# ╠═51988df7-5be5-478f-8cda-b4999b32ff6f
-# ╠═207929ea-af4a-4d4c-b2d2-59a0dc927ba6
-# ╠═e9ea4596-7d7b-4e87-87d2-88fb40a1b6ad
-# ╠═52894f69-76ab-4045-b70c-67bea0043279
+# ╟─51988df7-5be5-478f-8cda-b4999b32ff6f
+# ╟─207929ea-af4a-4d4c-b2d2-59a0dc927ba6
+# ╟─e9ea4596-7d7b-4e87-87d2-88fb40a1b6ad
+# ╟─52894f69-76ab-4045-b70c-67bea0043279
 # ╟─15e048b0-53d6-45bf-a637-a326bb58ccba
 # ╟─70476796-ae99-490b-a77f-7b609b9e5b5f
 # ╟─fee3909d-75c6-4a02-8e0d-cc8acbc00d9c
-# ╠═7e8ef8b5-630b-4150-aa46-d58537906103
+# ╟─7e8ef8b5-630b-4150-aa46-d58537906103
 # ╟─3cd039d3-3926-4889-a743-a8b908bf1796
-# ╠═8cfa738e-05cc-4d86-b40c-86442d14b4b1
+# ╟─8cfa738e-05cc-4d86-b40c-86442d14b4b1
 # ╟─c200b8df-3580-4cb5-9da4-bf5e2113bccb
 # ╠═f9d71607-f558-4f90-b5a0-b4c445c97f2e
 # ╟─6f7497ac-d157-4ed5-8ed8-2a80f267efad
 # ╟─21d63be3-b945-452b-91d8-63efb3568b95
 # ╠═c8b5b09b-789e-4c3c-bb88-8fc7e297b099
+# ╟─8175d7bb-b9c4-4fa4-83fb-463f4af3bc79
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

@@ -17,7 +17,7 @@ macro bind(def, element)
 end
 
 # ╔═╡ 1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-using Plots,PlanckFunctions, StaticArrays, MKL,LinearAlgebra, Optimization, OptimizationOptimJL, Interpolations,   PlutoUI, Polynomials, LegendrePolynomials,  Revise,Printf,PrettyTables, DelimitedFiles, BenchmarkTools,LaTeXStrings, RecipesBase
+using Plots,PlanckFunctions, StaticArrays, MKL,LinearAlgebra, Optimization, OptimizationOptimJL, Interpolations,   PlutoUI, Polynomials, LegendrePolynomials,  Revise,Printf,PrettyTables, DelimitedFiles, BenchmarkTools,LaTeXStrings, RecipesBase,Distributions
 
 # ╔═╡ 15a5265e-61bc-440d-9a7d-ff10773b78d8
 using Main.BandPyrometry #this line returns not defined error on the first Pluto run (probably, because of the Pluto running all "using"'s before the cells) just re-run this cell manually
@@ -341,19 +341,19 @@ md"""Set the "measured" spectrum emissivity approximation coefficients:"""
 		Child(Slider(-1:0.01:1,default=0.6,show_value = true))
 	) \
 	a1 = $(
-		Child(Slider(-1:0.01:1,default=0.1,show_value = true))
+		Child(Slider(-1:0.01:1,default=0.8,show_value = true))
 	)\
 	a2 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+		Child(Slider(-1:0.01:1,default=0.8,show_value = true))
 	)\
 	a3 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+		Child(Slider(-1:0.01:1,default=0.8,show_value = true))
 	)\
 	a4 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+		Child(Slider(-1:0.01:1,default=0.8,show_value = true))
 	)\
 	a5 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+		Child(Slider(-1:0.01:1,default=0.8,show_value = true))
 	)\
 	"""
 end
@@ -399,8 +399,11 @@ L"""%$(x_real_data)"""
 
 # ╔═╡ 2ef835b8-f62b-4254-9337-e7aa4d44c584
 md"""
-Starting optimization variables vector:
+#### II.III. Starting optimization variables vector:
 """
+
+# ╔═╡ 7f56174f-03f2-4996-a158-efcfc9ce9979
+md"Set polynomial degree : $(@bind poly_degree Select(0:15,default=2)) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
 
 # ╔═╡ 09f16e07-0f21-4bcc-a6e8-cdba3097d57b
 @bind  a_starting PlutoUI.combine() do Child
@@ -423,28 +426,41 @@ Starting optimization variables vector:
 	a5 = $(
 		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
 	)\
+	a6 = $(
+		Child(Slider(-1:0.01:1,default=0.1,show_value = true))
+	)\
+	a7 = $(
+		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	)\
+	a8 = $(
+		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	)\
+	a9 = $(
+		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	)\
+	a10 = $(
+		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
+	)\
+	
 	"""
 end
 
-# ╔═╡ 7f56174f-03f2-4996-a158-efcfc9ce9979
-md"Set polynomial degree : $(@bind poly_degree Select(0:15,default=2)) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
-
 # ╔═╡ acc77ec3-6afb-4e76-ad2f-ec137555d1bc
 md"""
-"Check" spectrum temperature, K = $(@bind T_starting	Slider(range(273,2573,length=1000), show_value=true,default=600))
+Starting temperature , K = $(@bind T_starting	Slider(range(273,2573,length=1000), show_value=true,default=600))
 """
 
 # ╔═╡ 808f8601-90fc-4cb1-b455-46cfc11b8fc7
 begin 
 	x_starting = MVector{poly_degree + 2}(zeros(poly_degree + 2))
-	x_starting[end] = 1700.0
+	x_starting[end] = T_starting
 	x_starting[1:end-1] .= a_starting[1:poly_degree+1]
 	x_starting
 end
 
 # ╔═╡ 9016369d-bc8b-4907-bdb2-f4e81c444d30
 md"""
-#### II.III. Solving the optimization problem
+#### II.IV. Solving the optimization problem
 """
 
 # ╔═╡ 01cd1f0d-15b8-474b-a05a-eec840c54fff
@@ -473,7 +489,7 @@ begin
 		
 		VVV= BandPyrometry.VanderMatrix(λ,RealPolyType)
 		Ib = Planck.ibb.(λ,T_to_fit) # bb spectrum
-		ϵ_data= if is_real_emissivity 
+		ϵ_data = if is_real_emissivity 
 				rt_emissivity_interpolation(Vector(λ))
 			else
 				VVV*x_real_data[1:end-1]# "measured" spectrum emissivity 
@@ -521,7 +537,13 @@ begin
 end
 
 # ╔═╡ 08cad9ec-ce1c-4c2e-9758-58a1988cd1d3
-plot(λ,ϵ_data_check,title= "Spectral emissivity",xlabel = "wavelength, μm", ylabel = "ϵ")
+begin 
+	plot(λ,ϵ_data_check,title= "Spectral emissivity",xlabel = "wavelength, μm", ylabel = "ϵ", label = "Starting emissivity")
+	plot!(λ,ϵ_data,label = "real emissivity")
+end	
+
+# ╔═╡ e9b7178b-f321-477f-bc63-060b9c96f4a0
+# BandPyrometry.fitting_error(band_fit)
 
 # ╔═╡ c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 md"""Choose the optimization method $(@bind optim_type confirm(Select(["NelderMead","BFGS","GradientDescent", "LBFGS","NewtonTrustRegion","ParticleSwarm","Newton","IPNewton" ])))"""
@@ -575,8 +597,11 @@ end # starting values
 # ╔═╡ 950a61f6-fe83-47a3-b65f-fd4b70ff12ba
 plot(band_fit)
 
+# ╔═╡ c3e9e5e5-0d1b-4329-a5b6-020e0e7321b8
+band_fit.hessian[end]
+
 # ╔═╡ a73dc68d-7e41-4748-b0bb-458d6ef73305
-T_fitted = BandPyrometry.temperature(band_fit)
+T_fitted = Main.BandPyrometry.temperature(band_fit)
 
 # ╔═╡ c947d126-092b-4b92-ab56-373d5a387908
 begin 
@@ -590,9 +615,6 @@ end
 # ╔═╡ 095cbaa2-9dfd-45d9-81a2-c075f7ba4838
 (lb1,ub1) = Main.BandPyrometry.evaluate_box_constraints(band_fit, e_range,t_range)
 
-# ╔═╡ 37bb17b2-03f5-497a-b5c4-4464c271c8ae
-band_fit.vandermonde
-
 # ╔═╡ 73c85c85-2fc4-48ac-b5f4-4c35edcf935c
 begin 
 	a_vect_fitted = out[2]
@@ -602,6 +624,7 @@ end;
 # ╔═╡ ebc0b228-01c8-42e4-9388-8194be1dd669
 md"""
 	Goodness of fit:
+
 	"""
 
 # ╔═╡ 5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
@@ -670,6 +693,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
@@ -689,6 +713,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 BenchmarkTools = "~1.6.0"
+Distributions = "~0.25.122"
 Interpolations = "~0.16.2"
 LaTeXStrings = "~1.4.0"
 LegendrePolynomials = "~0.4.5"
@@ -711,7 +736,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "605f30531750c279bcc6249139daa4873ed93bc2"
+project_hash = "4cf83d3d8e65ce4adb58d451ea8f576844d96da0"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "7927b9af540ee964cc5d1b73293f1eb0b761a3a1"
@@ -1086,6 +1111,22 @@ deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 version = "1.11.0"
 
+[[deps.Distributions]]
+deps = ["AliasTables", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns"]
+git-tree-sha1 = "3bc002af51045ca3b47d2e1787d6ce02e68b943a"
+uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
+version = "0.25.122"
+
+    [deps.Distributions.extensions]
+    DistributionsChainRulesCoreExt = "ChainRulesCore"
+    DistributionsDensityInterfaceExt = "DensityInterface"
+    DistributionsTestExt = "Test"
+
+    [deps.Distributions.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    DensityInterface = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
+    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
 [[deps.DocStringExtensions]]
 git-tree-sha1 = "7442a5dfe1ebb773c29cc2962a8980f47221d76c"
 uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
@@ -1299,6 +1340,12 @@ deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "f923f9a774fcf3f5cb761bfa43aeadd689714813"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "8.5.1+0"
+
+[[deps.HypergeometricFunctions]]
+deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
+git-tree-sha1 = "68c173f4f449de5b438ee67ed0c9c748dc31a2ec"
+uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
+version = "0.3.28"
 
 [[deps.Hyperscript]]
 deps = ["Test"]
@@ -1948,6 +1995,18 @@ git-tree-sha1 = "e1d5e16d0f65762396f9ca4644a5f4ddab8d452b"
 uuid = "e99dba38-086e-5de3-a5b1-6e4c66e897c3"
 version = "6.8.2+1"
 
+[[deps.QuadGK]]
+deps = ["DataStructures", "LinearAlgebra"]
+git-tree-sha1 = "9da16da70037ba9d701192e27befedefb91ec284"
+uuid = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+version = "2.11.2"
+
+    [deps.QuadGK.extensions]
+    QuadGKEnzymeExt = "Enzyme"
+
+    [deps.QuadGK.weakdeps]
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+
 [[deps.REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets", "StyledStrings", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
@@ -2036,6 +2095,18 @@ weakdeps = ["Distributed"]
 
     [deps.Revise.extensions]
     DistributedExt = "Distributed"
+
+[[deps.Rmath]]
+deps = ["Random", "Rmath_jll"]
+git-tree-sha1 = "5b3d50eb374cea306873b371d3f8d3915a018f0b"
+uuid = "79098fc4-a85e-5d69-aa6a-4863f24498fa"
+version = "0.9.0"
+
+[[deps.Rmath_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "58cdd8fb2201a6267e1db87ff148dd6c1dbd8ad8"
+uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
+version = "0.5.1+0"
 
 [[deps.RuntimeGeneratedFunctions]]
 deps = ["ExprTools", "SHA", "Serialization"]
@@ -2225,6 +2296,17 @@ deps = ["AliasTables", "DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunc
 git-tree-sha1 = "2c962245732371acd51700dbb268af311bddd719"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 version = "0.34.6"
+
+[[deps.StatsFuns]]
+deps = ["HypergeometricFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
+git-tree-sha1 = "91f091a8716a6bb38417a6e6f274602a19aaa685"
+uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
+version = "1.5.2"
+weakdeps = ["ChainRulesCore", "InverseFunctions"]
+
+    [deps.StatsFuns.extensions]
+    StatsFunsChainRulesCoreExt = "ChainRulesCore"
+    StatsFunsInverseFunctionsExt = "InverseFunctions"
 
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
@@ -2613,7 +2695,7 @@ version = "1.9.2+0"
 # ╟─30743a02-c643-4bdc-837e-b97299f9520a
 # ╟─1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
 # ╟─6c087f1c-052d-4efa-9fca-3a7e3fdbb8c2
-# ╠═255e0485-a280-4142-82dd-d76d0d3d0cca
+# ╟─255e0485-a280-4142-82dd-d76d0d3d0cca
 # ╟─15a5265e-61bc-440d-9a7d-ff10773b78d8
 # ╟─171409eb-22b5-4bc5-a8e2-eac0932a24f3
 # ╟─d442014a-20e6-4be4-ac7f-f13de329dec5
@@ -2651,7 +2733,7 @@ version = "1.9.2+0"
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
 # ╟─8ef42759-fb53-41af-904e-8916924415fa
 # ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
-# ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
+# ╠═4f2db18c-6f48-4c41-9a53-470042decf5f
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2
 # ╟─36c655f8-141b-4472-96d7-01c8fd1f1515
@@ -2663,17 +2745,19 @@ version = "1.9.2+0"
 # ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 # ╟─2ef835b8-f62b-4254-9337-e7aa4d44c584
 # ╟─08cad9ec-ce1c-4c2e-9758-58a1988cd1d3
+# ╟─7f56174f-03f2-4996-a158-efcfc9ce9979
 # ╟─09f16e07-0f21-4bcc-a6e8-cdba3097d57b
 # ╟─1c60da73-a088-45ac-a08d-885bb1d98dcc
-# ╟─7f56174f-03f2-4996-a158-efcfc9ce9979
 # ╟─acc77ec3-6afb-4e76-ad2f-ec137555d1bc
 # ╟─808f8601-90fc-4cb1-b455-46cfc11b8fc7
 # ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
 # ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
 # ╟─6f17606c-e52e-4913-87f6-56190d209308
+# ╟─c3e9e5e5-0d1b-4329-a5b6-020e0e7321b8
 # ╟─c947d126-092b-4b92-ab56-373d5a387908
 # ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
-# ╠═950a61f6-fe83-47a3-b65f-fd4b70ff12ba
+# ╟─950a61f6-fe83-47a3-b65f-fd4b70ff12ba
+# ╠═e9b7178b-f321-477f-bc63-060b9c96f4a0
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
 # ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
@@ -2681,9 +2765,8 @@ version = "1.9.2+0"
 # ╟─c9253144-b8c6-4a24-98d4-3faa4175d96a
 # ╟─15025715-1ff3-4e7c-8136-cc442b77528a
 # ╟─6118cebc-d18e-42cc-ac1b-aa1ad95cd719
-# ╟─a73dc68d-7e41-4748-b0bb-458d6ef73305
+# ╠═a73dc68d-7e41-4748-b0bb-458d6ef73305
 # ╟─095cbaa2-9dfd-45d9-81a2-c075f7ba4838
-# ╟─37bb17b2-03f5-497a-b5c4-4464c271c8ae
 # ╟─73c85c85-2fc4-48ac-b5f4-4c35edcf935c
 # ╠═ebc0b228-01c8-42e4-9388-8194be1dd669
 # ╠═5e46ca94-1ca2-4af1-88c3-54c7e86d1aef

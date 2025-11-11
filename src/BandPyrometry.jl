@@ -6,7 +6,8 @@ module BandPyrometry
     OptimizationOptimJL, 
     Interpolations,
     StaticArrays,
-    RecipesBase
+    RecipesBase,
+    Distributions
     
     import PlanckFunctions as Planck
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
@@ -42,6 +43,7 @@ module BandPyrometry
                             "Default"=>NelderMead,
                             "LBFGS"=>LBFGS,
                             "IPNewton"=>IPNewton) # list of supported optimizers
+    
     const DEFAULT_OPTIMIZER = Ref(LBFGS())
     const DEFAULT_TEMPERATURE_RANGE = Ref((20.0,3000.0)) # default temperture range used for bounded optimization
     """
@@ -55,7 +57,7 @@ module BandPyrometry
     Optimizer supporting lagrangian-constraint optimization
     """                                        
     const support_lagrange_constraints = ["IPNewton"]
-
+    sumabs2(a) = sum(abs2,a)
     """
     optimizer_switch(name::String;is_constraint::Bool=false,
                 is_lagrange_constraint::Bool=false)
@@ -312,7 +314,7 @@ Input:
     bp - (modified) current spectral band pytometry point      
 """
 function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
-        if x!=bp.x_hess_vec
+        if x != bp.x_hess_vec
             hess_approx!(bp.hessian,x,bp) # refresh the approximate hessian 
             # and fill hessian with approximate hessian Jᵀ*J
             # refreshes second derivative of the Planck function
@@ -332,9 +334,9 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
             # only right-down corner of hessian contains the second derivative
             # hm = rᵀ*(∇²Ibb)ᴰ*V*a
             bp.hessian[end,end] =bp.hessian[end,end] - dot(bp.r.*bp.e_p.∇²I,bp.ϵ) # dot product
-            bp.x_hess_vec .=x
+            bp.x_hess_vec .= x
         end
-        h.=bp.hessian # filling external matrix with internally stored hessian
+        h .= bp.hessian # filling external matrix with internally stored hessian
         return nothing
     end
 
@@ -473,10 +475,11 @@ In-place filling of least-square problem hessian matrix
 """
 function hess!(h,t::Float64,e::EmPoint) # calculates hessian of a simple Planck function fitting
         ∇²!(t,e)
-        if t!=e.Thess[]
-            Base.@inbounds h[1]= dot(e.∇I,e.∇I) - dot(e.ri,e.∇²I) # fill hessian vector from current value
+        if t != e.Thess[]
             e.Thess[] = t
+            h[]= dot(e.∇I,e.∇I) - dot(e.ri,e.∇²I)
         end
+        
         return nothing
     end
 
@@ -490,24 +493,7 @@ function hess!(h,t::Float64,e::EmPoint) # calculates hessian of a simple Planck 
             is_lagrange_constraint::Bool=false, 
             emissivity_range::C=nothing, 
             temperature_range::B=nothing) where {B <: Union{AbstractVector,Nothing,NTuple{2}},C <: Union{AbstractVector,Nothing,NTuple{2}}}
-    
-Input:
-    point - (modified) real suraface (BandPyrometryPoint) of blackbody thermal emission object
-    (optional)
-    optimizer_name - the name of optimizer must be the key of optim_dic
-    is_constraint - is box-constraint flag
-    is_lagrange_constraint - is Lagrange-constraint flag
 
-Returns:
-    if the point type is EmPoint, the output is:
-        named tuple with (T - fitted temperature,
-                            res - optimization output object,
-                            optimizer - chosen optimizer)
-    if the point is of the BandPyrometryPoint type, the output is:
-        named tuple with (T - fitted temperature ,a - fitted emissivity approximation coefficients,
-                            ϵ - emissivity spectrum in the whole wavelemgth range,
-                            res - optimization output object,
-                            optimizer - chosen optimizer)                
 Input:
     point - (modified) real suraface (BandPyrometryPoint) of blackbody thermal emission object
     (optional)
@@ -612,6 +598,47 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
     function (emp::Union{EmPoint,BandPyrometryPoint})()
         return fit_T!(emp).T
     end
+    """
+    covariance(bp::BandPyrometryPoint)
+
+Evaluates the covariance matrix as Cov(x) = 2σ²H⁻¹
+"""
+function fitting_covariance(bp::BandPyrometryPoint{N,Nx3,P}) where {N,Nx3,P}
+    sigma_square = sumabs2(bp.e_p.ri)/degrees_of_freedom(bp)
+    h = similar(bp.hessian)
+    hess!(h, bp.x, bp::BandPyrometryPoint)
+    return 2*sigma_square*inv(h)
+end
+"""
+    fitting_covariance(em::EmPoint{N})
+
+Evaluates the covariance matrix as Cov(x) = 2σ²H⁻¹
+"""
+function fitting_covariance(em::EmPoint{N,Nx3,T}) where {N,Nx3,T}
+    sigma_square = sumabs2(em.ri)/degrees_of_freedom(em)
+    h = MMatrix{1,1,T,1}(undef)
+    hess!(h,temperature(em),em)
+    return 2*sigma_square*inv.(h)
+end
+fitting_variance(em::EmPoint) = vec(fitting_covariance(em))
+"""
+    fitting_variance(bp::BandPyrometryPoint)
+
+Returns the optimization variable variance (diagonal of the covariance matrix)
+"""
+fitting_variance(bp::BandPyrometryPoint) = collect(diag(fitting_covariance(bp)))
+fitting_error(p::Union{BandPyrometryPoint,EmPoint};probability = 0.95,only_std::Bool=false) =(only_std ? 1.0 : student_coefficient(degrees_of_freedom(p),probability))*sqrt.(fitting_variance(p))
+"""
+    student_coefficient(degrees_of_freedom::Int, probability; digits::Int = 3, side::Int = 2)
+
+Evaluates Student's distribution coefficient
+"""
+function student_coefficient(degrees_of_freedom::Int, probability;  side::Int = 2)
+	if side == 2
+        probability = (1 + probability)/2
+    end
+	return Distributions.quantile(Distributions.TDist(degrees_of_freedom), probability)
+end
     @recipe function f(m::EmPoint)
         minorgrid--> true
         gridlinewidth-->2
