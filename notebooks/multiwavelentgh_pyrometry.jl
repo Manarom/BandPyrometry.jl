@@ -546,7 +546,7 @@ end
 # BandPyrometry.fitting_error(band_fit)
 
 # ╔═╡ c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
-md"""Choose the optimization method $(@bind optim_type confirm(Select(["NelderMead","BFGS","GradientDescent", "LBFGS","NewtonTrustRegion","ParticleSwarm","Newton","IPNewton" ])))"""
+md"""Choose the optimization method $(@bind optim_type confirm(Select(["NelderMead","BFGS","GradientDescent", "LBFGS","NewtonTrustRegion","ParticleSwarm","Newton","IPNewton" ],default = "LBFGS")))"""
 
 # ╔═╡ 50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
 @bind constraint_type confirm(Select(["constraint","unconstraint" ],default="unconstraint"))
@@ -594,11 +594,11 @@ begin
 										 temperature_range = t_range) # this function runs the optimizaiton is_box_constraint=is_constraint,
 end # starting values
 
-# ╔═╡ 950a61f6-fe83-47a3-b65f-fd4b70ff12ba
-plot(band_fit)
-
 # ╔═╡ c3e9e5e5-0d1b-4329-a5b6-020e0e7321b8
 band_fit.hessian[end]
+
+# ╔═╡ 950a61f6-fe83-47a3-b65f-fd4b70ff12ba
+plot(band_fit)
 
 # ╔═╡ a73dc68d-7e41-4748-b0bb-458d6ef73305
 T_fitted = Main.BandPyrometry.temperature(band_fit)
@@ -2733,7 +2733,7 @@ version = "1.9.2+0"
 # ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
 # ╟─8ef42759-fb53-41af-904e-8916924415fa
 # ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
-# ╠═4f2db18c-6f48-4c41-9a53-470042decf5f
+# ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
 # ╟─d17a5db7-0125-48b5-9016-76da6d72c673
 # ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2
 # ╟─36c655f8-141b-4472-96d7-01c8fd1f1515
@@ -2742,7 +2742,6 @@ version = "1.9.2+0"
 # ╟─0232ff3c-daa9-4e86-a6c7-582d66a16cb9
 # ╟─a7861092-024a-4011-820f-79835473a281
 # ╟─3b4308dc-da18-43ab-9f50-2c8bc05acb78
-# ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 # ╟─2ef835b8-f62b-4254-9337-e7aa4d44c584
 # ╟─08cad9ec-ce1c-4c2e-9758-58a1988cd1d3
 # ╟─7f56174f-03f2-4996-a158-efcfc9ce9979
@@ -2753,7 +2752,8 @@ version = "1.9.2+0"
 # ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
 # ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
 # ╟─6f17606c-e52e-4913-87f6-56190d209308
-# ╟─c3e9e5e5-0d1b-4329-a5b6-020e0e7321b8
+# ╠═c3e9e5e5-0d1b-4329-a5b6-020e0e7321b8
+# ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 # ╟─c947d126-092b-4b92-ab56-373d5a387908
 # ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
 # ╟─950a61f6-fe83-47a3-b65f-fd4b70ff12ba

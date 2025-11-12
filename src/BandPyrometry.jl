@@ -467,6 +467,7 @@ In-place filling of least-square problem hessian matrix
         h - hessian 
         T - temperature 
         e - (modified) current bb thermal emission point  
+        
 In-place filling of least-square problem hessian matrix 
     Input:
         h - hessian 

@@ -108,12 +108,14 @@ begin
 	p=plot(lam,p_func[3].(lam,T[1]),
 		title=p_func[1],
 		legend=true,
+		linewidth = 3,
 		xlabel = "λ [μm]", 
 		ylabel =p_func[2],
 		label =@sprintf("T=%5.1f K",T[1]))
 	for i in 2:3
 		plot!(lam,p_func[3].(lam,T[i]),
 		title=p_func[1],
+		linewidth = 3,
 		legend=true,
 		label =@sprintf("T=%5.1f K",T[i]))
 	end

@@ -23,6 +23,9 @@ using Revise,Plots,StaticArrays,Polynomials,Interpolations, RecipesBase, Legendr
 includet(raw"E:\JULIA\JULIA_DEPOT\dev\BandPyrometry.jl\src\PolynomialWrappers.jl")
 #includet(raw"D:\JuliaDepoth\dev\BandPyrometry\src\PolynomialWrappers.jl")
 
+# ╔═╡ 14fe8399-7d59-4382-bc53-6e9ae4c05a8c
+PlutoUI.TableOfContents(indent=true, depth=4, aside=true)
+
 # ╔═╡ f240500d-1198-49f7-b043-beea86a248c7
 md"""
 ## Bernstein polynomial basis
@@ -126,17 +129,25 @@ In the following, all formulas will be provided for ``x \in [0...1]`` basis, bec
 md"""
 ### Main features of B-polynomial basis:
 
-1. Each B-monomial ``\beta_{k}^{n}(x)`` is a polynomial of degree ``n``. 
+##### 1. Each B-monomial ``\beta_{k}^{n}(x)`` is a polynomial of degree ``n``. 
 
 Roughly speaking, all B-monomial have the same `units`
 
-2. Each B-monomial has a single maximum with the value and location governed by ``n`` and ``k``.
+"""
+
+# ╔═╡ d130ca1e-94be-48b3-9c09-956a7a6b6bf4
+md"""
+##### 2. Each B-monomial has a single maximum with the value and location governed by ``n`` and ``k``.
 
 B-basis function ``\beta_{k}^{n}(x)``  maximum value is ``max(\beta_{k}^{n}(x)) = k^k \cdot n^n \cdot (n-k)^{n-k} \cdot (\begin{matrix} n \\ k \end{matrix})``. It is located  at coordinate:  ``argmax(\beta_{k}^{n}(x)) = \frac{k}{n}``
 
-3. The summation over all B-monomials within any B-basis set  gives one for any coordinate ``x``: 
-``\Sigma_{k=0}^{n} \beta_{k}^{n}(x) = 1``. 
+"""
 
+# ╔═╡ 9aad3160-fb56-4407-bdb7-f969d2b982a3
+md"""
+
+##### 3. The summation over all B-monomials within any B-basis set  gives one for any coordinate ``x``: 
+``\Sigma_{k=0}^{n} \beta_{k}^{n}(x) = 1``. 
 
 """
 
@@ -204,6 +215,22 @@ end
 # ╔═╡ 3b475ddd-be05-4c56-9b28-68a808fc6e11
 a_real =SVector{polydegree + 1}(a[1:polydegree + 1]);
 
+# ╔═╡ 132a1594-326c-4d48-88ce-b7756656b606
+md" Show B-basis fitting $(@bind is_show_bern_coeffs CheckBox(false))"
+
+# ╔═╡ 7e1bcb20-a71a-4e9b-b797-dea6922f4cf8
+md" Fix axes limits $(@bind fix_limits CheckBox(false))"
+
+# ╔═╡ edeab52f-317e-42dc-840e-5bedece45dd8
+@bind  lim_vals PlutoUI.combine() do Child
+md"""
+	
+``y_{left}`` = $(Child(Slider(-5:1e-2:5,default = 0.0,show_value=true))) 	
+``y_{right}`` = $( Child(Slider(-5:1e-2:5,default = 1.0,show_value = true)))
+	
+"""
+end
+
 # ╔═╡ 8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
 md"Add noise $(@bind noise_amplitude Slider(0.0:1e-2:1, default =  0.0, show_value = true))"
 
@@ -221,9 +248,6 @@ md"""
 3. Scattered points are the values of ``a_k`` vs the locations of corresponding monomials ``\beta_k^n``
 """
 
-# ╔═╡ 7e1bcb20-a71a-4e9b-b797-dea6922f4cf8
-md" Fix axes limits $(@bind fix_limits CheckBox(false))"
-
 # ╔═╡ fd446c33-d439-439f-bd0a-f36770856cd2
 md" Bernstein fitting basis degree $(@bind bern_degree Select(1:50,default = 10))"
 
@@ -240,14 +264,6 @@ begin # bernsteinfit block
 	ber_max_ocations = Main.bern_max_locations(bern_vander_mat)
 end;
 
-# ╔═╡ bb55121f-9e67-446d-bf4f-4fc3dfe48062
-md" ``\Sigma_{i,j} V[i,j] =`` $(sum(bern_vander_mat.v)) 
-
-Is the summation of B Vandermonde matrix over all values for x with $(length(x))  points"
-
-# ╔═╡ 3280488d-efef-4833-ae37-6ea534f50df4
-plot([sum(c) for c in  eachcol(bern_vander_mat.v)],label=nothing, marker = :diamond, title = " Σ of V columns vs column index")
-
 # ╔═╡ 1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
 begin 
 	stand_bas = Main.VanderMatrix(x,Main.StandPolyWrapper{bern_degree + 1, Float64})
@@ -259,16 +275,19 @@ end
 # ╔═╡ bf5df253-2d64-470b-8592-e93a6bcd144a
 pretty_table(HTML,transpose(standart_basis_bern_monomial_fit) , title = "Standard basis polynomial fitting",column_labels = ["a_$(i)" for i in 0:length(standart_basis_bern_monomial_fit) - 1])
 
+# ╔═╡ bb55121f-9e67-446d-bf4f-4fc3dfe48062
+md" ``\Sigma_{i,j} V[i,j] =`` $(sum(bern_vander_mat.v)) 
+
+Is the summation of B Vandermonde matrix over all values for x with $(length(x))  points"
+
+# ╔═╡ 3280488d-efef-4833-ae37-6ea534f50df4
+plot([sum(c) for c in  eachcol(bern_vander_mat.v)],label=nothing, marker = :diamond, title = " Σ of V columns vs column index")
+
 # ╔═╡ 0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
 begin 
 	function_values_at_bernstein_location = linear_interpolation(x,y_bern)(ber_max_ocations)
 	delta = function_values_at_bernstein_location - bern_coeffs
 	pretty_table(HTML,hcat(ber_max_ocations,bern_coeffs,function_values_at_bernstein_location,100*delta./function_values_at_bernstein_location) ,column_labels = ["Coordinate", "Bernstein coefficient", "Function value", "delta/F, %"], title = "Bernstein polynomial fitting")
-end
-
-# ╔═╡ 4f9826a0-0b80-440d-9933-2c51bf901f07
-if fix_limits
-	lim_vals = (0.9*minimum(bern_coeffs), 1.1*maximum(bern_coeffs))
 end
 
 # ╔═╡ 4349710e-529b-4036-8986-6140292457c2
@@ -356,6 +375,9 @@ Bernstein polynomial optimization  with constraints
 	"""
 end
 
+# ╔═╡ 32dccd18-3140-446d-b997-8fd01d0dd359
+md"Add noise $(@bind demo_data_noise Slider(0.0:1e-2:1, default =  0.8, show_value = true))"
+
 # ╔═╡ d66a01ba-6040-4935-b36b-065015a0510c
 @bind  a_lb PlutoUI.combine() do Child
 	md"""
@@ -402,7 +424,7 @@ begin
 	Bound_Type = Main.BernsteinSymPolyWrapper{length(a_lb),Float64}
 	v_data = Main.VanderMatrix(x,Bound_Type)
 	a_f_vect = [a_f...]
-	y_bern_noisy = (1.0 .+ 0.8*rand(NPOINTS)).*(v_data*a_f_vect);
+	y_bern_noisy = (1.0 .+ demo_data_noise*rand(NPOINTS)).*(v_data*a_f_vect);
 	
 	
 	bound_vander_mat = Main.VanderMatrix(x,Bound_Type)
@@ -472,10 +494,13 @@ fit_res = Main.polyfitn(Vstand,Vector(x),Vector(y_bern))
 # ╔═╡ c0418e2e-a6b6-4af5-a639-6d13952c88de
 begin 
 	
-	ppp = plot(x,y_bern,label = "initial function f(x)")
+	ppp = plot(x,y_bern,label = "initial function f(x): $(poly_type) basis degree $(polydegree)")
 	!fix_limits || ylims!(ppp,lim_vals)
-	plot!(ppp,x,fit_res[2], label = "fitted function Σaᵢβᵢ" )
-	scatter!(ppp,ber_max_ocations,bern_coeffs, label = " aᵢ values located at B-monomials maxima")
+	
+	!is_show_bern_coeffs || begin 
+		plot!(ppp,x,fit_res[2], label = "B-basis fit Σbᵢβᵢ" )
+		scatter!(ppp,ber_max_ocations,bern_coeffs, label = " aᵢ values located at B-monomials maxima")
+	end
 	
 	ppp
 end
@@ -2418,10 +2443,11 @@ version = "1.9.2+0"
 # ╔═╡ Cell order:
 # ╟─bbfef040-b3cd-11f0-20ca-a5cbafbafd95
 # ╟─d20e7502-fa03-4448-84f4-dc46acf52c9b
+# ╟─14fe8399-7d59-4382-bc53-6e9ae4c05a8c
 # ╟─f240500d-1198-49f7-b043-beea86a248c7
 # ╟─c8102be0-6f8f-406e-9f18-45f462116602
 # ╟─381fd867-f404-40e5-a270-ae98f50bf9b5
-# ╟─1b15f3f8-fd8e-43c5-8c21-0b6fca139427
+# ╠═1b15f3f8-fd8e-43c5-8c21-0b6fca139427
 # ╟─81edb295-c20f-47a9-8a6f-d21e475df6a9
 # ╟─0dbf180e-8b27-4be7-8747-e424f37e2e50
 # ╟─a6381315-af21-4117-beed-6e3f7b8b8ca9
@@ -2430,22 +2456,25 @@ version = "1.9.2+0"
 # ╟─e243649b-b920-4ca3-b2f3-6e9b5ada13c9
 # ╟─7d6bf89c-4a52-4ed3-93ba-08c9f972c7a4
 # ╟─52c7978a-c51b-40ac-9604-0485ff469141
-# ╟─54e44992-423e-4ebb-92e6-2af89b52e7f7
-# ╟─bb55121f-9e67-446d-bf4f-4fc3dfe48062
-# ╟─3280488d-efef-4833-ae37-6ea534f50df4
 # ╟─bf5df253-2d64-470b-8592-e93a6bcd144a
 # ╟─eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
 # ╟─1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
+# ╟─d130ca1e-94be-48b3-9c09-956a7a6b6bf4
+# ╟─9aad3160-fb56-4407-bdb7-f969d2b982a3
+# ╟─54e44992-423e-4ebb-92e6-2af89b52e7f7
+# ╟─bb55121f-9e67-446d-bf4f-4fc3dfe48062
+# ╟─3280488d-efef-4833-ae37-6ea534f50df4
 # ╟─facb5dae-3ee9-4380-8c92-0e94c93c84bc
 # ╟─14ef768c-7039-4f34-862d-f58acf89e7d6
 # ╟─0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
 # ╟─56554cd8-e858-43d8-b6ef-7593d044920c
+# ╟─132a1594-326c-4d48-88ce-b7756656b606
 # ╟─c0418e2e-a6b6-4af5-a639-6d13952c88de
+# ╟─7e1bcb20-a71a-4e9b-b797-dea6922f4cf8
+# ╟─edeab52f-317e-42dc-840e-5bedece45dd8
 # ╟─8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
 # ╟─faaa4542-2066-49fc-b978-a6a45a4cca4e
 # ╟─67918393-0efb-4c8a-a291-3d86f7853cce
-# ╟─7e1bcb20-a71a-4e9b-b797-dea6922f4cf8
-# ╟─4f9826a0-0b80-440d-9933-2c51bf901f07
 # ╟─fd446c33-d439-439f-bd0a-f36770856cd2
 # ╟─67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
 # ╟─4349710e-529b-4036-8986-6140292457c2
@@ -2454,10 +2483,11 @@ version = "1.9.2+0"
 # ╟─9ddf624d-1e9f-41d9-9dd3-743a2730e89a
 # ╟─a842e84c-2566-4ef2-8801-2dcd489e2f37
 # ╟─616b871e-3229-4cb2-a60e-e9044485a330
+# ╟─32dccd18-3140-446d-b997-8fd01d0dd359
 # ╟─d66a01ba-6040-4935-b36b-065015a0510c
 # ╟─76c60a39-9d68-4765-b698-7c1943572be8
-# ╟─6aea3077-0fd9-47ab-8da6-30ef3fc46bda
 # ╟─68e6ca68-e895-4f4f-a2a0-945422827e22
+# ╟─6aea3077-0fd9-47ab-8da6-30ef3fc46bda
 # ╟─46a3593e-9653-49e8-8f11-b39b61176897
 # ╟─c8f1e2f2-cefb-4009-8c08-2574e1e6846a
 # ╟─5cfef29e-4687-46b2-89d0-97c7579e198e
@@ -2467,6 +2497,6 @@ version = "1.9.2+0"
 # ╟─36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
 # ╟─1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
 # ╟─8e492f7d-b959-4635-b524-feb48ba5f139
-# ╠═ebc42c78-90d4-4a49-84c1-93afa4a3f8d9
+# ╟─ebc42c78-90d4-4a49-84c1-93afa4a3f8d9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
