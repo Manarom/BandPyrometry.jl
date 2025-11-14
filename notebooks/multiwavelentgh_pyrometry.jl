@@ -137,11 +137,8 @@ Figure shows various typical partial radiation pyrometers available in `Radiatio
 
 # ╔═╡ 9b08b767-7e8f-4483-9f2f-226022ce10e4
 md"""
-	The legend of the figure above shows the `measured` temperature for emissivity set to one for several common pyrometers types.  Spectral regions are shown with different colours. This figure was generated using [RadiationPyrometers.jl](https://github.com/Manarom/RadiationPyrometers.jl), a small packahe, which provides several function to work with `virtual` partial radiation pyrometers. More details on this picture are available in  `RadiationPyrometers.jl` package description.
+	The legend of the figure above shows the `measured` temperature for emissivity set to one for several common pyrometers types.  Spectral regions are shown with different colours. This figure was generated using [RadiationPyrometers.jl](https://github.com/Manarom/RadiationPyrometers.jl), a small package, which provides several function to work with `virtual` partial radiation pyrometers. More details on this picture are available in  `RadiationPyrometers.jl` package description.
 	"""
-
-# ╔═╡ 712828a7-fb54-42e6-95fc-233243190f59
-md"Real surface temperature $(@bind T_pyr Slider(range(10,3000,1000),default=1000,show_value=true) ) "
 
 # ╔═╡ 824a6af1-3f70-4de0-8a94-6c63663a546a
 md"""
@@ -386,17 +383,6 @@ md" Use real emissivity $(@bind is_real_emissivity CheckBox(default = false))"
 # ╔═╡ a7861092-024a-4011-820f-79835473a281
 md" Use benchmark data $(@bind is_benchmark_data CheckBox(default = false))"
 
-# ╔═╡ 6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
-md"""
-"Measured" spectrum temperature, K = $(@bind T_to_fit Slider(range(273,2573,length=1000), show_value=true,default=1000))
-"""
-
-# ╔═╡ 36c655f8-141b-4472-96d7-01c8fd1f1515
-x_real_data = [a_real[1:real_poly_degree+1]...,T_to_fit];
-
-# ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
-L"""%$(x_real_data)"""
-
 # ╔═╡ 2ef835b8-f62b-4254-9337-e7aa4d44c584
 md"""
 #### II.III. Starting optimization variables vector:
@@ -462,6 +448,17 @@ end
 md"""
 #### II.IV. Solving the optimization problem
 """
+
+# ╔═╡ 6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
+md"""
+"Measured" spectrum temperature, K = $(@bind T_to_fit Slider(range(273,2573,length=1000), show_value=true,default=1000))
+"""
+
+# ╔═╡ 36c655f8-141b-4472-96d7-01c8fd1f1515
+x_real_data = [a_real[1:real_poly_degree+1]...,T_to_fit];
+
+# ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
+L"""%$(x_real_data)"""
 
 # ╔═╡ 01cd1f0d-15b8-474b-a05a-eec840c54fff
 md"""
@@ -642,6 +639,10 @@ e_fitted_spectrum = band_fit.ϵ;
 begin
 	p1 = plot(λ,ϵ_data,label="Real emissivity "); #a=  $(map(i->@sprintf("%.2f",i),x_data[1:end-1]) )
 	scatter!(p1,λ, e_fitted_spectrum,label="Fitted emissivity") #, a=  $(map(i->@sprintf("%.2f",i), a_vect_fitted ))
+	if is_constraint 
+		plot!(p1,λ,eps_lower*λ./λ,label = "lower bound",linestile = :dash,linewidth = 3)
+		plot!(p1,λ,eps_upper*λ./λ,label = "upper bound",linestile = :dash,linewidth = 3)
+	end
 	ylims!(0, 1.2)
 	xlabel!("Wavelength, μm") 
 	ylabel!(L"\epsilon")
@@ -2706,7 +2707,6 @@ version = "1.9.2+0"
 # ╟─03d76e64-ebf4-432b-b9be-d4cb26275f55
 # ╟─8a066ee5-80e9-462f-9a61-15851468aa63
 # ╟─9b08b767-7e8f-4483-9f2f-226022ce10e4
-# ╟─712828a7-fb54-42e6-95fc-233243190f59
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
 # ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
@@ -2750,17 +2750,17 @@ version = "1.9.2+0"
 # ╟─acc77ec3-6afb-4e76-ad2f-ec137555d1bc
 # ╟─808f8601-90fc-4cb1-b455-46cfc11b8fc7
 # ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
-# ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
-# ╟─6f17606c-e52e-4913-87f6-56190d209308
-# ╠═c3e9e5e5-0d1b-4329-a5b6-020e0e7321b8
 # ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
+# ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
 # ╟─c947d126-092b-4b92-ab56-373d5a387908
+# ╟─6f17606c-e52e-4913-87f6-56190d209308
+# ╟─c3e9e5e5-0d1b-4329-a5b6-020e0e7321b8
 # ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
 # ╟─950a61f6-fe83-47a3-b65f-fd4b70ff12ba
-# ╠═e9b7178b-f321-477f-bc63-060b9c96f4a0
+# ╟─e9b7178b-f321-477f-bc63-060b9c96f4a0
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
-# ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
+# ╠═0ca01e99-bf48-4e24-b937-c3863eb03f50
 # ╟─c01d5d8c-06f7-42b2-b845-e3ec0e82078e
 # ╟─c9253144-b8c6-4a24-98d4-3faa4175d96a
 # ╟─15025715-1ff3-4e7c-8136-cc442b77528a
@@ -2768,8 +2768,8 @@ version = "1.9.2+0"
 # ╠═a73dc68d-7e41-4748-b0bb-458d6ef73305
 # ╟─095cbaa2-9dfd-45d9-81a2-c075f7ba4838
 # ╟─73c85c85-2fc4-48ac-b5f4-4c35edcf935c
-# ╠═ebc0b228-01c8-42e4-9388-8194be1dd669
-# ╠═5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
+# ╟─ebc0b228-01c8-42e4-9388-8194be1dd669
+# ╟─5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
 # ╟─e9b7169f-0d75-44bb-8505-ccfde1bdce98
 # ╟─3f1e1a4c-48bf-44fa-a146-020dde04d2ff
 # ╟─027f22c1-5309-49d4-86ac-53791c2e0eaf

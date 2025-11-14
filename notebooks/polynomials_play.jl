@@ -28,7 +28,7 @@ PlutoUI.TableOfContents(indent=true, depth=4, aside=true)
 
 # ╔═╡ f240500d-1198-49f7-b043-beea86a248c7
 md"""
-## Bernstein polynomial basis
+## Bernstein polynomial for constraint optimization
 
 #### Introduction
 
@@ -52,11 +52,11 @@ Sometimes, the region of emissivity variation can be narrowed; for example, it m
 
 System of inequalities of contraints on emissivity:  
 
-``\vec{\epsilon_a} \leq \vec{\epsilon} \leq \vec{\epsilon_b}``
+``\vec{\epsilon_a} \leq \vec{\epsilon} \leq \vec{\epsilon_b}`` (vectors in independent variables space ``R^M``)
 
 Should be somehow converted to inequality constraints on emissivity approximation variables:
 
-``\vec{a_a} \leq \vec{a} \leq \vec{a_b}``
+``\vec{a_a} \leq \vec{a} \leq \vec{a_b}`` (vector in optimization variables space ``R^N`` !)
 
 This problem can be solved using the Bernstein polynomial basis.
 
@@ -143,10 +143,17 @@ B-basis function ``\beta_{k}^{n}(x)``  maximum value is ``max(\beta_{k}^{n}(x)) 
 
 """
 
+# ╔═╡ e9e28b59-36a2-406c-8f1e-488140aa9bc8
+md"""
+
+##### 3. All B-monomials are positive for all ``x``
+
+"""
+
 # ╔═╡ 9aad3160-fb56-4407-bdb7-f969d2b982a3
 md"""
 
-##### 3. The summation over all B-monomials within any B-basis set  gives one for any coordinate ``x``: 
+##### 4. The summation over all B-monomials within any B-basis set  gives one for any coordinate ``x``: 
 ``\Sigma_{k=0}^{n} \beta_{k}^{n}(x) = 1``. 
 
 """
@@ -2447,7 +2454,7 @@ version = "1.9.2+0"
 # ╟─f240500d-1198-49f7-b043-beea86a248c7
 # ╟─c8102be0-6f8f-406e-9f18-45f462116602
 # ╟─381fd867-f404-40e5-a270-ae98f50bf9b5
-# ╠═1b15f3f8-fd8e-43c5-8c21-0b6fca139427
+# ╟─1b15f3f8-fd8e-43c5-8c21-0b6fca139427
 # ╟─81edb295-c20f-47a9-8a6f-d21e475df6a9
 # ╟─0dbf180e-8b27-4be7-8747-e424f37e2e50
 # ╟─a6381315-af21-4117-beed-6e3f7b8b8ca9
@@ -2460,6 +2467,7 @@ version = "1.9.2+0"
 # ╟─eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
 # ╟─1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
 # ╟─d130ca1e-94be-48b3-9c09-956a7a6b6bf4
+# ╟─e9e28b59-36a2-406c-8f1e-488140aa9bc8
 # ╟─9aad3160-fb56-4407-bdb7-f969d2b982a3
 # ╟─54e44992-423e-4ebb-92e6-2af89b52e7f7
 # ╟─bb55121f-9e67-446d-bf4f-4fc3dfe48062
@@ -2493,7 +2501,7 @@ version = "1.9.2+0"
 # ╟─5cfef29e-4687-46b2-89d0-97c7579e198e
 # ╟─106d13d1-5310-4a9f-a688-778351c56a9f
 # ╟─342c4189-1164-4c0f-a4c9-029c8720caea
-# ╠═a365088c-4239-4068-9367-d070b1ad8fce
+# ╟─a365088c-4239-4068-9367-d070b1ad8fce
 # ╟─36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
 # ╟─1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
 # ╟─8e492f7d-b959-4635-b524-feb48ba5f139
