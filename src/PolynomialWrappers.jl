@@ -47,7 +47,21 @@ poly_degree(::AbstractPolyWrapper{N}) where {N} = N - 1
 poly_degree(::Type{P}) where P<:AbstractPolyWrapper{N} where {N} = N - 1
 parnumber(::AbstractPolyWrapper{N,T,V}) where {N,T,V} = N
 
-
+#=function chebyshev_sampling!(t,n,tmin,tmax)
+    k = (0:n-1)';
+    u = cos(pi * k / (n - 1));  % Includes endpoints u=±1
+    
+    % Affine map to [tmin, tmax]
+    t = tmin + (tmax - tmin) * (u + 1) / 2;
+end
+function V = cheb_vandermonde(nodes, d)
+    % CHEB_VANDERMONDE: Chebyshev basis Vandermonde (well-conditioned)
+    n = length(nodes); V = zeros(n, d+1);
+    V(:,1) = 1; V(:,2) = nodes;
+    for k = 2:d
+        V(:,k+1) = 2*nodes .* V(:,k) - V(:,k-1);  % T_k recurrence
+    end
+end =#
 """
     Function to evaluate polynomials
 """
