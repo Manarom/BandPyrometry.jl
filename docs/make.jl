@@ -9,8 +9,8 @@ makedocs(
         format=Documenter.HTML(size_threshold = 2000 * 2^10),
         pages=[
                 "Home" => "index.md"
-                "Examples"=>["BandPyrometry"=>"pluto_tests_git.md"
-                ]
+                #"Examples"=>["BandPyrometry"=>"pluto_tests_git.md"
+                #]
                 "API" => [
                     "BandPyrometry" => "bandpyrometry.md"
                  ] 

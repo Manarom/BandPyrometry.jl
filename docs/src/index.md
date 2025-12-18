@@ -10,11 +10,11 @@
 - BandPyrometry.jl module provides:
     - EmPoint type formulates the least-square problem to optimize the temperature of blackbody 
     - BandPyrometryPoint type formulates the least-square problem to optimize the temperature and spectral emissivity approximation to the real surface (with emissivity dependent on wavelength) formulates the least-square problem to optimize the temperature of blackbody 
-    - Methods to solve the least-square optimization problem using zero,first and second order methods using optimizers provided by Optim.jl package 
+    - Methods to solve the least-square optimization problem using zero,first and second order methods using optimizers provided by Optimization.jl package 
 
 ## Contact
 
-To contact me, please do it through the [GitHub repository](https://github.com/Manarom/BandPyrometry).
+To contact me use this repository [GitHub repository](https://github.com/Manarom/BandPyrometry).
 
 ## License
 
