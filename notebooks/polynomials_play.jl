@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.4
+# v0.20.20
 
 using Markdown
 using InteractiveUtils
@@ -7,7 +7,7 @@ using InteractiveUtils
 # This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
 macro bind(def, element)
     #! format: off
-    quote
+    return quote
         local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
         local el = $(esc(element))
         global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
@@ -16,585 +16,562 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ 1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-using Plots, StaticArrays, MKL,LinearAlgebra, Optimization,
-    OptimizationOptimJL, 
-    Interpolations,   PlutoUI, Polynomials, LegendrePolynomials, LaTeXStrings, Revise,Printf, NumericalIntegration,PrettyTables
+# ╔═╡ bbfef040-b3cd-11f0-20ca-a5cbafbafd95
+using Revise,Plots,StaticArrays,Polynomials,Interpolations, RecipesBase, LegendrePolynomials, PlutoUI, LinearAlgebra, PrettyTables, Optimization,OptimizationOptimJL
 
-# ╔═╡ 15a5265e-61bc-440d-9a7d-ff10773b78d8
-using Main.BandPyrometry #this line returns not defined error on the first Pluto run (probably, because of the Pluto running all "using"'s before the cells) just re-run this cell manually
+# ╔═╡ d20e7502-fa03-4448-84f4-dc46acf52c9b
+includet(raw"E:\JULIA\JULIA_DEPOT\dev\BandPyrometry.jl\src\PolynomialWrappers.jl")
+#includet(raw"D:\JuliaDepoth\dev\BandPyrometry\src\PolynomialWrappers.jl")
 
-# ╔═╡ 30743a02-c643-4bdc-837e-b97299f9520a
-md"""
-#  Pluto notebook for testing the `BandPyrometry.jl` module  
-
-##### Package **`BandPyrometry.jl`** contains methods to obtain the real surface's temperature from its thermal emission spectrum using multiwavelenght or band-pyrometry method. 
-____________________
-### Installation
-
-To run this notebook, you need:
-1) Install `julia` language itself from its official [download page](https://julialang.org/downloads) 
-2) Install [Pluto](https://plutojl.org/) notebook from `julia` REPL by entering the following commands line-by-line:
-```julia
-import Pkg
-Pkg.add("Pluto")
-using Pluto
-Pluto.run()
-```
-The last line will launch the Pluto starting page in your default browser 
-3) Copy the entire GitHub [repository](https://github.com/Manarom/BandPyrometry.jl.git) to your local folder
-4) Open this notebook file `BandPyrometry_test_git.jl` in `Pluto` by providing the full path to the *"Open a notebook"* text field on `Pluto`'s starting page. As far as `Pluto` has its own package manager, it will automatically install all necessary dependancies, which are marked in `using` cell of this file . 
-
-"""
-
-# ╔═╡ 255e0485-a280-4142-82dd-d76d0d3d0cca
-includet(joinpath("../src","BandPyrometry.jl")) # the package file is includet using Revise methods, thus the code of the main file can be modified
-
-# ╔═╡ 171409eb-22b5-4bc5-a8e2-eac0932a24f3
+# ╔═╡ 14fe8399-7d59-4382-bc53-6e9ae4c05a8c
 PlutoUI.TableOfContents(indent=true, depth=4, aside=true)
 
-# ╔═╡ d442014a-20e6-4be4-ac7f-f13de329dec5
+# ╔═╡ f240500d-1198-49f7-b043-beea86a248c7
 md"""
-## Part I. Introduction
+## Bernstein polynomial for constraint optimization
 
+#### Introduction
 
-#### I.I. The `blackbody` vs `real surface` thermal emission 
-_______________________
+A common problem in constrained nonlinear optimization is converting nonlinear constraints applied to some function of the optimization variables into box constraints on the optimization variables themselves. Simply, converting nonlinear constraints to box constraints is necessary.
 
-All heated bodies emit thermal radiation. According to Planck's law, the spectrum of ideal emitter (called the *blackbody*) is governed solaly by its temperature. The blackbody spectral intensity can be calculated as follows \
+For example, in multiwavelength pyrometry, the measured signal can be approximated as a product of two functions: one (spectral emissivity) is linear with respect to the optimization variables, while the other (`blackbody` thermal emission spectrum) is nonlinear.
 
+`` \vec{b}^*=argmin\{F(\vec{b})\}`` - optimization problem
 
-``I_{blackbody}(\lambda , T) =  \frac{C_1}{\lambda ^5} \cdot \frac{1}{e^{\frac{C_2}{\lambda T } } - 1}``, \
+``F(\vec{b})=\sum_{i=1}^{M}[y_i - I_{bb}(\lambda_i,T) \cdot (\sum_{k=0}^{n}a_k \cdot \phi_k(λ_i))]^2``  - discrepancy function
 
+``\vec{b} = [\vec{a},T]^t`` - optimization variables vector, ``T`` is the temperature,  ``\vec{a}`` - coefficients of emissivity approximation, ``I_{bb}(\lambda_i,T)`` - blackbody thermal emission spectrum, ``y_i``  - measured intensity.
 
-where ``C_1`` = $(Planck.C₁), ``W \cdot μm/m² \cdot sr`` and ``C_2`` = $(Planck.C₂), ``μm \cdot K`` , ``\lambda`` - wavelength in ``\mu m``, ``T`` - temperature in Kelvins
+``\epsilon(λ)=\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ)`` - spectral emissivity is a linear combination of some basis functions ``\phi_n(λ)``
 
-A real surface thermal emission intensity is lower than the one of the blackbody. The fraction of blackbody thermal radiation intensity emitted by a real surface is characterized by directional spectral emissivity ``\epsilon (\lambda, T,\vec{\Omega})``:
+There is a physical constraint on the emissivity, which follows from the fact that real object cannot emit more radiation than the blackbody:
 
-``I_{real\ \ surface}(\lambda , T, \vec{\Omega} ) = \epsilon (\lambda, T,\vec{\Omega}) \cdot  I_{blackbody}(\lambda , T)``, \
+``\epsilon(\lambda) \in (0...1)`` for the whole spectral range.
 
+Sometimes, the region of emissivity variation can be narrowed; for example, it may be known that, for a particular material, the emissivity lies within the range of ``[\epsilon_a ... \epsilon_b]``. The question is how to convert the emissivity variation region to the emissivity approximation coefficients ``\vec{a}`` variation.
 
-here  ``\vec{\Omega}`` stays for direction. \
+System of inequalities of contraints on emissivity:  
 
+``\vec{\epsilon_a} \leq \vec{\epsilon} \leq \vec{\epsilon_b}`` (vectors in independent variables space ``R^M``)
 
-It is interesting that, unlike the blackbody, the real surface thermal emission (in general) depends  on the direction of radiation. Therefore, the most general characteristic for thermal radiation of a real surface is the `directional spectral emissivity`.
+Should be somehow converted to inequality constraints on emissivity approximation variables:
 
-In [Planck.jl](https://manarom.github.io/BandPyrometry.jl/planck/) module there are several functions to calculate the blackbody thermal emission spectra (and various derivatives, integrals etc.).
-The following figure show the impact of spectral emissivity on the real surface thermal emission intensity.
+``\vec{a_a} \leq \vec{a} \leq \vec{a_b}`` (vector in optimization variables space ``R^N`` !)
+
+This problem can be solved using the Bernstein polynomial basis.
+
+\
 """
 
-# ╔═╡ 27b3c586-9eb0-4a51-b9ca-a9c0379fccdf
-@bind  λ_BB PlutoUI.combine() do Child
-	md"""
-	Blackbody spectral range, ``\mu m`` : \
-	``\lambda_{left}`` = $(
-		Child(Slider(0.1:0.1:50,default=0.1,show_value = true))
-	)   -- 
-	 $(
-		Child(Slider(0.1:0.1:50,default=25.0,show_value = true))
-	)  ``\lambda_{right}`` 
-	"""
-end
-
-# ╔═╡ f22d22b6-5d98-4cc4-998f-a53e92809618
-@bind  T_BB PlutoUI.combine() do Child
-	md"""
-	Blackbody temperatures: \
-	T₁ = $(
-		Child(Slider(-273.0:1:2500,default=300,show_value = true))
-	) ``^o C`` \
-	T₂ = $(
-		Child(Slider(-273.0:1:2500,default=900,show_value = true))
-	)  ``^o C`` 
-	"""
-end
-
-# ╔═╡ 7cc110e9-7655-4dfc-b1e0-ab3905866425
-@bind  scales_BB PlutoUI.combine() do Child
-	md"""
-	Scales : \
-	xscale = $(
-		Child(Select([:identity,:ln,:log10]))
-	)   yscale  
-	 $(
-		Child(Select([:identity,:ln,:log10]))
-	)   
-	"""
-end
-
-# ╔═╡ 8a066ee5-80e9-462f-9a61-15851468aa63
+# ╔═╡ c8102be0-6f8f-406e-9f18-45f462116602
 md"""
-#### I.II. Partial radiation pyrometry
-_______________________
+#### Matrix form of polynomial approximation
 
-As far as the `blackbody` thermal radiation energy strongly depends on temperature, this quantity can be used to measure the temperature of a real surface. This is the general idea of partial radiation pyrometry: **measure intensity to get the temperature**. As far as the intensity is a directional quantity, a pyrometer needs collimating optics (a telescope).The real surfaces emissivity often varies sufficiently with the wavelength, at the same time, partial radiation pyrometers assume constant emissivity (so-called `grey`-band approximation). Thus, for industrial purposes, it is useful to have several pyrometers, each working within a relatively narrow spectral band. In the spectral range of a partial radiation pyrometer, emissivity should not vary significantly to make the assumption of constant emissivity relevant.
+Each polynomial basis has a set of basis functions (monomials):
 
-One of BandPyrometry.jl modules  [Pyrometers.jl](https://manarom.github.io/BandPyrometry.jl/pyrometers/) provides several function to work with `virtual` partial radiation pyrometers.
+``\begin{bmatrix} \phi_0(x) , \dots,  \phi_n(x) \end{bmatrix}`` 
+
+E.g. for standard polynomial basis:  ``\phi_k = x^{k}``
+
+Columns of Vandermonde matrix (``V``) are the polynomial basis functions evaluated at coordinates ``x``, thus number of columns in ``V`` is equal to the `degree of polynomial + 1`: 
+
+``V= \begin{bmatrix} \vec{\phi_0} , \dots,  \vec{\phi_n} \end{bmatrix}`` - Vandermonde matrix
+
+\
 """
 
-# ╔═╡ e2a9aa39-2490-4681-89d3-a01f058f6feb
-pretty_table(HTML,Pyrometers.pyrometers_types,standalone=false,top_left_str="Table of different `virtual pyrometer` types provied by `Pyrometers.jl` and corresponding wavelength regions",wrap_table_in_div=true,row_labels=["λₗ","λᵣ" ])
+# ╔═╡ 381fd867-f404-40e5-a270-ae98f50bf9b5
+md"Select polynomial basis type for the initial function $(@bind poly_type Select(collect(keys(Main.SUPPORTED_POLYNOMIAL_TYPES)),default = :stand))"
 
+# ╔═╡ 1b15f3f8-fd8e-43c5-8c21-0b6fca139427
+md"Initial function polynomial degree $(@bind polydegree Select(0:30,default = 3))"
 
-# ╔═╡ 9b08b767-7e8f-4483-9f2f-226022ce10e4
-md"""
-	It is interesting to look how various pyrometers (with their emissivity set to one) `measure` the temperature of a real surface. The following figure shows the real surface thermal emission intensity and several common pyrometers types working regions. In the legend their `measured` temperature is shown. The `mesured` temperature for each pyrometer type is obtained by fitting the blackbody power to the real surface power both integrated over pyrometer's working spectral range.  
-	"""
-
-# ╔═╡ 712828a7-fb54-42e6-95fc-233243190f59
-md"Real surface temperature $(@bind T_pyr Slider(range(10,3000,1000),default=1000,show_value=true) ) "
-
-# ╔═╡ f763d449-2a7a-4008-a183-823a774bc25e
-#savefig(plot_pyrometers,joinpath(raw"C:\Users\user\Desktop","1000.png"))
-
-# ╔═╡ 667f7c30-56e0-461f-b35b-c924007eb9f2
-md"""
-For this particular material the type -`F` pyrometer readings are closer to the real temperature, because of the real surface emissivity being closer to unity for this pyrometer's spectral region. All results are summarized in the following table.
-"""
-
-# ╔═╡ 824a6af1-3f70-4de0-8a94-6c63663a546a
-md"""
-	#### I.III. Multiwavelength pyrometry
-	_______________________
-
-	Unlike classical partial radiation pyrometry, which requires setting a constant emissivity in some relatively narrow wavelength region, the **multiwavelength pyrometry** allows one to obtain the temperature of a surface without knowing the emissivity. More about multiwavelength pyrometry can be found e.g. in [Multi-spectral pyrometry—a review](https://iopscience.iop.org/article/10.1088/1361-6501/aa7b4b) 
-
-	In order to achieve this goal, the **multiwavelength pyrometry** assumes that the dependence of emissivity on wavelength in some spectral range can be described by some relatively small number (``N``) of parameters. Hence, if you have measured thermal radiation intensity at relatively large number (``M``) of wavelengths, and if ``M>N+1``, you can formulate the optimization problem in space of ``N+1`` optimization variables viz ``\vec{x}= \begin{bmatrix} a_0 , \dots,  a_{N-1} , T\end{bmatrix}``, here `` \begin{bmatrix} a_0 , \dots,  a_{N-1}  \end{bmatrix}`` are ``N``  emissivity approximation coefficients, and the ``(N+1)``'th optimization variable ``T`` is the temperature.	The **multiwavelength pyrometry** optimization problem has several features that can be utilized in order to obtain a computationally-effective algorithm:
-
-	* First, the emissivity approximation is a linear problem, this means that emissivity approximation coefficients can be taken independent of both the optimization variables and the independent variables (wavelength)
-	* Second, a highly non-linear term (viz Planck function) depends on only one of the optimizaiton variables
-	* And third, the target function is the product of linear and non-linear optimization problems
-
-	Mathematical consequencies of these features are described in this repository supplementary materials [download pdf](https://manarom.github.io/BandPyrometry.jl/assets/supplementary_v_0_0_1.pdf) in more details.
-
-	In `BandPyrometry.jl` , the real surface thermal emission is approximated as a product of Planck function (ideal surface thermal emission) and linear (with respect to the optimization variables e.g. polynomial coefficients) approximation of spectral emissivity.	
-
-	In `BandPyrometry.jl` the spectral emissivity is approximated as a linear combination of basis functions:
-	"""
-
-# ╔═╡ 5cc20c03-6c6e-4425-b974-242f69fe29be
-L"""
-\epsilon(λ)=\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ)
-	"""
-
-# ╔═╡ ba2d0691-aeef-4d0a-808a-0c01a8b49e12
-md"""
-	where ``\phi_n`` is the basis function column vector, e.g. for standard basis it is:
-	"""
-
-# ╔═╡ cbaf05db-3265-4e2d-8ea4-759442f798e0
-L"""
-\mathbf{ \phi_n(λ)  = \begin{bmatrix} λ₁ⁿ  \\ \vdots \\ λ_{M}ⁿ \end{bmatrix}
-}
-"""
-
-# ╔═╡ c2b82e9d-cae8-465c-bca0-160599e06102
-md"""
-	Full emission spectrum of a real surface is calculated as:
-	"""
-
-# ╔═╡ 478c8bb8-aa3c-4afe-b787-4924525858fa
-L"""
-	\mathbf{ 
-	I_{real\:surface} (\lambda,T) =I_{blackbody}(\lambda,T) \cdot  \epsilon(λ)=I_{blackbody}(\lambda,T) \cdot \sum_{n=0}^{N-1}a_n \cdot \phi_n(λ)
-	} 
-		"""
-
-
-# ╔═╡ 0831fddd-d2db-4ada-b293-00848d3673fb
-md"Now, the optimization problem can be formulated:"
-
-# ╔═╡ 4accbaec-4e08-43d3-8f36-2217b9394e86
-L"""
-	\begin{gather}
-
-	\vec{x}^*=argmin\{F(\vec{x})\} \\
-
-	F(\vec{x})=\sum_{i=1}^{M}[y_i - I_{blackbody}(\lambda_i,T) \cdot (\sum_{n=0}^{N-1}a_n \cdot \phi_n(λ_i))]^2 \\
-
-	\vec{x} = [\vec{a},T]^t
-	\end{gather} 
-
-	"""
-
-# ╔═╡ c47637c6-b243-4d8b-8234-40c68608939c
-md"where ``\vec{a}`` is the column vector of emissivity approximation (  ``[]^t`` stays for transposition), ``\vec{x}^*`` is the local minimum"
-
-# ╔═╡ d55793f5-45ff-4968-b2e1-8b846de8b91f
-md"""
-
-	To solve this optimization problem `BandPyrometry.jl` package provides functions to evaluate the discrepancy function ``F``, ``\nabla F`` and ``\nabla^2F`` which are needed to solve the optimization problem using zero, first or second order optimization algorithms. It also has special type to work with the emissivity linear approximation.
-	"""
-
-# ╔═╡ da6d5178-c083-4baa-91c3-e62f735bf808
-md"""
-#### I.IV. Emissivity approximation functions
-_______________________
-
-To approximate the emissivity `BandPyrometry.jl`  uses several polynomial bases:
-
-* Standard basis (from [`Polynomials.jl`](https://juliamath.github.io/Polynomials.jl/stable/) package)
-* Chebyshev basis (from [`Polynomials.jl`](https://juliamath.github.io/Polynomials.jl/stable/) package)
-* Legendre polynomials (from [`LegendrePolynoials.jl`](https://jishnub.github.io/LegendrePolynomials.jl/stable/) package)
-* Trigonometric basis: ``\phi_n(λ) = sin(\pi \cdot n \lambda)``  for odd n, and  ``\phi_n(λ) = cos(\pi \cdot n \lambda)`` for even n
-
-All basis vectors are stored in a structure called `VanderMatrix`, this type: 
-
-1. Stores basis vectors for selected polynomial type and degreee  - columns of matrix ``V``: ``V= \begin{bmatrix} \vec{\phi_1} , \dots,  \vec{\phi_n} \end{bmatrix}``
-
-2. The resulting emissivity can be calculated as a product of `VanderMatrix` and the vector of emissivity approximation polynomial coefficients vector: ``\vec{\epsilon}=V\cdot\vec{a}``
-
-Independent variable vector ``\lambda`` is stored in normalized (in order to fit withing the range of -1...1) form, `VanderMatrix` also stores all data needed to return the original  ``\lambda`` vector. Matrix ``V`` can  be used to fit (in a least-square sense) by solving the overdetermined system of equations: ``\vec{a}= V^{\dagger} \cdot \vec{\epsilon}``, where  []^{\dagger} means pseudo-inverse. The package implements this in  `polyfit` function (show docs) $(@bind show_polyfit_docs CheckBox(default=false)). 
-"""
-
-# ╔═╡ ae970ce5-fc5d-40d8-9f08-5dce0f99a509
-show_polyfit_docs ? @doc(BandPyrometry.polyfit) : nothing
-
-# ╔═╡ 529b07d7-e622-4816-8de9-e31581ea96a6
-@bind  λ_fit_vand confirm(PlutoUI.combine() do Child
-	md"""
-	Emissivity fitting spectral range, ``\mu m`` : \
-	``\lambda_{left}`` = $(
-		Child(Slider(0.1:0.1:16,default=4.0,show_value = true))
-	)   -- 
-	 $(
-		Child(Slider(0.1:0.1:16,default=8.0,show_value = true))
-	)  ``\lambda_{right}`` 
-	"""
-end)
-
-# ╔═╡ ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
-md"Select the polynomial type = $(@bind em_approx_poly_type Select(collect(keys(BandPyrometry.supported_polynomial_types))))"
-
-# ╔═╡ 988274c4-ad6a-42df-aead-5f40e0000998
-md"Set polynomial degree : $(@bind poly_fit_degree Select(0:10,default=3)) (the polynomial degree = numer of basis functions - 1, thus, zero order polynomial is an all-units vector)"
-
-# ╔═╡ 111122e9-1260-4f00-aba6-0fdf6cf04c4e
+# ╔═╡ 81edb295-c20f-47a9-8a6f-d21e475df6a9
 begin 
-	λ_fit_vec = collect(range(λ_fit_vand...,length=30)) 
-	rt_emissivity_data = JDXreader.read_jdx_file("real_surface_emissivity.txt") # loading file, actually this file is two-column data with no headers, but this is ok
-	rt_emissivity_interpolation = linear_interpolation(rt_emissivity_data.x,rt_emissivity_data.y,extrapolation_bc = Interpolations.Flat())
-	interpolated_values =rt_emissivity_interpolation(λ_fit_vec) # interpolating data at λ points
-	Vander_test = BandPyrometry.Vander(λ_fit_vec,poly_fit_degree,MatrixType = Matrix{Float64},poly_type=em_approx_poly_type) # creating new matrix 
-	(a_fit_check,fitted_value,goodness_of_fit) = BandPyrometry.polyfit(Vander_test,λ_fit_vec,interpolated_values)# fitting polynomial coefficients
-	plot(rt_emissivity_data.x,rt_emissivity_data.y,label = "ϵ real")
-	scatter!(λ_fit_vec,fitted_value, label="ϵ fitted")
-	xlabel!("Wavelength, μm")
-	ylabel!("Emissivity")
-end
-
-# ╔═╡ 4d6337aa-cfc7-4154-a395-5aa53e23d01a
-begin 
-	T₁ = T_BB[1] + Planck.Tₖ # converting to Kelvins
-	T₂ = T_BB[2] + Planck.Tₖ # converting to Kelvins
-	λ_bb = collect(range(λ_BB...,length=500));
-	ibb1 = Planck.ibb.(λ_bb,T₁ );ibb2 =  Planck.ibb.(λ_bb,T₂);
-	p_bb = plot(λ_bb,ibb1,label="blackbody T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
-	plot!(λ_bb,ibb2,label="blackbody T=$(T₂),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
-	plot!(λ_bb,ibb1.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2)	
-	plot!(λ_bb,ibb2.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₂),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2)
-	xlabel!("Wavelength, μm")
-	ylabel!("Spectral intensity, W/m²⋅sr⋅μm")
-end
-
-# ╔═╡ 03d76e64-ebf4-432b-b9be-d4cb26275f55
-begin 
-	e_real_BB = rt_emissivity_interpolation(λ_bb) # this spectral emissivity was measured up to 18 μm, thus for higher wavelengths it uses flat extrapolation
-	plot(λ_bb, e_real_BB, label=nothing, linewidth=3.0)
-	title!("Real (measured) surface spectral emissivity")
-	xlabel!("Wavelength, μm");ylabel!("Spectral emissivity (ϵ)")
-end
-
-# ╔═╡ c69acbf6-94fb-4ac3-8d56-d1f9dda11440
-begin
-	λ_pyr = collect(range(0.1,18,1000))
-	pyrometers_vector = sort(Pyrometers.produce_pyrometers());# returns a vector of all supported pyrometers 
-	real_i = Planck.ibb.(λ_pyr,T_pyr).*rt_emissivity_interpolation(λ_pyr)
-	plot_pyrometers = plot(λ_pyr,real_i,label="Actual: T=$(round(T_pyr))", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3,legend=:best,dpi=600)
-	real_i_interp = linear_interpolation(λ_pyr,real_i)
-	xlabel!("Wavelnegth , μm")
-	ylabel!("Thermal radiation intensity")
-	plot!(twinx(),λ_pyr,rt_emissivity_interpolation(λ_pyr),linewidth=4,linecolor=:red,label=nothing,alpha=0.3,ylabel ="Real surface spectral emissivity" )
-	#ylabel!()
-	max_val = maximum(real_i)
-	t_em_unity = Vector{Float64}(undef,length(pyrometers_vector))
-	t_em_acttual = Vector{Float64}(undef,length(pyrometers_vector))
-	for (j,ppp) in enumerate(pyrometers_vector)# iterating over virtual pyrometers vector
-		is_wo_wavelength_pyrometer = length(ppp.λ)>1 
-		l_cur = is_wo_wavelength_pyrometer ? ppp.λ : [ppp.λ[]-0.2,ppp.λ[]+0.2 ]
-		λ_pyr_interp = collect(range(l_cur...,length=30))
-		measure_intensity =  is_wo_wavelength_pyrometer ? NumericalIntegration.integrate(λ_pyr_interp,real_i_interp(λ_pyr_interp)) : real_i_interp(ppp.λ[1])
-		measured_temp = round(Pyrometers.measure(ppp,measure_intensity,T_starting= T_pyr))
-		region_flag = 
-		plot!(l_cur,[max_val,max_val],fillrange=0, fillalpha=0.5,label=ppp.type*"- ($(ppp.λ)) :T="*string(measured_temp))
-		t_em_unity[j] = measured_temp # remember value of temperature with unit emissivity
-		ppp.ϵ[] =measure_intensity/(is_wo_wavelength_pyrometer ? Planck.band_power(T_pyr,λₗ=l_cur[1],λᵣ=l_cur[2]) : Planck.ibb(ppp.λ[],T_pyr)   ) # calcaulting the average emissivity wthin the pyrometers spectral band (or at fixed wavelength)
-		 t_em_acttual[j] =  round(Pyrometers.measure(ppp,measure_intensity,T_starting= T_pyr))
-		 
-	end
-	plot_pyrometers
-end
-
-# ╔═╡ 2d12b1a7-9474-44dc-8a39-e13bf451928e
-begin # creating output table
-	data = Matrix{Any}(undef,length(pyrometers_vector),5)
-	e_grey = [p.ϵ[] for p in pyrometers_vector]
- 	data[:,3:end] .= hcat(t_em_unity,e_grey, t_em_acttual)
-	data[:,1] .= [p.type for p in pyrometers_vector]
-	data[:,2] .= [string(p.λ) for p in pyrometers_vector]
-	pretty_table(HTML,data,header = ["type","λ region,μm","T₀ (ϵ=1),K","grey-ϵ", "T₁ (grey-ϵ),K"],top_left_str="Table of temperatures `measured` by different pyrometers with the spectral emissivity settled to unity (T₀) and to the calculated grey-ϵ (T₁) the real temperature is Tᵣ=$(T_pyr)",)
-end
-
-# ╔═╡ efbc4a5f-8853-47b1-8842-c77b060d2de7
-pretty_table(HTML,hcat(["a$(i)" for i in 0:1:poly_fit_degree],a_fit_check),header=["","Polynomial coefficients"],top_left_str="Table of the coefficients of emissivity linear approximation in the band from $(λ_fit_vand[1]) to $(λ_fit_vand[2]) μm using $(em_approx_poly_type) bases type,  the goodness of fit = $(goodness_of_fit)" )
-
-# ╔═╡ 38300c92-e5e6-4d5e-a394-aa1a47cfd757
-md"""
-	## Part II. `BandPyrometry.jl` testing
-
-	In this notebook, the "measured" thermal emission spectrum is calculated as the same model  as the `BandPyrometryPoint.jl` internal representation, further this spectrum is fitted using optimization tools provided by **`Optimization.jl`** package, some random noise can be added (`optionally`). 
-
-	#### II.I. "Measured" emissivity generation
-	"""
-
-# ╔═╡ 8a54d856-2298-4225-81ac-23bf66f35136
-md"Measured spectrum fitting region:"
-
-# ╔═╡ 6f17606c-e52e-4913-87f6-56190d209308
-@bind  lam_region confirm(PlutoUI.combine() do Child
-	md"""
-	λₘᵢₙ ,μm = $(
-		Child(Slider(0.01:0.1:30,default=8.0,show_value = true))
-	) \
-	λₘₐₓ ,μm = $(
-		Child(Slider(0.0:0.1:30,default=13.0,show_value = true))
-	) 
-	"""
-end)
-
-# ╔═╡ 78edb9ca-0d47-4503-8c86-175cf9cfeeba
-λ = collect(range(lam_region[1],lam_region[2],length=50));
-
-# ╔═╡ 278c2da0-b396-493e-bdcd-fc2a539780b6
-md"Select the polynomial type = $(@bind poly_type confirm(Select(collect(keys(BandPyrometry.supported_polynomial_types)))))"
-
-# ╔═╡ d90da478-40b3-4677-82b9-fbfd79a72ef0
-md"""Set the "measured" spectrum emissivity approximation coefficients:"""
-
-# ╔═╡ 22eab67b-868a-44fd-9d40-69234f1ecb43
-@bind  a confirm(PlutoUI.combine() do Child
-	md"""
-	a0 = $(
-		Child(Slider(-1:0.01:1,default=0.3,show_value = true))
-	) \
-	a1 = $(
-		Child(Slider(-1:0.01:1,default=0.1,show_value = true))
-	)\
-	a2 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
-	)\
-	a3 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
-	)\
-	a4 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
-	)\
-	a5 = $(
-		Child(Slider(-1:0.01:1,default=0.2,show_value = true))
-	)\
-	"""
-end)
-
-# ╔═╡ 8ef42759-fb53-41af-904e-8916924415fa
-md"Set polynomial degree : $(@bind poly_degree confirm(Select(0:4,default=2))) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
-
-# ╔═╡ a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
-md"""
-The following two figures show:
-
-1)basis vectors for selected polynomial (columns of `VanderMatrix.v`): ``V``
-
-2)the resulting emissivity, calculated as a product of `VanderMatrix` and the vector of emissivity approximation polynomial: ``\vec{\epsilon}= \begin{bmatrix} \vec{\phi_1} , \dots,  \vec{\phi_n} \end{bmatrix}\cdot\vec{a} = V\cdot\vec{a}``
-
-"""
-
-# ╔═╡ d17a5db7-0125-48b5-9016-76da6d72c673
-begin
-	VVV= BandPyrometry.Vander(λ,poly_degree,poly_type=poly_type);
-	p_mode = plot(VVV.xi,VVV.v[:,1], label="n= "*string(0),linewidth=3)
-	for (i,V) in enumerate(eachcol(VVV.v[:,2:end]))
-		plot!(VVV.xi,V, label="n= "*string(i),linewidth=3)
-	end
-	title!("Emissivity fitting modes for $(poly_type) -type polynomial")
-	xlabel!("Normalized wavelength")
-	ylabel!("Normalized amplitude")
-	p_mode
-end
-
-# ╔═╡ 4f2db18c-6f48-4c41-9a53-470042decf5f
-begin 
-	p_em = plot(λ, VVV*[i for i in a[1:poly_degree+1]],label=nothing,linewidth=6)
-	title!(raw"""Generated "real" surface spectral emissivity""")
-    xlabel!("Wavelength, μm")
-	ylabel!("ϵ")
-	p_em
-end
-
-# ╔═╡ 80dacea5-ea46-479f-b0d8-da9a9cf41aa2
-md"""
-#### II.II. Generating the "measured" spectral intensity
-"""
-
-# ╔═╡ 6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
-md"""
-"Measured" spectrum temperature, K = $(@bind T_to_fit confirm(Slider(range(273,2573,length=1000), show_value=true,default=1000)))
-"""
-
-# ╔═╡ 36c655f8-141b-4472-96d7-01c8fd1f1515
-x_data = [a[1:poly_degree+1]...,T_to_fit];
-
-# ╔═╡ 321172de-dcf6-4f51-ab31-edb37b8c3983
-L"""\text{Real values of the optimization variables for "measured" thermal emission spectrum: } """
-
-# ╔═╡ c4df3ad4-9f1a-414c-b02c-8161f007ccd5
-L"""%$(x_data)"""
-
-# ╔═╡ 01cd1f0d-15b8-474b-a05a-eec840c54fff
-md"""
-	add noise to the "measured" spectrum = $(@bind noise_amplitude  confirm(Slider(0.0:0.0001:0.1,show_value = true)))
-	"""
-
-# ╔═╡ 3b4308dc-da18-43ab-9f50-2c8bc05acb78
-begin
-	Ib = Main.BandPyrometry.Planck.ibb.(λ,T_to_fit) # bb spectrum
-	ϵ_data= VVV*x_data[1:end-1]# "measured" spectrum emissivity 
-	I_data = Ib.*ϵ_data .+ noise_amplitude*Ib.*(0.5 .-rand(length(λ)))# adding noise to the "measured" spectrum
+	NPOINTS = 80
+	x = SVector{NPOINTS}(collect(range(-1,1,NPOINTS)));
+	PolyType = Main.SUPPORTED_POLYNOMIAL_TYPES[poly_type]{polydegree + 1,Float64}
+	V = Main.VanderMatrix(x,PolyType)
 end;
 
-# ╔═╡ 9016369d-bc8b-4907-bdb2-f4e81c444d30
+# ╔═╡ 0dbf180e-8b27-4be7-8747-e424f37e2e50
+md" Show infilled ? $(@bind isinfilled CheckBox(default = true))"
+
+# ╔═╡ a6381315-af21-4117-beed-6e3f7b8b8ca9
 md"""
-#### II.III. Solving the optimization problem
+The following figure shows basis functions (Vandermonde matrix columns) for polynomial of type **$(poly_type)**
 """
 
-# ╔═╡ c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
-md"""Choose the optimization method $(@bind optim_type confirm(Select(["NelderMead","BFGS","GradientDescent", "LBFGS","NewtonTrustRegion","ParticleSwarm","Newton","IPNewton" ])))"""
+# ╔═╡ c6dfdffe-8dd7-4264-9b75-c435c5bbf941
+plot(V,infill= isinfilled, title = "Basis functions for $(poly_type) polynomial bassis")
 
-# ╔═╡ 50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
-@bind constraint_type confirm(Select(["constraint","unconstraint" ],default="unconstraint"))
-
-# ╔═╡ 0ca01e99-bf48-4e24-b937-c3863eb03f50
-is_constraint = constraint_type=="constraint";
-
-# ╔═╡ 15025715-1ff3-4e7c-8136-cc442b77528a
+# ╔═╡ e243649b-b920-4ca3-b2f3-6e9b5ada13c9
 md"""
-Selected optimization method is $(optim_type)
-the actual optimizer is
-$(Main.BandPyrometry.optimizer_switch(optim_type,is_constraint=is_constraint,is_lagrange_constraint = false)) 
-"""
-# this function returns the methods which was actually used (some methods from optim_type list does not support constraints)
+### Bernstein polynomial basis
 
-# ╔═╡ 6118cebc-d18e-42cc-ac1b-aa1ad95cd719
+Bernstein polynomial basis of degree ``n`` has the following set of ``n + 1`` basis functions (monomials):
+
+``\beta_{k}^{n}(x) = (\begin{matrix} n \\ k \end{matrix}) x^k(1-x)^{n-k}`` - Bernstein basis function for ``x \in [0...1]`` , ``k \in [0...n]``.
+
+``(\begin{matrix} n \\ k \end{matrix}) = \frac {n!}{(n - k)!k!}``
+"""
+
+# ╔═╡ 7d6bf89c-4a52-4ed3-93ba-08c9f972c7a4
+md"""
+For general case, when ``x \in [a,b]``
+
+``\beta_{k}^{n}(x) = (\begin{matrix} n \\ k \end{matrix}) (\frac {x - a}{b - a})^k(\frac {b-x}{b-a})^{n-k}`` - Bernstein basis function for ``x \in [a...b]`` , ``k \in [0...n]`` 
+
+In the following, all formulas will be provided for ``x \in [0...1]`` basis, because of simplicity, but for calculations, symmetric Bernstein (**bernsteinsym** in selection dropdown) basis (``x \in [-1...1]``) was used because of the ransge ``[-1...1]`` is more natural for other polynomial bases, like Legendre and Chebyshev polynomials
+"""
+
+# ╔═╡ 52c7978a-c51b-40ac-9604-0485ff469141
+md"""
+### Main features of B-polynomial basis:
+
+##### 1. Each B-monomial ``\beta_{k}^{n}(x)`` is a polynomial of degree ``n``. 
+
+Roughly speaking, all B-monomial have the same `units`
+
+"""
+
+# ╔═╡ d130ca1e-94be-48b3-9c09-956a7a6b6bf4
+md"""
+##### 2. Each B-monomial has a single maximum with the value and location governed by ``n`` and ``k``.
+
+B-basis function ``\beta_{k}^{n}(x)``  maximum value is ``max(\beta_{k}^{n}(x)) = k^k \cdot n^n \cdot (n-k)^{n-k} \cdot (\begin{matrix} n \\ k \end{matrix})``. It is located  at coordinate:  ``argmax(\beta_{k}^{n}(x)) = \frac{k}{n}``
+
+"""
+
+# ╔═╡ e9e28b59-36a2-406c-8f1e-488140aa9bc8
+md"""
+
+##### 3. All B-monomials are positive for all ``x``
+
+"""
+
+# ╔═╡ 9aad3160-fb56-4407-bdb7-f969d2b982a3
+md"""
+
+##### 4. The summation over all B-monomials within any B-basis set  gives one for any coordinate ``x``: 
+``\Sigma_{k=0}^{n} \beta_{k}^{n}(x) = 1``. 
+
+"""
+
+# ╔═╡ 54e44992-423e-4ebb-92e6-2af89b52e7f7
+md"The third property means that each row of Vandermonde matrix sums to one: ``\Sigma_i V[i,:] = 1``, hence ``\Sigma_{i,j} V[i,j] = M`` ,  M is the number of rows (size of x vector)"
+
+# ╔═╡ facb5dae-3ee9-4380-8c92-0e94c93c84bc
+md"""
+Now, consider the expantion of function ``f(x)``  in Bernstein polynomial basis of degree ``n``:
+
+``f(x) = \Sigma_{k=0}^{n} a_k \beta_k^n(x)``
+
+``\vec{f} = V \vec{a}`` - here ``\vec{f}`` is the vector of function values evaluated at ``\vec{x}`` coordinates.
+(the least-square solution of this systemof equations is ``\vec{a} = V^{\dagger}\vec{f}``, where ``V^{\dagger}`` is pseudo-inverse)
+"""
+
+# ╔═╡ 14ef768c-7039-4f34-862d-f58acf89e7d6
+md"""
+Bernstein polynomial approximation coefficients:
+
+"""
+
+# ╔═╡ 56554cd8-e858-43d8-b6ef-7593d044920c
+
+@bind  a PlutoUI.combine() do Child
+	md"""
+	Coefficients of f(x) function, ``f(x) = \Sigma_{k=0}^{n} a_k\phi_k^n``, where n=$(polydegree) and ``\phi_k^n`` are the basis functions for $(poly_type) basis
+	
+	``a_0`` = $(
+		Child(Slider(-1:0.001:1,default=0.3,show_value = true))
+	) \
+	``a_1`` = $(
+		Child(Slider(-1:0.001:1,default=0.1,show_value = true))
+	)\
+	``a_2`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
+	)\
+	``a_3`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
+	)\
+	``a_4`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
+	)\
+	``a_5`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
+	)\
+	``a_6`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
+	)\
+	``a_7`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
+	)\
+	``a_8`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
+	)\
+	``a_9`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
+	)\
+	``a_{10}`` = $(
+		Child(Slider(-1:0.001:1,default=0.2,show_value = true))
+	)\
+	"""
+end
+
+# ╔═╡ 3b475ddd-be05-4c56-9b28-68a808fc6e11
+a_real =SVector{polydegree + 1}(a[1:polydegree + 1]);
+
+# ╔═╡ 132a1594-326c-4d48-88ce-b7756656b606
+md" Show B-basis fitting $(@bind is_show_bern_coeffs CheckBox(false))"
+
+# ╔═╡ 7e1bcb20-a71a-4e9b-b797-dea6922f4cf8
+md" Fix axes limits $(@bind fix_limits CheckBox(false))"
+
+# ╔═╡ edeab52f-317e-42dc-840e-5bedece45dd8
+@bind  lim_vals PlutoUI.combine() do Child
+md"""
+	
+``y_{left}`` = $(Child(Slider(-5:1e-2:5,default = 0.0,show_value=true))) 	
+``y_{right}`` = $( Child(Slider(-5:1e-2:5,default = 1.0,show_value = true)))
+	
+"""
+end
+
+# ╔═╡ 8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
+md"Add noise $(@bind noise_amplitude Slider(0.0:1e-2:1, default =  0.0, show_value = true))"
+
+# ╔═╡ faaa4542-2066-49fc-b978-a6a45a4cca4e
 begin 
-	x_starting = zeros(length(x_data))
-	x_starting[end] = 673.5
-	band_fit =Main.BandPyrometry.BandPyrometryPoint(I_data,λ,x_starting,polynomial_type=poly_type)# creating BandPyrometryPoint from the data to be fitted, wavelength region and starting optimization variables vector x_starting
-	@time out = Main.BandPyrometry.fit_T!(band_fit,optimizer_name=optim_type,is_constraint=is_constraint,is_lagrange_constraint = false) # this function runs the optimizaiton 
-end # starting values
+	y_bern = (1.0 .+ noise_amplitude*rand(NPOINTS)).*(V*a_real)
+	sum(eachcol(V.v_unnorm)) # checking normalization
+end;
 
-# ╔═╡ a73dc68d-7e41-4748-b0bb-458d6ef73305
-T_fitted = out[1];
-
-# ╔═╡ 73c85c85-2fc4-48ac-b5f4-4c35edcf935c
-a_vect_fitted = out[2];
-
-# ╔═╡ d6406663-77e9-4987-9ddf-955d8101c401
-a_vect_real = x_data[1:end-1];
-
-# ╔═╡ ebc0b228-01c8-42e4-9388-8194be1dd669
+# ╔═╡ 67918393-0efb-4c8a-a291-3d86f7853cce
 md"""
-	Goodness of fit:
+##### Figure shows the following plots: 
+1. Initial function ``f(x)`` (which is summation of monomials of basis $poly_type of degree $polydegree)
+2. The result of ``f(x)`` fitting using B-polynomial basis: ``\Sigma_{k=0}^na_k\beta_k^n``
+3. Scattered points are the values of ``a_k`` vs the locations of corresponding monomials ``\beta_k^n``
+"""
+
+# ╔═╡ fd446c33-d439-439f-bd0a-f36770856cd2
+md" Bernstein fitting basis degree $(@bind bern_degree Select(1:50,default = 10))"
+
+# ╔═╡ eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
+md"""
+The following table and figure show  $(@bind sub_monomial_degree Select(0:bern_degree))'th B-monomial for B-basis of degree $(bern_degree) fitting using standard basis polynomial
+"""
+
+# ╔═╡ 67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
+begin # bernsteinfit block
+	Bern_Type = Main.BernsteinSymPolyWrapper{bern_degree + 1,Float64}
+	bern_vander_mat = Main.VanderMatrix(x,Bern_Type)
+	(bern_coeffs,bern_fit) = Main.polyfitn(bern_vander_mat,Vector(x),Vector(y_bern))
+	ber_max_ocations = Main.bern_max_locations(bern_vander_mat)
+end;
+
+# ╔═╡ 1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
+begin 
+	stand_bas = Main.VanderMatrix(x,Main.StandPolyWrapper{bern_degree + 1, Float64})
+	(standart_basis_bern_monomial_fit,) = Main.polyfitn(stand_bas,Vector(x),Vector(bern_vander_mat.v[:,sub_monomial_degree +1]))
+	plot(x,bern_vander_mat.v[:,sub_monomial_degree +1],label="Bernstein monomial $(sub_monomial_degree)")
+	plot!(x,stand_bas*standart_basis_bern_monomial_fit,label = "Standard basis fit")
+end
+
+# ╔═╡ bf5df253-2d64-470b-8592-e93a6bcd144a
+pretty_table(HTML,transpose(standart_basis_bern_monomial_fit) , title = "Standard basis polynomial fitting",column_labels = ["a_$(i)" for i in 0:length(standart_basis_bern_monomial_fit) - 1])
+
+# ╔═╡ bb55121f-9e67-446d-bf4f-4fc3dfe48062
+md" ``\Sigma_{i,j} V[i,j] =`` $(sum(bern_vander_mat.v)) 
+
+Is the summation of B Vandermonde matrix over all values for x with $(length(x))  points"
+
+# ╔═╡ 3280488d-efef-4833-ae37-6ea534f50df4
+plot([sum(c) for c in  eachcol(bern_vander_mat.v)],label=nothing, marker = :diamond, title = " Σ of V columns vs column index")
+
+# ╔═╡ 0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
+begin 
+	function_values_at_bernstein_location = linear_interpolation(x,y_bern)(ber_max_ocations)
+	delta = function_values_at_bernstein_location - bern_coeffs
+	pretty_table(HTML,hcat(ber_max_ocations,bern_coeffs,function_values_at_bernstein_location,100*delta./function_values_at_bernstein_location) ,column_labels = ["Coordinate", "Bernstein coefficient", "Function value", "delta/F, %"], title = "Bernstein polynomial fitting")
+end
+
+# ╔═╡ 4349710e-529b-4036-8986-6140292457c2
+md"""
+##### It is clearly visible that the values of B-polynomials coefficients tend to the values of function itself!
+-----------------------
+The oposite is also true, if the initial function is a linear cobination of B-monomials, than the value of function in the vicinity of the corresponding monomial maxima location can be adjusted by adjusting the value of the coefficient (to check - set the polynomial bassis type of the initial function to **bernsteinsym** and use sliders)
+"""
+
+# ╔═╡ 9c73d7b0-547a-4577-8655-45a4e13df7a8
+md"""
+
+### Bernstein polynomials for constraints mapping
+
+Now, we are going to the main topic - converting a nonlinear constraints to the box-constraints.
+
+The problem is the following:
+
+Fit the polynomial function ``f(\vec{a}, x)``  to the measured data ``y(x)`` with the following constraints:  ``f(\vec{a}, x) \le q(x)`` and ``f(\vec{a},x) \ge g(x)``, where ``\vec{a}`` is the the optimization variables vector, ``x`` is the independent variable,  ``g(x)`` and ``q(x)`` are known nonlinear functions. 
+
+The loss function will be a least-square discrepancy:
+
+``\Phi(\vec{a}) = \Sigma_i (y(x_i) - f(\vec{a},x_i))^2`` - loss function 
+
+In mathematical form this gives:
+
+``\vec{a^*} = argmin(\Phi(\vec{a}))``
+
+Where the feasible region of ``\vec{a}`` is a subject to the following constraints:
+
+``f(\vec{a}, x) \le q(x)``
+
+``f(\vec{a},x) \ge g(x)``
+
+"""
+
+# ╔═╡ 7dfbac39-8e1b-4d88-830f-d18d94ed5e1b
+md"""
+We will be looking for the function ``f(\vec{a}, x)`` as an expantion in Bernstein basis:
+
+``f(\vec{a},x) = \Sigma_j a_j\beta_j^n`` or in matrix form:  
+``\vec{f} = V_{\beta}\cdot \vec{a}``, here ``V_{\beta}`` is Bernstein basis Vendermonde matrix.    
+
+We also expand both ``q(x)`` and ``g(x)`` in Bernstein of the same degree:
+
+``\vec{g} = V_{\beta}\cdot \vec{a}_{lower}``
+
+``\vec{q} = V_{\beta}\cdot \vec{a}_{upper}``
+
+Both ``\vec{a}_{lower}``  and  ``\vec{a}_{upper}`` are known vectors (as far as ``g(x)`` and ``q(x)`` are known functions)
+
+"""
+
+# ╔═╡ 9ddf624d-1e9f-41d9-9dd3-743a2730e89a
+md"""
+Original problem can now be reformulated in Bernstein basis:
+
+``\vec{a^*} = argmin(\Phi(\vec{a}))``
+
+"""
+
+# ╔═╡ a842e84c-2566-4ef2-8801-2dcd489e2f37
+md"""
+Bernstein polynomial optimization  with constraints
+
+"""
+
+# ╔═╡ 616b871e-3229-4cb2-a60e-e9044485a330
+@bind  a_f PlutoUI.combine() do Child
+	md"""
+	Coefficients of f(x) function
+	
+	``a_0`` = $(
+		Child(Slider(-3:0.001:3,default=0.3,show_value = true))
+	) \
+	``a_1`` = $(
+		Child(Slider(-3:0.001:3,default=0.1,show_value = true))
+	)\
+	``a_2`` = $(
+		Child(Slider(-3:0.001:3,default=0.2,show_value = true))
+	)\
+	``a_3`` = $(
+		Child(Slider(-3:0.001:3,default=0.2,show_value = true))
+	)
+	"""
+end
+
+# ╔═╡ 32dccd18-3140-446d-b997-8fd01d0dd359
+md"Add noise $(@bind demo_data_noise Slider(0.0:1e-2:1, default =  0.8, show_value = true))"
+
+# ╔═╡ d66a01ba-6040-4935-b36b-065015a0510c
+@bind  a_lb PlutoUI.combine() do Child
+	md"""
+	Coefficients of f(x) function lower boundary g(x), ``g(x) \le f(x) ``
+	
+	``a_0`` = $(
+		Child(Slider(-3:0.001:3,default=0.1,show_value = true))
+	) \
+	``a_1`` = $(
+		Child(Slider(-3:0.001:3,default=0.1,show_value = true))
+	)\
+	``a_2`` = $(
+		Child(Slider(-3:0.001:3,default=0.1,show_value = true))
+	)\
+	``a_3`` = $(
+		Child(Slider(-3:0.001:3,default=0.1,show_value = true))
+	)
+	"""
+end
+
+# ╔═╡ 68e6ca68-e895-4f4f-a2a0-945422827e22
+@bind  a_ub PlutoUI.combine() do Child
+	md"""
+	Coefficients of f(x) function upper boundary
+	q(x), ``f(x) \le q(x)``
+	
+	``a_0`` = $(
+		Child(Slider(-3:0.001:3,default=0.8,show_value = true))
+	) \
+	``a_1`` = $(
+		Child(Slider(-3:0.001:3,default=0.8,show_value = true))
+	)\
+	``a_2`` = $(
+		Child(Slider(-3:0.001:3,default=0.8,show_value = true))
+	)\
+	``a_3`` = $(
+		Child(Slider(-3:0.001:3,default=0.8,show_value = true))
+	)
+	"""
+end
+
+# ╔═╡ 46a3593e-9653-49e8-8f11-b39b61176897
+begin
+	Bound_Type = Main.BernsteinSymPolyWrapper{length(a_lb),Float64}
+	v_data = Main.VanderMatrix(x,Bound_Type)
+	a_f_vect = [a_f...]
+	y_bern_noisy = (1.0 .+ demo_data_noise*rand(NPOINTS)).*(v_data*a_f_vect);
+	
+	
+	bound_vander_mat = Main.VanderMatrix(x,Bound_Type)
+	a_lb_vect = [a_lb...]
+	a_ub_vect = [a_ub...]
+end;
+
+# ╔═╡ c8f1e2f2-cefb-4009-8c08-2574e1e6846a
+md"Use constraints $(@bind is_constraint CheckBox(false))"
+
+# ╔═╡ 5cfef29e-4687-46b2-89d0-97c7579e198e
+md"""
+	Select optimizer $(@bind optimizer Select([ParticleSwarm()=>"Particle swarm",NelderMead()=>"Nelder-Mead",LBFGS()=>"LBFGS"] ))
 	"""
 
-# ╔═╡ 5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
-L"""
-	\begin{bmatrix} T_{fitted} = %$(T_fitted) & T_{real} = %$(T_to_fit) & \Delta T /T = %$(abs(T_fitted-T_to_fit)/T_to_fit) \\ |\vec{a}_{fitted}| = %$(norm(a_vect_fitted)) & |\vec{a}_{real}| = %$(norm(x_data[1:end-1])) & |\vec{a}_{fitted} -\vec{a}_{real}|= %$(norm(a_vect_fitted - a_vect_real))\end{bmatrix}
-
-"""
-
-# ╔═╡ e9b7169f-0d75-44bb-8505-ccfde1bdce98
-e_fitted_spectrum = out[3];
-
-# ╔═╡ 68b4b548-0a96-4f67-baef-921bda3ff0a5
-out[4].original
-
-# ╔═╡ c947d126-092b-4b92-ab56-373d5a387908
+# ╔═╡ 106d13d1-5310-4a9f-a688-778351c56a9f
 begin 
-	p3 = plot(λ, I_data, lw=2,label="Data T=  $(T_to_fit) ");
-	plot!(p3,λ, band_fit.Ic, lw=2,label="Fitting T= $(T_fitted)", ls=:dot)
-	title!("Initial data vs fitting results")
-	xlabel!("Wavelength, μm") 
-	ylabel!("Emission intensity")
+	fun_optim = (x,_)  -> sum( t->^(t,2) , y_bern_noisy .- bound_vander_mat*x)
+	fun_opt = OptimizationFunction(fun_optim,AutoForwardDiff()) 
+	starting_vector =0.5*(  a_ub_vect .+ a_lb_vect )
+	probl = if is_constraint
+	 OptimizationProblem(fun_opt, 
+                            starting_vector,
+                            lb = a_lb_vect, # both min and max of emissivity should 
+                            ub = a_ub_vect) # both min and max should be higher than 
+	else
+			 OptimizationProblem(fun_opt, 
+                            starting_vector) 
+	end
+	a_solve = solve(probl,optimizer)
+	
 end
 
-# ╔═╡ fead76f5-c0b5-4fcb-a39e-c97ded034653
+# ╔═╡ 76c60a39-9d68-4765-b698-7c1943572be8
 begin
-	p1 = plot(λ,ϵ_data,label="Real emissivity, a=  $(map(i->@sprintf("%.2f",i),x_data[1:end-1]) )");
-	scatter!(p1,λ, e_fitted_spectrum,label="Fitted emissivity, a=  $(map(i->@sprintf("%.2f",i), a_vect_fitted ))")
-	ylims!(0, 1.2)
-	xlabel!("Wavelength, μm") 
-	ylabel!(L"\epsilon")
+	pp_b = scatter(x,y_bern_noisy,label="data",legendcolumn=3) #1
+	
+	bern_coeffs_locations = Main.bern_max_locations(bound_vander_mat)
+	plot!(pp_b,x,bound_vander_mat*a_lb_vect,label="lower bound",linewidth=3,linecolor=:green)
+	scatter!(pp_b,bern_coeffs_locations,a_lb_vect,markercolor=:green,label ="lb coeffs", markersize = 6)
+	plot!(pp_b,x,bound_vander_mat*a_solve,linewidth=3,label = "fitting results")
+	plot!(pp_b,x,bound_vander_mat*a_ub_vect,label="upper bound",linewidth=3,linecolor=:red)
+	scatter!(pp_b,bern_coeffs_locations,a_ub_vect,markercolor=:red,label ="ub coeffs", markersize = 6)
+	scatter!(pp_b,bern_coeffs_locations,a_solve,markercolor=:black,markerstype=:diamond,markersize = 8, label = "fitted aᵢ")
 end
 
-# ╔═╡ 3f1e1a4c-48bf-44fa-a146-020dde04d2ff
-md"Final discrepancy value: $(Main.BandPyrometry.disc(out[4].u, band_fit ))"
+# ╔═╡ 6aea3077-0fd9-47ab-8da6-30ef3fc46bda
+begin pretty_table(HTML,hcat(a_f_vect,a_lb_vect,a_solve,a_ub_vect) ,column_labels = ["Data coeffs", "Lower bound", "Fitted coeffs", "Upper bound"], title = "Constraint optimization")
+end
+
+# ╔═╡ 342c4189-1164-4c0f-a4c9-029c8720caea
+if PolyType <: Main.BernsteinPolyWrapper || PolyType <: Main.BernsteinSymPolyWrapper
+	Main.bern_max(PolyType,1)
+	Main.bern_max_values(Main.VanderMatrix(x,PolyType))
+	Main.bern_max_locations(Main.VanderMatrix(x,PolyType))
+end;
+
+# ╔═╡ a365088c-4239-4068-9367-d070b1ad8fce
+a_lb
+
+# ╔═╡ 36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
+Vstand = Main.VanderMatrix(x,Main.StandPolyWrapper{polydegree + 1,Float64});
+
+# ╔═╡ 1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
+fit_res = Main.polyfitn(Vstand,Vector(x),Vector(y_bern))
+
+# ╔═╡ c0418e2e-a6b6-4af5-a639-6d13952c88de
+begin 
+	
+	ppp = plot(x,y_bern,label = "initial function f(x): $(poly_type) basis degree $(polydegree)")
+	!fix_limits || ylims!(ppp,lim_vals)
+	
+	!is_show_bern_coeffs || begin 
+		plot!(ppp,x,fit_res[2], label = "B-basis fit Σbᵢβᵢ" )
+		scatter!(ppp,ber_max_ocations,bern_coeffs, label = " aᵢ values located at B-monomials maxima")
+	end
+	
+	ppp
+end
+
+# ╔═╡ 8e492f7d-b959-4635-b524-feb48ba5f139
+begin 
+	NNN = 10
+	XXX = SVector{NNN}(collect(range(-1.0,1.0,NNN)))
+	V_stand = Main.VanderMatrix(XXX,Main.StandPolyWrapper{NNN,Float64})
+	V_leg = Main.VanderMatrix(XXX,Main.LegPolyWrapper{NNN,Float64})
+	V_bern2 = Main.VanderMatrix(XXX,Main.BernsteinSymPolyWrapper{NNN,Float64})
+	p_spectra = plot()
+	for V in (V_stand,V_leg,V_bern2)
+		plot!(p_spectra, svd(V.v).S, label = string(Main.poly_name(V)),linewidth= 3,markersize=8,marker=:auto,markeralpha=0.5)
+	end
+	title!(p_spectra,"Singular values spectra for various polynomial bases")
+	p_spectra
+end
+
+# ╔═╡ ebc42c78-90d4-4a49-84c1-93afa4a3f8d9
+md" a = $(@bind scr Scrubbable(20.0,default = 10))"
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
-LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-MKL = "33e6dc65-8f57-5167-99aa-e5a354878fb2"
-NumericalIntegration = "e7bfaba1-d571-5449-8927-abc22e82249b"
 Optimization = "7f7a1694-90dd-40f0-9382-eb1efda571ba"
 OptimizationOptimJL = "36348300-93cb-4f02-beb5-3c3902f8871e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
-Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
-Interpolations = "~0.15.1"
-LaTeXStrings = "~1.4.0"
+Interpolations = "~0.16.2"
 LegendrePolynomials = "~0.4.5"
-MKL = "~0.8.0"
-NumericalIntegration = "~0.2.0"
-Optimization = "~4.1.2"
-OptimizationOptimJL = "~0.4.1"
-Plots = "~1.40.11"
-PlutoUI = "~0.7.62"
-Polynomials = "~4.0.19"
-PrettyTables = "~2.4.0"
-Revise = "~3.7.3"
-StaticArrays = "~1.9.13"
+Optimization = "~5.0.0"
+OptimizationOptimJL = "~0.4.6"
+Plots = "~1.41.1"
+PlutoUI = "~0.7.72"
+Polynomials = "~4.1.0"
+PrettyTables = "~3.1.0"
+RecipesBase = "~1.3.4"
+Revise = "~3.9.0"
+StaticArrays = "~1.9.15"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.4"
+julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "bb7ed094dd3112f62f649312a69ba0b04f4fa9d7"
+project_hash = "316477323e648157a297c8b1cf9911848f3635e7"
 
 [[deps.ADTypes]]
-git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
+git-tree-sha1 = "27cecae79e5cc9935255f90c53bb831cc3c870d7"
 uuid = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
-version = "1.14.0"
+version = "1.18.0"
 
     [deps.ADTypes.extensions]
     ADTypesChainRulesCoreExt = "ChainRulesCore"
@@ -643,9 +620,9 @@ version = "0.1.42"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra", "Requires"]
-git-tree-sha1 = "f7817e2e585aa6d924fd714df1e2a84be7896c60"
+git-tree-sha1 = "7e35fca2bdfba44d797c53dfe63a51fabf39bfc0"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-version = "4.3.0"
+version = "4.4.0"
 weakdeps = ["SparseArrays", "StaticArrays"]
 
     [deps.Adapt.extensions]
@@ -664,18 +641,19 @@ version = "1.1.2"
 
 [[deps.ArrayInterface]]
 deps = ["Adapt", "LinearAlgebra"]
-git-tree-sha1 = "017fcb757f8e921fb44ee063a7aafe5f89b86dd1"
+git-tree-sha1 = "d2cd034553ee6ca084edaaf8ed6c9d50fd01555d"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "7.18.0"
+version = "7.21.0"
 
     [deps.ArrayInterface.extensions]
     ArrayInterfaceBandedMatricesExt = "BandedMatrices"
     ArrayInterfaceBlockBandedMatricesExt = "BlockBandedMatrices"
     ArrayInterfaceCUDAExt = "CUDA"
-    ArrayInterfaceCUDSSExt = "CUDSS"
+    ArrayInterfaceCUDSSExt = ["CUDSS", "CUDA"]
     ArrayInterfaceChainRulesCoreExt = "ChainRulesCore"
     ArrayInterfaceChainRulesExt = "ChainRules"
     ArrayInterfaceGPUArraysCoreExt = "GPUArraysCore"
+    ArrayInterfaceMetalExt = "Metal"
     ArrayInterfaceReverseDiffExt = "ReverseDiff"
     ArrayInterfaceSparseArraysExt = "SparseArrays"
     ArrayInterfaceStaticArraysCoreExt = "StaticArraysCore"
@@ -689,6 +667,7 @@ version = "7.18.0"
     ChainRules = "082447d4-558c-5d27-93f4-14fc19e9eca2"
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
     GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
+    Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
@@ -721,15 +700,15 @@ version = "1.0.9+0"
 
 [[deps.Cairo_jll]]
 deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
-git-tree-sha1 = "2ac646d71d0d24b44f3f8c84da8c9f4d70fb67df"
+git-tree-sha1 = "fde3bf89aead2e723284a8ff9cdf5b551ed700e8"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
-version = "1.18.4+0"
+version = "1.18.5+0"
 
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
-git-tree-sha1 = "1713c74e00545bfe14605d2a2be1712de8fbcb58"
+git-tree-sha1 = "e4c6a16e77171a5f5e25e9646617ab1c276c5607"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-version = "1.25.1"
+version = "1.26.0"
 weakdeps = ["SparseArrays"]
 
     [deps.ChainRulesCore.extensions]
@@ -737,9 +716,9 @@ weakdeps = ["SparseArrays"]
 
 [[deps.CodeTracking]]
 deps = ["InteractiveUtils", "UUIDs"]
-git-tree-sha1 = "7eee164f122511d3e4e1ebadb7956939ea7e1c77"
+git-tree-sha1 = "5ac098a7c8660e217ffac31dc2af0964a8c3182a"
 uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
-version = "1.3.6"
+version = "2.0.0"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -749,21 +728,25 @@ version = "0.7.8"
 
 [[deps.ColorSchemes]]
 deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "PrecompileTools", "Random"]
-git-tree-sha1 = "403f2d8e209681fcbd9468a8514efff3ea08452e"
+git-tree-sha1 = "b0fd3f56fa442f81e0a47815c92245acfaaa4e34"
 uuid = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
-version = "3.29.0"
+version = "3.31.0"
 
 [[deps.ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
-git-tree-sha1 = "b10d0b65641d57b8b4d5e234446582de5047050d"
+git-tree-sha1 = "67e11ee83a43eb71ddc950302c53bf33f0690dfe"
 uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
-version = "0.11.5"
+version = "0.12.1"
+weakdeps = ["StyledStrings"]
+
+    [deps.ColorTypes.extensions]
+    StyledStringsExt = "StyledStrings"
 
 [[deps.ColorVectorSpace]]
 deps = ["ColorTypes", "FixedPointNumbers", "LinearAlgebra", "Requires", "Statistics", "TensorCore"]
-git-tree-sha1 = "a1f44953f2382ebb937d60dafbe2deea4bd23249"
+git-tree-sha1 = "8b3b6f87ce8f65a2b4f857528fd8d70086cd72b1"
 uuid = "c3611d14-8923-5661-9e6a-0046d554d3a4"
-version = "0.10.0"
+version = "0.11.0"
 weakdeps = ["SpecialFunctions"]
 
     [deps.ColorVectorSpace.extensions]
@@ -771,9 +754,9 @@ weakdeps = ["SpecialFunctions"]
 
 [[deps.Colors]]
 deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
-git-tree-sha1 = "64e15186f0aa277e174aa81798f7eb8598e0157e"
+git-tree-sha1 = "37ea44092930b1811e666c3bc38065d7d87fcc74"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
-version = "0.13.0"
+version = "0.13.1"
 
 [[deps.CommonSolve]]
 git-tree-sha1 = "0eee5eb66b1cf62cd6ad1b460238e60e4b09400c"
@@ -788,13 +771,18 @@ version = "0.3.1"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
-git-tree-sha1 = "8ae8d32e09f0dcf42a36b90d4e17f5dd2e4c4215"
+git-tree-sha1 = "9d8a54ce4b17aa5bdce0ea5c34bc5e7c340d16ad"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
-version = "4.16.0"
+version = "4.18.1"
 weakdeps = ["Dates", "LinearAlgebra"]
 
     [deps.Compat.extensions]
     CompatLinearAlgebraExt = "LinearAlgebra"
+
+[[deps.Compiler]]
+git-tree-sha1 = "382d79bfe72a406294faca39ef0c3cef6e6ce1f1"
+uuid = "807dbc54-b67e-4c79-8afb-eafe4df6f2e1"
+version = "0.1.1"
 
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -823,9 +811,9 @@ uuid = "88cd18e8-d9cc-4ea6-8889-5259c0d15c8b"
 version = "0.1.2"
 
 [[deps.ConstructionBase]]
-git-tree-sha1 = "76219f1ed5771adbb096743bff43fb5fdd4c1157"
+git-tree-sha1 = "b4b092499347b18a015186eae3042f72267106cb"
 uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
-version = "1.5.8"
+version = "1.6.0"
 
     [deps.ConstructionBase.extensions]
     ConstructionBaseIntervalSetsExt = "IntervalSets"
@@ -853,10 +841,10 @@ uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
 version = "1.16.0"
 
 [[deps.DataStructures]]
-deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
-git-tree-sha1 = "4e1fe97fdaed23e9dc21d4d664bea76b65fc50a0"
+deps = ["OrderedCollections"]
+git-tree-sha1 = "6c72198e6a101cccdd4c9731d3985e904ba26037"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-version = "0.18.22"
+version = "0.19.1"
 
 [[deps.DataValueInterfaces]]
 git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
@@ -870,9 +858,9 @@ version = "1.11.0"
 
 [[deps.Dbus_jll]]
 deps = ["Artifacts", "Expat_jll", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "fc173b380865f70627d7dd1190dc2fce6cc105af"
+git-tree-sha1 = "473e9afc9cf30814eb67ffa5f2db7df82c3ad9fd"
 uuid = "ee1fde0b-3d02-5ea6-8484-8dfef6360eab"
-version = "1.14.10+0"
+version = "1.16.2+0"
 
 [[deps.DelimitedFiles]]
 deps = ["Mmap"]
@@ -894,9 +882,9 @@ version = "1.15.1"
 
 [[deps.DifferentiationInterface]]
 deps = ["ADTypes", "LinearAlgebra"]
-git-tree-sha1 = "cf6dcb4b21bdd893fd45be70791d6dc89ca16506"
+git-tree-sha1 = "529bebbc74b36a4cfea09dd2aecb1288cd713a6d"
 uuid = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
-version = "0.6.48"
+version = "0.7.9"
 
     [deps.DifferentiationInterface.extensions]
     DifferentiationInterfaceChainRulesCoreExt = "ChainRulesCore"
@@ -906,6 +894,7 @@ version = "0.6.48"
     DifferentiationInterfaceFiniteDiffExt = "FiniteDiff"
     DifferentiationInterfaceFiniteDifferencesExt = "FiniteDifferences"
     DifferentiationInterfaceForwardDiffExt = ["ForwardDiff", "DiffResults"]
+    DifferentiationInterfaceGPUArraysCoreExt = "GPUArraysCore"
     DifferentiationInterfaceGTPSAExt = "GTPSA"
     DifferentiationInterfaceMooncakeExt = "Mooncake"
     DifferentiationInterfacePolyesterForwardDiffExt = ["PolyesterForwardDiff", "ForwardDiff", "DiffResults"]
@@ -928,6 +917,7 @@ version = "0.6.48"
     FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
     FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
     ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
     GTPSA = "b27dd330-f138-47c5-815b-40db9dd9b6e8"
     Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
     PolyesterForwardDiff = "98d1487c-24ca-40b6-b7ab-df2af84e126b"
@@ -946,10 +936,9 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 version = "1.11.0"
 
 [[deps.DocStringExtensions]]
-deps = ["LibGit2"]
-git-tree-sha1 = "2fb1e02f2b635d0845df5d7c167fec4dd739b00d"
+git-tree-sha1 = "7442a5dfe1ebb773c29cc2962a8980f47221d76c"
 uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
-version = "0.9.3"
+version = "0.9.5"
 
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
@@ -975,9 +964,9 @@ version = "0.1.11"
 
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "d55dffd9ae73ff72f1c0482454dcf2ec6c6c4a63"
+git-tree-sha1 = "7bb1361afdb33c7f2b085aa49ea8fe1b0fb14e58"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
-version = "2.6.5+0"
+version = "2.7.1+0"
 
 [[deps.ExprTools]]
 git-tree-sha1 = "27415f162e6028e81c72b82ef756bf321213b6ec"
@@ -991,15 +980,15 @@ version = "0.10.14"
 
 [[deps.FFMPEG]]
 deps = ["FFMPEG_jll"]
-git-tree-sha1 = "53ebe7511fa11d33bec688a9178fac4e49eeee00"
+git-tree-sha1 = "83dc665d0312b41367b7263e8a4d172eac1897f4"
 uuid = "c87230d0-a227-11e9-1b43-d7ebe4e7570a"
-version = "0.4.2"
+version = "0.4.4"
 
 [[deps.FFMPEG_jll]]
 deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers", "LAME_jll", "Libdl", "Ogg_jll", "OpenSSL_jll", "Opus_jll", "PCRE2_jll", "Zlib_jll", "libaom_jll", "libass_jll", "libfdk_aac_jll", "libvorbis_jll", "x264_jll", "x265_jll"]
-git-tree-sha1 = "466d45dc38e15794ec7d5d63ec03d776a9aff36e"
+git-tree-sha1 = "3a948313e7a41eb1db7a1e733e6335f17b4ab3c4"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
-version = "4.4.4+1"
+version = "7.1.1+0"
 
 [[deps.FastClosures]]
 git-tree-sha1 = "acebe244d53ee1b461970f8910c235b259e772ef"
@@ -1012,9 +1001,9 @@ version = "1.11.0"
 
 [[deps.FillArrays]]
 deps = ["LinearAlgebra"]
-git-tree-sha1 = "6a70198746448456524cb442b8af316927ff3e1a"
+git-tree-sha1 = "173e4d8f14230a7523ae11b9a3fa9edb3e0efd78"
 uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
-version = "1.13.0"
+version = "1.14.0"
 weakdeps = ["PDMats", "SparseArrays", "Statistics"]
 
     [deps.FillArrays.extensions]
@@ -1024,9 +1013,9 @@ weakdeps = ["PDMats", "SparseArrays", "Statistics"]
 
 [[deps.FiniteDiff]]
 deps = ["ArrayInterface", "LinearAlgebra", "Setfield"]
-git-tree-sha1 = "f089ab1f834470c525562030c8cfde4025d5e915"
+git-tree-sha1 = "9340ca07ca27093ff68418b7558ca37b05f8aeb1"
 uuid = "6a86dc24-6348-571c-b903-95158fe2bd41"
-version = "2.27.0"
+version = "2.29.0"
 
     [deps.FiniteDiff.extensions]
     FiniteDiffBandedMatricesExt = "BandedMatrices"
@@ -1048,9 +1037,9 @@ version = "0.8.5"
 
 [[deps.Fontconfig_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Expat_jll", "FreeType2_jll", "JLLWrappers", "Libdl", "Libuuid_jll", "Zlib_jll"]
-git-tree-sha1 = "21fac3c77d7b5a9fc03b0ec503aa1a6392c34d2b"
+git-tree-sha1 = "f85dac9a96a01087df6e3a749840015a0ca3817d"
 uuid = "a3f928ae-7b40-5064-980b-68af3947d34b"
-version = "2.15.0+0"
+version = "2.17.1+0"
 
 [[deps.Format]]
 git-tree-sha1 = "9c68794ef81b08086aeb32eeaf33531668d5f5fc"
@@ -1059,9 +1048,9 @@ version = "1.3.7"
 
 [[deps.ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "LogExpFunctions", "NaNMath", "Preferences", "Printf", "Random", "SpecialFunctions"]
-git-tree-sha1 = "a2df1b776752e3f344e5116c06d75a10436ab853"
+git-tree-sha1 = "ba6ce081425d0afb2bedd00d9884464f764a9225"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
-version = "0.10.38"
+version = "1.2.2"
 weakdeps = ["StaticArrays"]
 
     [deps.ForwardDiff.extensions]
@@ -1069,15 +1058,15 @@ weakdeps = ["StaticArrays"]
 
 [[deps.FreeType2_jll]]
 deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "786e968a8d2fb167f2e4880baba62e0e26bd8e4e"
+git-tree-sha1 = "2c5512e11c791d1baed2049c5652441b28fc6a31"
 uuid = "d7e528f0-a631-5988-bf34-fe36492bcfd7"
-version = "2.13.3+1"
+version = "2.13.4+0"
 
 [[deps.FriBidi_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "846f7026a9decf3679419122b49f8a1fdb48d2d5"
+git-tree-sha1 = "7a214fdac5ed5f59a22c2d9a885a16da1c74bbc7"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
-version = "1.0.16+0"
+version = "1.0.17+0"
 
 [[deps.FunctionWrappers]]
 git-tree-sha1 = "d62485945ce5ae9c0c48f124a84998d755bae00e"
@@ -1109,33 +1098,39 @@ version = "0.2.0"
 
 [[deps.GR]]
 deps = ["Artifacts", "Base64", "DelimitedFiles", "Downloads", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Preferences", "Printf", "Qt6Wayland_jll", "Random", "Serialization", "Sockets", "TOML", "Tar", "Test", "p7zip_jll"]
-git-tree-sha1 = "0ff136326605f8e06e9bcf085a356ab312eef18a"
+git-tree-sha1 = "1828eb7275491981fa5f1752a5e126e8f26f8741"
 uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
-version = "0.73.13"
+version = "0.73.17"
 
 [[deps.GR_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "FreeType2_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Qt6Base_jll", "Zlib_jll", "libpng_jll"]
-git-tree-sha1 = "9cb62849057df859575fc1dda1e91b82f8609709"
+git-tree-sha1 = "27299071cc29e409488ada41ec7643e0ab19091f"
 uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
-version = "0.73.13+0"
+version = "0.73.17+0"
 
-[[deps.Gettext_jll]]
-deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "XML2_jll"]
-git-tree-sha1 = "9b02998aba7bf074d14de89f9d37ca24a1a0b046"
-uuid = "78b55507-aeef-58d4-861c-77aaff3498b1"
-version = "0.21.0+0"
+[[deps.GettextRuntime_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Libiconv_jll"]
+git-tree-sha1 = "45288942190db7c5f760f59c04495064eedf9340"
+uuid = "b0724c58-0f36-5564-988d-3bb0596ebc4a"
+version = "0.22.4+0"
+
+[[deps.Ghostscript_jll]]
+deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Zlib_jll"]
+git-tree-sha1 = "38044a04637976140074d0b0621c1edf0eb531fd"
+uuid = "61579ee1-b43e-5ca0-a5da-69d92c66a64b"
+version = "9.55.1+0"
 
 [[deps.Glib_jll]]
-deps = ["Artifacts", "Gettext_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libiconv_jll", "Libmount_jll", "PCRE2_jll", "Zlib_jll"]
-git-tree-sha1 = "b0036b392358c80d2d2124746c2bf3d48d457938"
+deps = ["Artifacts", "GettextRuntime_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libiconv_jll", "Libmount_jll", "PCRE2_jll", "Zlib_jll"]
+git-tree-sha1 = "50c11ffab2a3d50192a228c313f05b5b5dc5acb2"
 uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
-version = "2.82.4+0"
+version = "2.86.0+0"
 
 [[deps.Graphite2_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "01979f9b37367603e2848ea225918a3b3861b606"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "8a6dbda1fd736d60cc477d99f2e7a042acfa46e8"
 uuid = "3b182d85-2403-5c21-9c21-1e1f0cc25472"
-version = "1.3.14+1"
+version = "1.3.15+0"
 
 [[deps.Grisu]]
 git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
@@ -1144,15 +1139,15 @@ version = "1.0.2"
 
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "PrecompileTools", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
-git-tree-sha1 = "c67b33b085f6e2faf8bf79a61962e7339a81129c"
+git-tree-sha1 = "5e6fe50ae7f23d171f44e311c2960294aaa0beb5"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "1.10.15"
+version = "1.10.19"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll"]
-git-tree-sha1 = "55c53be97790242c29031e5cd45e8ac296dadda3"
+git-tree-sha1 = "f923f9a774fcf3f5cb761bfa43aeadd689714813"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
-version = "8.5.0+0"
+version = "8.5.1+0"
 
 [[deps.Hyperscript]]
 deps = ["Test"]
@@ -1172,26 +1167,24 @@ git-tree-sha1 = "b6d6bfdd7ce25b0f9b2f6b3dd56b2673a66c8770"
 uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
 version = "0.2.5"
 
-[[deps.IntelOpenMP_jll]]
-deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
-git-tree-sha1 = "0f14a5456bdc6b9731a5682f439a672750a09e48"
-uuid = "1d5cc7b8-4909-519e-a0f8-d0f5ad9712d0"
-version = "2025.0.4+0"
-
 [[deps.InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 version = "1.11.0"
 
 [[deps.Interpolations]]
-deps = ["Adapt", "AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "Requires", "SharedArrays", "SparseArrays", "StaticArrays", "WoodburyMatrices"]
-git-tree-sha1 = "88a101217d7cb38a7b481ccd50d21876e1d1b0e0"
+deps = ["Adapt", "AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "SharedArrays", "SparseArrays", "StaticArrays", "WoodburyMatrices"]
+git-tree-sha1 = "65d505fa4c0d7072990d659ef3fc086eb6da8208"
 uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
-version = "0.15.1"
-weakdeps = ["Unitful"]
+version = "0.16.2"
 
     [deps.Interpolations.extensions]
+    InterpolationsForwardDiffExt = "ForwardDiff"
     InterpolationsUnitfulExt = "Unitful"
+
+    [deps.Interpolations.weakdeps]
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.InverseFunctions]]
 git-tree-sha1 = "a779299d77cd080bf77b97535acecd73e1c5e5cb"
@@ -1204,9 +1197,9 @@ weakdeps = ["Dates", "Test"]
     InverseFunctionsTestExt = "Test"
 
 [[deps.IrrationalConstants]]
-git-tree-sha1 = "e2222959fbc6c19554dc15174c81bf7bf3aa691c"
+git-tree-sha1 = "b2d91fe939cae05960e760110b328288867b5758"
 uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
-version = "0.2.4"
+version = "0.2.6"
 
 [[deps.IteratorInterfaceExtensions]]
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
@@ -1215,15 +1208,15 @@ version = "1.0.0"
 
 [[deps.JLFzf]]
 deps = ["REPL", "Random", "fzf_jll"]
-git-tree-sha1 = "1d4015b1eb6dc3be7e6c400fbd8042fe825a6bac"
+git-tree-sha1 = "82f7acdc599b65e0f8ccd270ffa1467c21cb647b"
 uuid = "1019f520-868f-41f5-a6de-eb00f4b6a39c"
-version = "0.1.10"
+version = "0.1.11"
 
 [[deps.JLLWrappers]]
 deps = ["Artifacts", "Preferences"]
-git-tree-sha1 = "a007feb38b422fbdab534406aeca1b86823cb4d6"
+git-tree-sha1 = "0533e564aae234aff59ab625543145446d8b6ec2"
 uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
-version = "1.7.0"
+version = "1.7.1"
 
 [[deps.JSON]]
 deps = ["Dates", "Mmap", "Parsers", "Unicode"]
@@ -1239,27 +1232,21 @@ version = "0.2.1"
 
 [[deps.JpegTurbo_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "eac1206917768cb54957c65a615460d87b455fc1"
+git-tree-sha1 = "4255f0032eafd6451d707a51d5f0248b8a165e4d"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
-version = "3.1.1+0"
+version = "3.1.3+0"
 
 [[deps.JuliaInterpreter]]
 deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
-git-tree-sha1 = "a434e811d10e7cbf4f0674285542e697dca605d0"
+git-tree-sha1 = "d8337622fe53c05d16f031df24daf0270e53bc64"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
-version = "0.9.42"
+version = "0.10.5"
 
 [[deps.LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "170b660facf5df5de098d866564877e119141cbd"
+git-tree-sha1 = "059aabebaa7c82ccb853dd4a0ee9d17796f7e1bc"
 uuid = "c1c5ebd0-6772-5130-a774-d5fcae4a789d"
-version = "3.100.2+0"
-
-[[deps.LBFGSB]]
-deps = ["L_BFGS_B_jll"]
-git-tree-sha1 = "e2e6f53ee20605d0ea2be473480b7480bd5091b5"
-uuid = "5be7bae1-8223-5378-bac3-9e7378a2f6e6"
-version = "0.4.1"
+version = "3.100.3+0"
 
 [[deps.LERC_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1269,9 +1256,9 @@ version = "4.0.1+0"
 
 [[deps.LLVMOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "78211fb6cbc872f77cad3fc0b6cf647d923f4929"
+git-tree-sha1 = "eb62a3deb62fc6d8822c0c4bef73e4412419c5d8"
 uuid = "1d63c593-3942-5779-bab2-d838dc0a180e"
-version = "18.1.7+0"
+version = "18.1.8+0"
 
 [[deps.LZO_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1279,43 +1266,34 @@ git-tree-sha1 = "1c602b1127f4751facb671441ca72715cc95938a"
 uuid = "dd4b983a-f0e5-5f8d-a1b7-129d4a5fb1ac"
 version = "2.10.3+0"
 
-[[deps.L_BFGS_B_jll]]
-deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "77feda930ed3f04b2b0fbb5bea89e69d3677c6b0"
-uuid = "81d17ec3-03a1-5e46-b53e-bddc35a13473"
-version = "3.0.1+0"
-
 [[deps.LaTeXStrings]]
 git-tree-sha1 = "dda21b8cbd6a6c40d9d02a73230f9d70fed6918c"
 uuid = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 version = "1.4.0"
 
 [[deps.Latexify]]
-deps = ["Format", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "OrderedCollections", "Requires"]
-git-tree-sha1 = "cd714447457c660382fe634710fb56eb255ee42e"
+deps = ["Format", "Ghostscript_jll", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "OrderedCollections", "Requires"]
+git-tree-sha1 = "44f93c47f9cd6c7e431f2f2091fcba8f01cd7e8f"
 uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
-version = "0.16.6"
+version = "0.16.10"
 
     [deps.Latexify.extensions]
     DataFramesExt = "DataFrames"
     SparseArraysExt = "SparseArrays"
     SymEngineExt = "SymEngine"
+    TectonicExt = "tectonic_jll"
 
     [deps.Latexify.weakdeps]
     DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
-
-[[deps.LazyArtifacts]]
-deps = ["Artifacts", "Pkg"]
-uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
-version = "1.11.0"
+    tectonic_jll = "d7dd28d6-a5e6-559c-9131-7eb760cdacc5"
 
 [[deps.LeftChildRightSiblingTrees]]
 deps = ["AbstractTrees"]
-git-tree-sha1 = "fb6803dafae4a5d62ea5cab204b1e657d9737e7f"
+git-tree-sha1 = "95ba48564903b43b2462318aa243ee79d81135ff"
 uuid = "1d6d02ad-be62-4b6b-8a6d-2f90e265016e"
-version = "0.2.0"
+version = "0.2.1"
 
 [[deps.LegendrePolynomials]]
 deps = ["OffsetArrays", "SpecialFunctions"]
@@ -1353,28 +1331,16 @@ uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 version = "1.11.0"
 
 [[deps.Libffi_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "27ecae93dd25ee0909666e6835051dd684cc035e"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "c8da7e6a91781c41a863611c7e966098d783c57a"
 uuid = "e9f186c6-92d2-5b65-8a66-fee21dc1b490"
-version = "3.2.2+2"
-
-[[deps.Libgcrypt_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Libgpg_error_jll"]
-git-tree-sha1 = "8be878062e0ffa2c3f67bb58a595375eda5de80b"
-uuid = "d4300ac3-e22c-5743-9152-c294e39db1e4"
-version = "1.11.0+0"
+version = "3.4.7+0"
 
 [[deps.Libglvnd_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll", "Xorg_libXext_jll"]
-git-tree-sha1 = "ff3b4b9d35de638936a525ecd36e86a8bb919d11"
+git-tree-sha1 = "d36c21b9e7c172a44a10484125024495e2625ac0"
 uuid = "7e76a0d4-f3c7-5321-8279-8d96eeed0f29"
-version = "1.7.0+0"
-
-[[deps.Libgpg_error_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "df37206100d39f79b3376afb6b9cee4970041c61"
-uuid = "7add5ba3-2f88-524e-9cd5-f83b8a55f7b8"
-version = "1.51.1+0"
+version = "1.7.1+1"
 
 [[deps.Libiconv_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1384,27 +1350,27 @@ version = "1.18.0+0"
 
 [[deps.Libmount_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "89211ea35d9df5831fca5d33552c02bd33878419"
+git-tree-sha1 = "3acf07f130a76f87c041cfb2ff7d7284ca67b072"
 uuid = "4b2f31a3-9ecc-558c-b454-b3730dcb73e9"
-version = "2.40.3+0"
+version = "2.41.2+0"
 
 [[deps.Libtiff_jll]]
 deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "LERC_jll", "Libdl", "XZ_jll", "Zlib_jll", "Zstd_jll"]
-git-tree-sha1 = "4ab7581296671007fc33f07a721631b8855f4b1d"
+git-tree-sha1 = "f04133fe05eff1667d2054c53d59f9122383fe05"
 uuid = "89763e89-9b03-5906-acba-b20f662cd828"
-version = "4.7.1+0"
+version = "4.7.2+0"
 
 [[deps.Libuuid_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "e888ad02ce716b319e6bdb985d2ef300e7089889"
+git-tree-sha1 = "2a7a12fc0a4e7fb773450d17975322aa77142106"
 uuid = "38a345b3-de98-5d2b-a5d3-14cd9215e700"
-version = "2.40.3+0"
+version = "2.41.2+0"
 
 [[deps.LineSearches]]
 deps = ["LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "Printf"]
-git-tree-sha1 = "e4c3be53733db1051cc15ecf573b1042b3a712a1"
+git-tree-sha1 = "4adee99b7262ad2a1a4bbbc59d993d24e55ea96f"
 uuid = "d3d80556-e9d4-5f37-9878-2ab0fcc64255"
-version = "7.3.0"
+version = "7.4.0"
 
 [[deps.LinearAlgebra]]
 deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
@@ -1433,37 +1399,25 @@ version = "1.11.0"
 
 [[deps.LoggingExtras]]
 deps = ["Dates", "Logging"]
-git-tree-sha1 = "f02b56007b064fbfddb4c9cd60161b6dd0f40df3"
+git-tree-sha1 = "f00544d95982ea270145636c181ceda21c4e2575"
 uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
-version = "1.1.0"
+version = "1.2.0"
 
 [[deps.LoweredCodeUtils]]
-deps = ["JuliaInterpreter"]
-git-tree-sha1 = "688d6d9e098109051ae33d126fcfc88c4ce4a021"
+deps = ["CodeTracking", "Compiler", "JuliaInterpreter"]
+git-tree-sha1 = "73b98709ad811a6f81d84e105f4f695c229385ba"
 uuid = "6f1432cf-f94c-5a45-995e-cdbf5db27b0b"
-version = "3.1.0"
+version = "3.4.3"
 
 [[deps.MIMEs]]
 git-tree-sha1 = "c64d943587f7187e751162b3b84445bbbd79f691"
 uuid = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
 version = "1.1.0"
 
-[[deps.MKL]]
-deps = ["Artifacts", "Libdl", "LinearAlgebra", "Logging", "MKL_jll"]
-git-tree-sha1 = "39fd578c295085e77aedec501149a63f9ab0c0b6"
-uuid = "33e6dc65-8f57-5167-99aa-e5a354878fb2"
-version = "0.8.0"
-
-[[deps.MKL_jll]]
-deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
-git-tree-sha1 = "5de60bc6cb3899cd318d80d627560fae2e2d99ae"
-uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
-version = "2025.0.1+1"
-
 [[deps.MacroTools]]
-git-tree-sha1 = "72aebe0b5051e5143a079a4685a46da330a40472"
+git-tree-sha1 = "1e0228a030642014fe5cfe68c2c0a818f9e3f522"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
-version = "0.5.15"
+version = "0.5.16"
 
 [[deps.Markdown]]
 deps = ["Base64"]
@@ -1498,9 +1452,9 @@ version = "1.11.0"
 
 [[deps.Moshi]]
 deps = ["ExproniconLite", "Jieko"]
-git-tree-sha1 = "453de0fc2be3d11b9b93ca4d0fddd91196dcf1ed"
+git-tree-sha1 = "53f817d3e84537d84545e0ad749e483412dd6b2a"
 uuid = "2e0e35c7-a2e4-4343-998d-7ef72827ed2d"
-version = "0.3.5"
+version = "0.3.7"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
@@ -1508,40 +1462,34 @@ version = "2023.12.12"
 
 [[deps.NLSolversBase]]
 deps = ["ADTypes", "DifferentiationInterface", "Distributed", "FiniteDiff", "ForwardDiff"]
-git-tree-sha1 = "1f78293864c5e48ecf97269b0e23d7be28eb1958"
+git-tree-sha1 = "25a6638571a902ecfb1ae2a18fc1575f86b1d4df"
 uuid = "d41bc354-129a-5804-8e4c-c37616107c6c"
-version = "7.9.0"
+version = "7.10.0"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
-git-tree-sha1 = "cc0a5deefdb12ab3a096f00a6d42133af4560d71"
+git-tree-sha1 = "9b8215b1ee9e78a293f99797cd31375471b2bcae"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
-version = "1.1.2"
+version = "1.1.3"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
 
-[[deps.NumericalIntegration]]
-deps = ["InteractiveUtils", "LinearAlgebra", "Logging", "Test"]
-git-tree-sha1 = "71a5bf35469ec57e1bfdeec7dbb5757e51949bbb"
-uuid = "e7bfaba1-d571-5449-8927-abc22e82249b"
-version = "0.2.0"
-
 [[deps.OffsetArrays]]
-git-tree-sha1 = "a414039192a155fb38c4599a60110f0018c6ec82"
+git-tree-sha1 = "117432e406b5c023f665fa73dc26e79ec3630151"
 uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
-version = "1.16.0"
+version = "1.17.0"
 weakdeps = ["Adapt"]
 
     [deps.OffsetArrays.extensions]
     OffsetArraysAdaptExt = "Adapt"
 
 [[deps.Ogg_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "887579a3eb005446d514ab7aeac5d1d027658b8f"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "b6aa4566bb7ae78498a5e68943863fa8b5231b59"
 uuid = "e7412a2a-1a6e-54c0-be00-318e2571c051"
-version = "1.3.5+1"
+version = "1.3.6+0"
 
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
@@ -1551,19 +1499,19 @@ version = "0.3.27+1"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+4"
+version = "0.8.5+0"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
-git-tree-sha1 = "38cb508d080d21dc1128f7fb04f20387ed4c0af4"
+git-tree-sha1 = "f1a7e086c677df53e064e0fdd2c9d0b0833e3f6e"
 uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
-version = "1.4.3"
+version = "1.5.0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "a9697f1d06cc3eb3fb3ad49cc67f2cfabaac31ea"
+git-tree-sha1 = "f19301ae653233bc88b1810ae908194f07f8db9d"
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
-version = "3.0.16+0"
+version = "3.5.4+0"
 
 [[deps.OpenSpecFun_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
@@ -1572,10 +1520,10 @@ uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
 version = "0.5.6+0"
 
 [[deps.Optim]]
-deps = ["Compat", "FillArrays", "ForwardDiff", "LineSearches", "LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "PositiveFactorizations", "Printf", "SparseArrays", "StatsBase"]
-git-tree-sha1 = "c1f51f704f689f87f28b33836fd460ecf9b34583"
+deps = ["Compat", "EnumX", "FillArrays", "ForwardDiff", "LineSearches", "LinearAlgebra", "NLSolversBase", "NaNMath", "PositiveFactorizations", "Printf", "SparseArrays", "StatsBase"]
+git-tree-sha1 = "61942645c38dd2b5b78e2082c9b51ab315315d10"
 uuid = "429524aa-4258-5aef-a3af-852621145aeb"
-version = "1.11.0"
+version = "1.13.2"
 
     [deps.Optim.extensions]
     OptimMOIExt = "MathOptInterface"
@@ -1584,16 +1532,16 @@ version = "1.11.0"
     MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 
 [[deps.Optimization]]
-deps = ["ADTypes", "ArrayInterface", "ConsoleProgressMonitor", "DocStringExtensions", "LBFGSB", "LinearAlgebra", "Logging", "LoggingExtras", "OptimizationBase", "Printf", "ProgressLogging", "Reexport", "SciMLBase", "SparseArrays", "TerminalLoggers"]
-git-tree-sha1 = "e72af10f1c6ffe2f295455c4c35534d713be62bb"
+deps = ["ADTypes", "ArrayInterface", "ConsoleProgressMonitor", "DocStringExtensions", "LinearAlgebra", "Logging", "LoggingExtras", "OptimizationBase", "Printf", "ProgressLogging", "Reexport", "SciMLBase", "SparseArrays", "TerminalLoggers"]
+git-tree-sha1 = "6b74af28fe70d6c828746376549c357cf88d3c3a"
 uuid = "7f7a1694-90dd-40f0-9382-eb1efda571ba"
-version = "4.1.2"
+version = "5.0.0"
 
 [[deps.OptimizationBase]]
-deps = ["ADTypes", "ArrayInterface", "DifferentiationInterface", "DocStringExtensions", "FastClosures", "LinearAlgebra", "PDMats", "Reexport", "Requires", "SciMLBase", "SparseArrays", "SparseConnectivityTracer", "SparseMatrixColorings"]
-git-tree-sha1 = "070d2c33da5f0b33d57b61f7f601c4ea6185af15"
+deps = ["ADTypes", "ArrayInterface", "DifferentiationInterface", "DocStringExtensions", "FastClosures", "LinearAlgebra", "PDMats", "Reexport", "SciMLBase", "SparseArrays", "SparseConnectivityTracer", "SparseMatrixColorings"]
+git-tree-sha1 = "9656e816095035cb993863fea4209f0cd8b1bc45"
 uuid = "bca83a33-5cc9-4baa-983d-23429ab6bcbb"
-version = "2.5.0"
+version = "3.3.1"
 
     [deps.OptimizationBase.extensions]
     OptimizationEnzymeExt = "Enzyme"
@@ -1618,21 +1566,21 @@ version = "2.5.0"
     Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [[deps.OptimizationOptimJL]]
-deps = ["Optim", "Optimization", "PrecompileTools", "Reexport", "SparseArrays"]
-git-tree-sha1 = "980ec7190741db164a2923dc42d6f1e7ce2cc434"
+deps = ["Optim", "OptimizationBase", "PrecompileTools", "Reexport", "SciMLBase", "SparseArrays"]
+git-tree-sha1 = "f46a4ac6619a232ef35f9f8728d76fd7baeb962e"
 uuid = "36348300-93cb-4f02-beb5-3c3902f8871e"
-version = "0.4.1"
+version = "0.4.6"
 
 [[deps.Opus_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "6703a85cb3781bd5909d48730a67205f3f31a575"
+git-tree-sha1 = "c392fc5dd032381919e3b22dd32d6443760ce7ea"
 uuid = "91d4177d-7536-5919-b921-800302f37372"
-version = "1.3.3+0"
+version = "1.5.2+0"
 
 [[deps.OrderedCollections]]
-git-tree-sha1 = "cc4054e898b852042d7b503313f7ad03de99c3dd"
+git-tree-sha1 = "05868e21324cede2207c6f0f466b4bfef6d5e7ee"
 uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
-version = "1.8.0"
+version = "1.8.1"
 
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -1641,15 +1589,15 @@ version = "10.42.0+1"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
-git-tree-sha1 = "966b85253e959ea89c53a9abebbf2e964fbf593b"
+git-tree-sha1 = "f07c06228a1c670ae4c87d1276b92c7c597fdda0"
 uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
-version = "0.11.32"
+version = "0.11.35"
 
 [[deps.Pango_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "3b31172c032a1def20c98dae3f2cdc9d10e3b561"
+git-tree-sha1 = "1f7f9bbd5f7a2e5a9f7d96e51c9754454ea7f60b"
 uuid = "36c8627f-9965-5494-a995-c6b170f724f3"
-version = "1.56.1+0"
+version = "1.56.4+0"
 
 [[deps.Parameters]]
 deps = ["OrderedCollections", "UnPack"]
@@ -1659,9 +1607,9 @@ version = "0.12.3"
 
 [[deps.Parsers]]
 deps = ["Dates", "PrecompileTools", "UUIDs"]
-git-tree-sha1 = "8489905bcdbcfac64d1daa51ca07c0d8f0283821"
+git-tree-sha1 = "7d2f8f21da5db6a806faf7b9b292296da42b2810"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.8.1"
+version = "2.8.3"
 
 [[deps.Pixman_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LLVMOpenMP_jll", "Libdl"]
@@ -1691,10 +1639,10 @@ uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
 version = "1.4.3"
 
 [[deps.Plots]]
-deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "JLFzf", "JSON", "LaTeXStrings", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "PrecompileTools", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "RelocatableFolders", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "TOML", "UUIDs", "UnicodeFun", "UnitfulLatexify", "Unzip"]
-git-tree-sha1 = "24be21541580495368c35a6ccef1454e7b5015be"
+deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "JLFzf", "JSON", "LaTeXStrings", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "PrecompileTools", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "RelocatableFolders", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "TOML", "UUIDs", "UnicodeFun", "Unzip"]
+git-tree-sha1 = "12ce661880f8e309569074a61d3767e5756a199f"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.40.11"
+version = "1.41.1"
 
     [deps.Plots.extensions]
     FileIOExt = "FileIO"
@@ -1711,27 +1659,27 @@ version = "1.40.11"
     Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.PlutoUI]]
-deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]
-git-tree-sha1 = "d3de2694b52a01ce61a036f18ea9c0f61c4a9230"
+deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "Downloads", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]
+git-tree-sha1 = "f53232a27a8c1c836d3998ae1e17d898d4df2a46"
 uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
-version = "0.7.62"
+version = "0.7.72"
 
 [[deps.Polynomials]]
 deps = ["LinearAlgebra", "OrderedCollections", "RecipesBase", "Requires", "Setfield", "SparseArrays"]
-git-tree-sha1 = "555c272d20fc80a2658587fb9bbda60067b93b7c"
+git-tree-sha1 = "972089912ba299fba87671b025cd0da74f5f54f7"
 uuid = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
-version = "4.0.19"
+version = "4.1.0"
 
     [deps.Polynomials.extensions]
     PolynomialsChainRulesCoreExt = "ChainRulesCore"
     PolynomialsFFTWExt = "FFTW"
-    PolynomialsMakieCoreExt = "MakieCore"
+    PolynomialsMakieExt = "Makie"
     PolynomialsMutableArithmeticsExt = "MutableArithmetics"
 
     [deps.Polynomials.weakdeps]
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
     FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
-    MakieCore = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
     MutableArithmetics = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
 
 [[deps.PositiveFactorizations]]
@@ -1739,6 +1687,22 @@ deps = ["LinearAlgebra"]
 git-tree-sha1 = "17275485f373e6673f7e7f97051f703ed5b15b20"
 uuid = "85a6dd25-e78a-55b7-8502-1745935b8125"
 version = "0.2.4"
+
+[[deps.PreallocationTools]]
+deps = ["Adapt", "ArrayInterface", "PrecompileTools"]
+git-tree-sha1 = "c05b4c6325262152483a1ecb6c69846d2e01727b"
+uuid = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
+version = "0.4.34"
+
+    [deps.PreallocationTools.extensions]
+    PreallocationToolsForwardDiffExt = "ForwardDiff"
+    PreallocationToolsReverseDiffExt = "ReverseDiff"
+    PreallocationToolsSparseConnectivityTracerExt = "SparseConnectivityTracer"
+
+    [deps.PreallocationTools.weakdeps]
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    SparseConnectivityTracer = "9f842d2f-2579-4b1d-911e-f412cf18a3f5"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
@@ -1748,15 +1712,15 @@ version = "1.2.1"
 
 [[deps.Preferences]]
 deps = ["TOML"]
-git-tree-sha1 = "9306f6085165d270f7e3db02af26a400d580f5c6"
+git-tree-sha1 = "0f27480397253da18fe2c12a4ba4eb9eb208bf3d"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
-version = "1.4.3"
+version = "1.5.0"
 
 [[deps.PrettyTables]]
-deps = ["Crayons", "LaTeXStrings", "Markdown", "PrecompileTools", "Printf", "Reexport", "StringManipulation", "Tables"]
-git-tree-sha1 = "1101cd475833706e4d0e7b122218257178f48f34"
+deps = ["Crayons", "LaTeXStrings", "Markdown", "PrecompileTools", "Printf", "REPL", "Reexport", "StringManipulation", "Tables"]
+git-tree-sha1 = "6b8e2f0bae3f678811678065c09571c1619da219"
 uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
-version = "2.4.0"
+version = "3.1.0"
 
 [[deps.Printf]]
 deps = ["Unicode"]
@@ -1765,15 +1729,15 @@ version = "1.11.0"
 
 [[deps.ProgressLogging]]
 deps = ["Logging", "SHA", "UUIDs"]
-git-tree-sha1 = "80d919dee55b9c50e8d9e2da5eeafff3fe58b539"
+git-tree-sha1 = "d95ed0324b0799843ac6f7a6a85e65fe4e5173f0"
 uuid = "33c8b6b6-d38a-422a-b730-caa89a2f386c"
-version = "0.1.4"
+version = "0.1.5"
 
 [[deps.ProgressMeter]]
 deps = ["Distributed", "Printf"]
-git-tree-sha1 = "8f6bc219586aef8baf0ff9a5fe16ee9c70cb65e4"
+git-tree-sha1 = "fbb92c6c56b34e1a2c4c36058f68f332bec840e7"
 uuid = "92933f4c-e287-5a05-a399-4b506db050ca"
-version = "1.10.2"
+version = "1.11.0"
 
 [[deps.PtrArrays]]
 git-tree-sha1 = "1d36ef11a9aaf1e8b74dacc6a731dd1de8fd493d"
@@ -1782,27 +1746,27 @@ version = "1.3.0"
 
 [[deps.Qt6Base_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Fontconfig_jll", "Glib_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "OpenSSL_jll", "Vulkan_Loader_jll", "Xorg_libSM_jll", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Xorg_libxcb_jll", "Xorg_xcb_util_cursor_jll", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_keysyms_jll", "Xorg_xcb_util_renderutil_jll", "Xorg_xcb_util_wm_jll", "Zlib_jll", "libinput_jll", "xkbcommon_jll"]
-git-tree-sha1 = "492601870742dcd38f233b23c3ec629628c1d724"
+git-tree-sha1 = "34f7e5d2861083ec7596af8b8c092531facf2192"
 uuid = "c0090381-4147-56d7-9ebc-da0b1113ec56"
-version = "6.7.1+1"
+version = "6.8.2+2"
 
 [[deps.Qt6Declarative_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Qt6Base_jll", "Qt6ShaderTools_jll"]
-git-tree-sha1 = "e5dd466bf2569fe08c91a2cc29c1003f4797ac3b"
+git-tree-sha1 = "da7adf145cce0d44e892626e647f9dcbe9cb3e10"
 uuid = "629bc702-f1f5-5709-abd5-49b8460ea067"
-version = "6.7.1+2"
+version = "6.8.2+1"
 
 [[deps.Qt6ShaderTools_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Qt6Base_jll"]
-git-tree-sha1 = "1a180aeced866700d4bebc3120ea1451201f16bc"
+git-tree-sha1 = "9eca9fc3fe515d619ce004c83c31ffd3f85c7ccf"
 uuid = "ce943373-25bb-56aa-8eca-768745ed7b5a"
-version = "6.7.1+1"
+version = "6.8.2+1"
 
 [[deps.Qt6Wayland_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Qt6Base_jll", "Qt6Declarative_jll"]
-git-tree-sha1 = "729927532d48cf79f49070341e1d918a65aba6b0"
+git-tree-sha1 = "8f528b0851b5b7025032818eb5abbeb8a736f853"
 uuid = "e99dba38-086e-5de3-a5b1-6e4c66e897c3"
-version = "6.7.1+1"
+version = "6.8.2+2"
 
 [[deps.REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets", "StyledStrings", "Unicode"]
@@ -1837,30 +1801,34 @@ uuid = "01d81517-befc-4cb6-b9ec-a95719d0359c"
 version = "0.6.12"
 
 [[deps.RecursiveArrayTools]]
-deps = ["Adapt", "ArrayInterface", "DocStringExtensions", "GPUArraysCore", "IteratorInterfaceExtensions", "LinearAlgebra", "RecipesBase", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "Tables"]
-git-tree-sha1 = "112c876cee36a5784df19098b55db2b238afc36a"
+deps = ["Adapt", "ArrayInterface", "DocStringExtensions", "GPUArraysCore", "LinearAlgebra", "RecipesBase", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
+git-tree-sha1 = "51bdb23afaaa551f923a0e990f7c44a4451a26f1"
 uuid = "731186ca-8d62-57ce-b412-fbd966d074cd"
-version = "3.31.2"
+version = "3.39.0"
 
     [deps.RecursiveArrayTools.extensions]
     RecursiveArrayToolsFastBroadcastExt = "FastBroadcast"
     RecursiveArrayToolsForwardDiffExt = "ForwardDiff"
+    RecursiveArrayToolsKernelAbstractionsExt = "KernelAbstractions"
     RecursiveArrayToolsMeasurementsExt = "Measurements"
     RecursiveArrayToolsMonteCarloMeasurementsExt = "MonteCarloMeasurements"
     RecursiveArrayToolsReverseDiffExt = ["ReverseDiff", "Zygote"]
     RecursiveArrayToolsSparseArraysExt = ["SparseArrays"]
     RecursiveArrayToolsStructArraysExt = "StructArrays"
+    RecursiveArrayToolsTablesExt = ["Tables"]
     RecursiveArrayToolsTrackerExt = "Tracker"
     RecursiveArrayToolsZygoteExt = "Zygote"
 
     [deps.RecursiveArrayTools.weakdeps]
     FastBroadcast = "7034ab61-46d4-4ed7-9d0f-46aef9175898"
     ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
     Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
     MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+    Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
     Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
     Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
@@ -1883,9 +1851,9 @@ version = "1.3.1"
 
 [[deps.Revise]]
 deps = ["CodeTracking", "FileWatching", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "REPL", "Requires", "UUIDs", "Unicode"]
-git-tree-sha1 = "5cf59106f9b47014c58c5053a1ce09c0a2e0333c"
+git-tree-sha1 = "d852eba0cc08181083a58d5eb9dccaec3129cb03"
 uuid = "295af30f-e4ad-537b-8983-00126c2a3abe"
-version = "3.7.3"
+version = "3.9.0"
 weakdeps = ["Distributed"]
 
     [deps.Revise.extensions]
@@ -1893,46 +1861,62 @@ weakdeps = ["Distributed"]
 
 [[deps.RuntimeGeneratedFunctions]]
 deps = ["ExprTools", "SHA", "Serialization"]
-git-tree-sha1 = "04c968137612c4a5629fa531334bb81ad5680f00"
+git-tree-sha1 = "86a8a8b783481e1ea6b9c91dd949cb32191f8ab4"
 uuid = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
-version = "0.5.13"
+version = "0.5.15"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 version = "0.7.0"
 
 [[deps.SciMLBase]]
-deps = ["ADTypes", "Accessors", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "b774e82af5c068939e1085d4ec058aadb79c5483"
+deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PreallocationTools", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
+git-tree-sha1 = "737abcec59e3b999dda21018a6f3e442c0a58a65"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "2.79.0"
+version = "2.121.1"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
+    SciMLBaseDistributionsExt = "Distributions"
+    SciMLBaseEnzymeExt = "Enzyme"
+    SciMLBaseForwardDiffExt = "ForwardDiff"
     SciMLBaseMLStyleExt = "MLStyle"
     SciMLBaseMakieExt = "Makie"
+    SciMLBaseMeasurementsExt = "Measurements"
+    SciMLBaseMonteCarloMeasurementsExt = "MonteCarloMeasurements"
+    SciMLBaseMooncakeExt = "Mooncake"
     SciMLBasePartialFunctionsExt = "PartialFunctions"
     SciMLBasePyCallExt = "PyCall"
     SciMLBasePythonCallExt = "PythonCall"
     SciMLBaseRCallExt = "RCall"
+    SciMLBaseReverseDiffExt = "ReverseDiff"
+    SciMLBaseTrackerExt = "Tracker"
     SciMLBaseZygoteExt = ["Zygote", "ChainRulesCore"]
 
     [deps.SciMLBase.weakdeps]
     ChainRules = "082447d4-558c-5d27-93f4-14fc19e9eca2"
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
     MLStyle = "d8e11817-5142-5d16-987a-aa16d5891078"
     Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+    MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
+    Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
     PartialFunctions = "570af359-4316-4cb7-8c74-252c00c2016b"
     PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
     PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
     RCall = "6f49c342-dc21-5d91-9882-a32aef131414"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
     Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [[deps.SciMLOperators]]
 deps = ["Accessors", "ArrayInterface", "DocStringExtensions", "LinearAlgebra", "MacroTools"]
-git-tree-sha1 = "1c4b7f6c3e14e6de0af66e66b86d525cae10ecb4"
+git-tree-sha1 = "c1053ba68ede9e4005fc925dd4e8723fcd96eef8"
 uuid = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
-version = "0.3.13"
+version = "1.9.0"
 weakdeps = ["SparseArrays", "StaticArraysCore"]
 
     [deps.SciMLOperators.extensions]
@@ -1947,9 +1931,9 @@ version = "1.7.0"
 
 [[deps.Scratch]]
 deps = ["Dates"]
-git-tree-sha1 = "3bac05bc7e74a75fd9cba4295cde4045d9fe2386"
+git-tree-sha1 = "9b81b8393e50b7d4e6d0a9f14e192294d3b7c109"
 uuid = "6c6a2e73-6563-6170-7368-637461726353"
-version = "1.2.1"
+version = "1.3.0"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
@@ -1983,9 +1967,9 @@ version = "1.11.0"
 
 [[deps.SortingAlgorithms]]
 deps = ["DataStructures"]
-git-tree-sha1 = "66e0a8e672a0bdfca2c3f5937efb8538b9ddc085"
+git-tree-sha1 = "64d974c2e6fdf07f8155b5b2ca2ffa9069b608d9"
 uuid = "a2af1166-a08f-5f64-846c-94a0d3cef48c"
-version = "1.2.1"
+version = "1.2.2"
 
 [[deps.SparseArrays]]
 deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
@@ -1994,39 +1978,45 @@ version = "1.11.0"
 
 [[deps.SparseConnectivityTracer]]
 deps = ["ADTypes", "DocStringExtensions", "FillArrays", "LinearAlgebra", "Random", "SparseArrays"]
-git-tree-sha1 = "9603842a7a68464a066b5754e89fc7f810db8ae7"
+git-tree-sha1 = "62f3dbfa8e0bb01ce41076ee31686f0514a9e339"
 uuid = "9f842d2f-2579-4b1d-911e-f412cf18a3f5"
-version = "0.6.15"
+version = "1.1.1"
 
     [deps.SparseConnectivityTracer.extensions]
-    SparseConnectivityTracerDataInterpolationsExt = "DataInterpolations"
+    SparseConnectivityTracerChainRulesCoreExt = "ChainRulesCore"
     SparseConnectivityTracerLogExpFunctionsExt = "LogExpFunctions"
     SparseConnectivityTracerNNlibExt = "NNlib"
     SparseConnectivityTracerNaNMathExt = "NaNMath"
     SparseConnectivityTracerSpecialFunctionsExt = "SpecialFunctions"
 
     [deps.SparseConnectivityTracer.weakdeps]
-    DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
     LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
     NNlib = "872c559c-99b0-510c-b3b7-b6c96a88d5cd"
     NaNMath = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
     SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [[deps.SparseMatrixColorings]]
-deps = ["ADTypes", "DataStructures", "DocStringExtensions", "LinearAlgebra", "Random", "SparseArrays"]
-git-tree-sha1 = "e0ae9189392572abe85bc9fd4ce35e772b1e1e10"
+deps = ["ADTypes", "DocStringExtensions", "LinearAlgebra", "PrecompileTools", "Random", "SparseArrays"]
+git-tree-sha1 = "d3f3b7bb8a561b5ff20ee7cf9574841ee4e4e137"
 uuid = "0a514795-09f3-496d-8182-132a7b665d35"
-version = "0.4.14"
-weakdeps = ["Colors"]
+version = "0.4.22"
 
     [deps.SparseMatrixColorings.extensions]
+    SparseMatrixColoringsCUDAExt = "CUDA"
+    SparseMatrixColoringsCliqueTreesExt = "CliqueTrees"
     SparseMatrixColoringsColorsExt = "Colors"
+
+    [deps.SparseMatrixColorings.weakdeps]
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    CliqueTrees = "60701a23-6482-424a-84db-faee86b9b1f8"
+    Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 
 [[deps.SpecialFunctions]]
 deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
-git-tree-sha1 = "64cca0c26b4f31ba18f13f6c12af7c85f478cfde"
+git-tree-sha1 = "f2685b435df2613e25fc10ad8c26dddb8640f547"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
-version = "2.5.0"
+version = "2.6.1"
 weakdeps = ["ChainRulesCore"]
 
     [deps.SpecialFunctions.extensions]
@@ -2034,15 +2024,15 @@ weakdeps = ["ChainRulesCore"]
 
 [[deps.StableRNGs]]
 deps = ["Random"]
-git-tree-sha1 = "83e6cce8324d49dfaf9ef059227f91ed4441a8e5"
+git-tree-sha1 = "95af145932c2ed859b63329952ce8d633719f091"
 uuid = "860ef19b-820b-49d6-a774-d7a799459cd3"
-version = "1.0.2"
+version = "1.0.3"
 
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "PrecompileTools", "Random", "StaticArraysCore"]
-git-tree-sha1 = "0feb6b9031bd5c51f9072393eb5ab3efd31bf9e4"
+git-tree-sha1 = "b8693004b385c842357406e3af647701fe783f98"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.9.13"
+version = "1.9.15"
 weakdeps = ["ChainRulesCore", "Statistics"]
 
     [deps.StaticArrays.extensions]
@@ -2066,15 +2056,15 @@ weakdeps = ["SparseArrays"]
 
 [[deps.StatsAPI]]
 deps = ["LinearAlgebra"]
-git-tree-sha1 = "1ff449ad350c9c4cbc756624d6f8a8c3ef56d3ed"
+git-tree-sha1 = "9d72a13a3f4dd3795a195ac5a44d7d6ff5f552ff"
 uuid = "82ae8749-77ed-4fe6-ae5f-f523153014b0"
-version = "1.7.0"
+version = "1.7.1"
 
 [[deps.StatsBase]]
 deps = ["AliasTables", "DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunctions", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "StatsAPI"]
-git-tree-sha1 = "29321314c920c26684834965ec2ce0dacc9cf8e5"
+git-tree-sha1 = "2c962245732371acd51700dbb268af311bddd719"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-version = "0.34.4"
+version = "0.34.6"
 
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
@@ -2097,9 +2087,13 @@ version = "7.7.0+0"
 
 [[deps.SymbolicIndexingInterface]]
 deps = ["Accessors", "ArrayInterface", "RuntimeGeneratedFunctions", "StaticArraysCore"]
-git-tree-sha1 = "d6c04e26aa1c8f7d144e1a8c47f1c73d3013e289"
+git-tree-sha1 = "94c58884e013efff548002e8dc2fdd1cb74dfce5"
 uuid = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
-version = "0.3.38"
+version = "0.3.46"
+weakdeps = ["PrettyTables"]
+
+    [deps.SymbolicIndexingInterface.extensions]
+    SymbolicIndexingInterfacePrettyTablesExt = "PrettyTables"
 
 [[deps.TOML]]
 deps = ["Dates"]
@@ -2114,9 +2108,9 @@ version = "1.0.1"
 
 [[deps.Tables]]
 deps = ["DataAPI", "DataValueInterfaces", "IteratorInterfaceExtensions", "OrderedCollections", "TableTraits"]
-git-tree-sha1 = "598cd7c1f68d1e205689b1c2fe65a9f85846f297"
+git-tree-sha1 = "f2c1efbc8f3a609aadf318094f8fc5204bdaf344"
 uuid = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
-version = "1.12.0"
+version = "1.12.1"
 
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
@@ -2146,14 +2140,14 @@ uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.11.3"
 
 [[deps.Tricks]]
-git-tree-sha1 = "6cae795a5a9313bbb4f60683f7263318fc7d1505"
+git-tree-sha1 = "372b90fe551c019541fafc6ff034199dc19c8436"
 uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
-version = "0.1.10"
+version = "0.1.12"
 
 [[deps.URIs]]
-git-tree-sha1 = "cbbebadbcc76c5ca1cc4b4f3b0614b3e603b5000"
+git-tree-sha1 = "bef26fb046d031353ef97a82e3fdb6afe7f21b1a"
 uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
-version = "1.5.2"
+version = "1.6.1"
 
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
@@ -2175,23 +2169,6 @@ git-tree-sha1 = "53915e50200959667e78a92a418594b428dffddf"
 uuid = "1cfade01-22cf-5700-b092-accc4b62d6e1"
 version = "0.4.1"
 
-[[deps.Unitful]]
-deps = ["Dates", "LinearAlgebra", "Random"]
-git-tree-sha1 = "c0667a8e676c53d390a09dc6870b3d8d6650e2bf"
-uuid = "1986cc42-f94f-5a68-af5c-568840ba703d"
-version = "1.22.0"
-weakdeps = ["ConstructionBase", "InverseFunctions"]
-
-    [deps.Unitful.extensions]
-    ConstructionBaseUnitfulExt = "ConstructionBase"
-    InverseFunctionsUnitfulExt = "InverseFunctions"
-
-[[deps.UnitfulLatexify]]
-deps = ["LaTeXStrings", "Latexify", "Unitful"]
-git-tree-sha1 = "975c354fcd5f7e1ddcc1f1a23e6e091d99e99bc8"
-uuid = "45397f5d-5981-4c77-b2b3-fc36d6e9b728"
-version = "1.6.4"
-
 [[deps.Unzip]]
 git-tree-sha1 = "ca0969166a028236229f63514992fc073799bb78"
 uuid = "41fe7b60-77ed-43a1-b4f0-825fd5a5650d"
@@ -2204,16 +2181,10 @@ uuid = "a44049a8-05dd-5a78-86c9-5fde0876e88c"
 version = "1.3.243+0"
 
 [[deps.Wayland_jll]]
-deps = ["Artifacts", "EpollShim_jll", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg", "XML2_jll"]
-git-tree-sha1 = "85c7811eddec9e7f22615371c3cc81a504c508ee"
+deps = ["Artifacts", "EpollShim_jll", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll"]
+git-tree-sha1 = "96478df35bbc2f3e1e791bc7a3d0eeee559e60e9"
 uuid = "a2964d1f-97da-50d4-b82a-358c7fce9d89"
-version = "1.21.0+2"
-
-[[deps.Wayland_protocols_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "5db3e9d307d32baba7067b13fc7b5aa6edd4a19a"
-uuid = "2381bf8a-dfd0-557d-9999-79630e7b1b91"
-version = "1.36.0+0"
+version = "1.24.0+0"
 
 [[deps.WoodburyMatrices]]
 deps = ["LinearAlgebra", "SparseArrays"]
@@ -2221,167 +2192,149 @@ git-tree-sha1 = "c1a7aa6219628fcd757dede0ca95e245c5cd9511"
 uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
 version = "1.0.0"
 
-[[deps.XML2_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Zlib_jll"]
-git-tree-sha1 = "b8b243e47228b4a3877f1dd6aee0c5d56db7fcf4"
-uuid = "02c8fc9c-b97f-50b9-bbe4-9be30ff0a78a"
-version = "2.13.6+1"
-
-[[deps.XSLT_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Libgcrypt_jll", "Libgpg_error_jll", "Libiconv_jll", "XML2_jll", "Zlib_jll"]
-git-tree-sha1 = "7d1671acbe47ac88e981868a078bd6b4e27c5191"
-uuid = "aed1982a-8fda-507f-9586-7b0439959a61"
-version = "1.1.42+0"
-
 [[deps.XZ_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "56c6604ec8b2d82cc4cfe01aa03b00426aac7e1f"
+git-tree-sha1 = "fee71455b0aaa3440dfdd54a9a36ccef829be7d4"
 uuid = "ffd25f8a-64ca-5728-b0f7-c24cf3aae800"
-version = "5.6.4+1"
+version = "5.8.1+0"
 
 [[deps.Xorg_libICE_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "326b4fea307b0b39892b3e85fa451692eda8d46c"
+git-tree-sha1 = "a3ea76ee3f4facd7a64684f9af25310825ee3668"
 uuid = "f67eecfb-183a-506d-b269-f58e52b52d7c"
-version = "1.1.1+0"
+version = "1.1.2+0"
 
 [[deps.Xorg_libSM_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libICE_jll"]
-git-tree-sha1 = "3796722887072218eabafb494a13c963209754ce"
+git-tree-sha1 = "9c7ad99c629a44f81e7799eb05ec2746abb5d588"
 uuid = "c834827a-8449-5923-a945-d239c165b7dd"
-version = "1.2.4+0"
+version = "1.2.6+0"
 
 [[deps.Xorg_libX11_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxcb_jll", "Xorg_xtrans_jll"]
-git-tree-sha1 = "9dafcee1d24c4f024e7edc92603cedba72118283"
+git-tree-sha1 = "b5899b25d17bf1889d25906fb9deed5da0c15b3b"
 uuid = "4f6342f7-b3d2-589e-9d20-edeb45f2b2bc"
-version = "1.8.6+3"
+version = "1.8.12+0"
 
 [[deps.Xorg_libXau_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "e9216fdcd8514b7072b43653874fd688e4c6c003"
+git-tree-sha1 = "aa1261ebbac3ccc8d16558ae6799524c450ed16b"
 uuid = "0c0b7dd1-d40b-584c-a123-a41640f87eec"
-version = "1.0.12+0"
+version = "1.0.13+0"
 
 [[deps.Xorg_libXcursor_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXfixes_jll", "Xorg_libXrender_jll"]
-git-tree-sha1 = "807c226eaf3651e7b2c468f687ac788291f9a89b"
+git-tree-sha1 = "6c74ca84bbabc18c4547014765d194ff0b4dc9da"
 uuid = "935fb764-8cf2-53bf-bb30-45bb1f8bf724"
-version = "1.2.3+0"
+version = "1.2.4+0"
 
 [[deps.Xorg_libXdmcp_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "89799ae67c17caa5b3b5a19b8469eeee474377db"
+git-tree-sha1 = "52858d64353db33a56e13c341d7bf44cd0d7b309"
 uuid = "a3789734-cfe1-5b06-b2d0-1dd0d9d62d05"
-version = "1.1.5+0"
+version = "1.1.6+0"
 
 [[deps.Xorg_libXext_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
-git-tree-sha1 = "d7155fea91a4123ef59f42c4afb5ab3b4ca95058"
+git-tree-sha1 = "a4c0ee07ad36bf8bbce1c3bb52d21fb1e0b987fb"
 uuid = "1082639a-0dae-5f34-9b06-72781eeb8cb3"
-version = "1.3.6+3"
+version = "1.3.7+0"
 
 [[deps.Xorg_libXfixes_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
-git-tree-sha1 = "6fcc21d5aea1a0b7cce6cab3e62246abd1949b86"
+git-tree-sha1 = "75e00946e43621e09d431d9b95818ee751e6b2ef"
 uuid = "d091e8ba-531a-589c-9de9-94069b037ed8"
-version = "6.0.0+0"
+version = "6.0.2+0"
 
 [[deps.Xorg_libXi_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll", "Xorg_libXfixes_jll"]
-git-tree-sha1 = "984b313b049c89739075b8e2a94407076de17449"
+git-tree-sha1 = "a376af5c7ae60d29825164db40787f15c80c7c54"
 uuid = "a51aa0fd-4e3c-5386-b890-e753decda492"
-version = "1.8.2+0"
+version = "1.8.3+0"
 
 [[deps.Xorg_libXinerama_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll"]
-git-tree-sha1 = "a1a7eaf6c3b5b05cb903e35e8372049b107ac729"
+git-tree-sha1 = "a5bc75478d323358a90dc36766f3c99ba7feb024"
 uuid = "d1454406-59df-5ea1-beac-c340f2130bc3"
-version = "1.1.5+0"
+version = "1.1.6+0"
 
 [[deps.Xorg_libXrandr_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll", "Xorg_libXrender_jll"]
-git-tree-sha1 = "b6f664b7b2f6a39689d822a6300b14df4668f0f4"
+git-tree-sha1 = "aff463c82a773cb86061bce8d53a0d976854923e"
 uuid = "ec84b674-ba8e-5d96-8ba1-2a689ba10484"
-version = "1.5.4+0"
+version = "1.5.5+0"
 
 [[deps.Xorg_libXrender_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
-git-tree-sha1 = "a490c6212a0e90d2d55111ac956f7c4fa9c277a6"
+git-tree-sha1 = "7ed9347888fac59a618302ee38216dd0379c480d"
 uuid = "ea2f1a96-1ddc-540d-b46f-429655e07cfa"
-version = "0.9.11+1"
-
-[[deps.Xorg_libpthread_stubs_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "c57201109a9e4c0585b208bb408bc41d205ac4e9"
-uuid = "14d82f49-176c-5ed1-bb49-ad3f5cbd8c74"
-version = "0.1.2+0"
+version = "0.9.12+0"
 
 [[deps.Xorg_libxcb_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "XSLT_jll", "Xorg_libXau_jll", "Xorg_libXdmcp_jll", "Xorg_libpthread_stubs_jll"]
-git-tree-sha1 = "1a74296303b6524a0472a8cb12d3d87a78eb3612"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXau_jll", "Xorg_libXdmcp_jll"]
+git-tree-sha1 = "bfcaf7ec088eaba362093393fe11aa141fa15422"
 uuid = "c7cfdc94-dc32-55de-ac96-5a1b8d977c5b"
-version = "1.17.0+3"
+version = "1.17.1+0"
 
 [[deps.Xorg_libxkbfile_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
-git-tree-sha1 = "dbc53e4cf7701c6c7047c51e17d6e64df55dca94"
+git-tree-sha1 = "e3150c7400c41e207012b41659591f083f3ef795"
 uuid = "cc61e674-0454-545c-8b26-ed2c68acab7a"
-version = "1.1.2+1"
+version = "1.1.3+0"
 
 [[deps.Xorg_xcb_util_cursor_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_jll", "Xorg_xcb_util_renderutil_jll"]
-git-tree-sha1 = "04341cb870f29dcd5e39055f895c39d016e18ccd"
+git-tree-sha1 = "9750dc53819eba4e9a20be42349a6d3b86c7cdf8"
 uuid = "e920d4aa-a673-5f3a-b3d7-f755a4d47c43"
-version = "0.1.4+0"
+version = "0.1.6+0"
 
 [[deps.Xorg_xcb_util_image_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
-git-tree-sha1 = "0fab0a40349ba1cba2c1da699243396ff8e94b97"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "f4fc02e384b74418679983a97385644b67e1263b"
 uuid = "12413925-8142-5f55-bb0e-6d7ca50bb09b"
-version = "0.4.0+1"
+version = "0.4.1+0"
 
 [[deps.Xorg_xcb_util_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_libxcb_jll"]
-git-tree-sha1 = "e7fd7b2881fa2eaa72717420894d3938177862d1"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxcb_jll"]
+git-tree-sha1 = "68da27247e7d8d8dafd1fcf0c3654ad6506f5f97"
 uuid = "2def613f-5ad1-5310-b15b-b15d46f528f5"
-version = "0.4.0+1"
+version = "0.4.1+0"
 
 [[deps.Xorg_xcb_util_keysyms_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
-git-tree-sha1 = "d1151e2c45a544f32441a567d1690e701ec89b00"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "44ec54b0e2acd408b0fb361e1e9244c60c9c3dd4"
 uuid = "975044d2-76e6-5fbe-bf08-97ce7c6574c7"
-version = "0.4.0+1"
+version = "0.4.1+0"
 
 [[deps.Xorg_xcb_util_renderutil_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
-git-tree-sha1 = "dfd7a8f38d4613b6a575253b3174dd991ca6183e"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "5b0263b6d080716a02544c55fdff2c8d7f9a16a0"
 uuid = "0d47668e-0667-5a69-a72c-f761630bfb7e"
-version = "0.3.9+1"
+version = "0.3.10+0"
 
 [[deps.Xorg_xcb_util_wm_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_xcb_util_jll"]
-git-tree-sha1 = "e78d10aab01a4a154142c5006ed44fd9e8e31b67"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_xcb_util_jll"]
+git-tree-sha1 = "f233c83cad1fa0e70b7771e0e21b061a116f2763"
 uuid = "c22f9ab0-d5fe-5066-847c-f4bb1cd4e361"
-version = "0.4.1+1"
+version = "0.4.2+0"
 
 [[deps.Xorg_xkbcomp_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxkbfile_jll"]
-git-tree-sha1 = "ab2221d309eda71020cdda67a973aa582aa85d69"
+git-tree-sha1 = "801a858fc9fb90c11ffddee1801bb06a738bda9b"
 uuid = "35661453-b289-5fab-8a00-3d9160c6a3a4"
-version = "1.4.6+1"
+version = "1.4.7+0"
 
 [[deps.Xorg_xkeyboard_config_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_xkbcomp_jll"]
-git-tree-sha1 = "691634e5453ad362044e2ad653e79f3ee3bb98c3"
+git-tree-sha1 = "00af7ebdc563c9217ecc67776d1bbf037dbcebf4"
 uuid = "33bec58e-1273-512f-9401-5d533626f822"
-version = "2.39.0+0"
+version = "2.44.0+0"
 
 [[deps.Xorg_xtrans_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "6dba04dbfb72ae3ebe5418ba33d087ba8aa8cb00"
+git-tree-sha1 = "a63799ff68005991f9d9491b6e95bd3478d783cb"
 uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
-version = "1.5.1+0"
+version = "1.6.0+0"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
@@ -2395,34 +2348,28 @@ uuid = "3161d3a3-bdf6-5164-811a-617609db77b4"
 version = "1.5.7+1"
 
 [[deps.eudev_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "gperf_jll"]
-git-tree-sha1 = "431b678a28ebb559d224c0b6b6d01afce87c51ba"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "c3b0e6196d50eab0c5ed34021aaa0bb463489510"
 uuid = "35ca27e7-8b34-5b7f-bca9-bdc33f59eb06"
-version = "3.2.9+0"
+version = "3.2.14+0"
 
 [[deps.fzf_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "6e50f145003024df4f5cb96c7fce79466741d601"
+git-tree-sha1 = "b6a34e0e0960190ac2a4363a1bd003504772d631"
 uuid = "214eeab7-80f7-51ab-84ad-2988db7cef09"
-version = "0.56.3+0"
-
-[[deps.gperf_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "0ba42241cb6809f1a278d0bcb976e0483c3f1f2d"
-uuid = "1a1c6b14-54f6-533d-8383-74cd7377aa70"
-version = "3.1.1+1"
+version = "0.61.1+0"
 
 [[deps.libaom_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "522c1df09d05a71785765d19c9524661234738e9"
+git-tree-sha1 = "371cc681c00a3ccc3fbc5c0fb91f58ba9bec1ecf"
 uuid = "a4ae2306-e953-59d6-aa16-d00cac43593b"
-version = "3.11.0+0"
+version = "3.13.1+0"
 
 [[deps.libass_jll]]
 deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "e17c115d55c5fbb7e52ebedb427a0dca79d4484e"
+git-tree-sha1 = "125eedcb0a4a0bba65b657251ce1d27c8714e9d6"
 uuid = "0ac62f75-1d6f-5e53-bd7c-93b484bb37c0"
-version = "0.15.2+0"
+version = "0.17.4+0"
 
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -2436,51 +2383,45 @@ uuid = "1183f4f0-6f2a-5f1a-908b-139f9cdfea6f"
 version = "0.2.2+0"
 
 [[deps.libevdev_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "141fe65dc3efabb0b1d5ba74e91f6ad26f84cc22"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "56d643b57b188d30cccc25e331d416d3d358e557"
 uuid = "2db6ffa8-e38f-5e21-84af-90c45d0032cc"
-version = "1.11.0+0"
+version = "1.13.4+0"
 
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "8a22cf860a7d27e4f3498a0fe0811a7957badb38"
+git-tree-sha1 = "646634dd19587a56ee2f1199563ec056c5f228df"
 uuid = "f638f0a6-7fb0-5443-88ba-1cc74229b280"
-version = "2.0.3+0"
+version = "2.0.4+0"
 
 [[deps.libinput_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "eudev_jll", "libevdev_jll", "mtdev_jll"]
-git-tree-sha1 = "ad50e5b90f222cfe78aa3d5183a20a12de1322ce"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "eudev_jll", "libevdev_jll", "mtdev_jll"]
+git-tree-sha1 = "91d05d7f4a9f67205bd6cf395e488009fe85b499"
 uuid = "36db933b-70db-51c0-b978-0f229ee0e533"
-version = "1.18.0+0"
+version = "1.28.1+0"
 
 [[deps.libpng_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "068dfe202b0a05b8332f1e8e6b4080684b9c7700"
+git-tree-sha1 = "07b6a107d926093898e82b3b1db657ebe33134ec"
 uuid = "b53b4c65-9356-5827-b1ea-8c7a1a84506f"
-version = "1.6.47+0"
+version = "1.6.50+0"
 
 [[deps.libvorbis_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Ogg_jll", "Pkg"]
-git-tree-sha1 = "490376214c4721cdaca654041f635213c6165cb3"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Ogg_jll"]
+git-tree-sha1 = "11e1772e7f3cc987e9d3de991dd4f6b2602663a5"
 uuid = "f27f6e37-5d2b-51aa-960f-b287f2bc3b7a"
-version = "1.3.7+2"
+version = "1.3.8+0"
 
 [[deps.mtdev_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "814e154bdb7be91d78b6802843f76b6ece642f11"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "b4d631fd51f2e9cdd93724ae25b2efc198b059b1"
 uuid = "009596ad-96f7-51b1-9f1b-5ce2d5e8a71e"
-version = "1.1.6+0"
+version = "1.1.7+0"
 
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
 version = "1.59.0+0"
-
-[[deps.oneTBB_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "d5a767a3bb77135a99e433afe0eb14cd7f6914c3"
-uuid = "1317d2d5-d96f-522e-a858-c73665f53c3e"
-version = "2022.0.0+0"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -2488,94 +2429,82 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 version = "17.4.0+2"
 
 [[deps.x264_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "4fea590b89e6ec504593146bf8b988b2c00922b2"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "14cc7083fc6dff3cc44f2bc435ee96d06ed79aa7"
 uuid = "1270edf5-f2f9-52d2-97e9-ab00b5d0237a"
-version = "2021.5.5+0"
+version = "10164.0.1+0"
 
 [[deps.x265_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "ee567a171cce03570d77ad3a43e90218e38937a9"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "e7b67590c14d487e734dcb925924c5dc43ec85f3"
 uuid = "dfaa095f-4041-5dcd-9319-2fabd8486b76"
-version = "3.5.0+0"
+version = "4.1.0+0"
 
 [[deps.xkbcommon_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Wayland_jll", "Wayland_protocols_jll", "Xorg_libxcb_jll", "Xorg_xkeyboard_config_jll"]
-git-tree-sha1 = "63406453ed9b33a0df95d570816d5366c92b7809"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxcb_jll", "Xorg_xkeyboard_config_jll"]
+git-tree-sha1 = "fbf139bce07a534df0e699dbb5f5cc9346f95cc1"
 uuid = "d8fb68d0-12a3-5cfd-a85a-d49703b185fd"
-version = "1.4.1+2"
+version = "1.9.2+0"
 """
 
 # ╔═╡ Cell order:
-# ╟─30743a02-c643-4bdc-837e-b97299f9520a
-# ╟─1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-# ╟─255e0485-a280-4142-82dd-d76d0d3d0cca
-# ╟─15a5265e-61bc-440d-9a7d-ff10773b78d8
-# ╟─171409eb-22b5-4bc5-a8e2-eac0932a24f3
-# ╟─d442014a-20e6-4be4-ac7f-f13de329dec5
-# ╟─27b3c586-9eb0-4a51-b9ca-a9c0379fccdf
-# ╟─f22d22b6-5d98-4cc4-998f-a53e92809618
-# ╟─7cc110e9-7655-4dfc-b1e0-ab3905866425
-# ╟─4d6337aa-cfc7-4154-a395-5aa53e23d01a
-# ╟─03d76e64-ebf4-432b-b9be-d4cb26275f55
-# ╟─8a066ee5-80e9-462f-9a61-15851468aa63
-# ╟─e2a9aa39-2490-4681-89d3-a01f058f6feb
-# ╟─9b08b767-7e8f-4483-9f2f-226022ce10e4
-# ╟─712828a7-fb54-42e6-95fc-233243190f59
-# ╟─c69acbf6-94fb-4ac3-8d56-d1f9dda11440
-# ╠═f763d449-2a7a-4008-a183-823a774bc25e
-# ╟─667f7c30-56e0-461f-b35b-c924007eb9f2
-# ╟─2d12b1a7-9474-44dc-8a39-e13bf451928e
-# ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
-# ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
-# ╟─ba2d0691-aeef-4d0a-808a-0c01a8b49e12
-# ╟─cbaf05db-3265-4e2d-8ea4-759442f798e0
-# ╟─c2b82e9d-cae8-465c-bca0-160599e06102
-# ╟─478c8bb8-aa3c-4afe-b787-4924525858fa
-# ╟─0831fddd-d2db-4ada-b293-00848d3673fb
-# ╟─4accbaec-4e08-43d3-8f36-2217b9394e86
-# ╟─c47637c6-b243-4d8b-8234-40c68608939c
-# ╟─d55793f5-45ff-4968-b2e1-8b846de8b91f
-# ╟─da6d5178-c083-4baa-91c3-e62f735bf808
-# ╟─ae970ce5-fc5d-40d8-9f08-5dce0f99a509
-# ╟─529b07d7-e622-4816-8de9-e31581ea96a6
-# ╟─ceae7a29-6fbc-403e-aee0-f0117d2c4ae1
-# ╟─988274c4-ad6a-42df-aead-5f40e0000998
-# ╠═111122e9-1260-4f00-aba6-0fdf6cf04c4e
-# ╟─efbc4a5f-8853-47b1-8842-c77b060d2de7
-# ╟─38300c92-e5e6-4d5e-a394-aa1a47cfd757
-# ╟─8a54d856-2298-4225-81ac-23bf66f35136
-# ╟─6f17606c-e52e-4913-87f6-56190d209308
-# ╟─78edb9ca-0d47-4503-8c86-175cf9cfeeba
-# ╟─278c2da0-b396-493e-bdcd-fc2a539780b6
-# ╟─d90da478-40b3-4677-82b9-fbfd79a72ef0
-# ╟─22eab67b-868a-44fd-9d40-69234f1ecb43
-# ╟─8ef42759-fb53-41af-904e-8916924415fa
-# ╟─a4dc0b5e-0ee7-4c22-8deb-eafdeb672207
-# ╟─d17a5db7-0125-48b5-9016-76da6d72c673
-# ╟─4f2db18c-6f48-4c41-9a53-470042decf5f
-# ╟─80dacea5-ea46-479f-b0d8-da9a9cf41aa2
-# ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
-# ╟─36c655f8-141b-4472-96d7-01c8fd1f1515
-# ╟─321172de-dcf6-4f51-ab31-edb37b8c3983
-# ╟─c4df3ad4-9f1a-414c-b02c-8161f007ccd5
-# ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
-# ╟─3b4308dc-da18-43ab-9f50-2c8bc05acb78
-# ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
-# ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
-# ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
-# ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
-# ╟─15025715-1ff3-4e7c-8136-cc442b77528a
-# ╟─6118cebc-d18e-42cc-ac1b-aa1ad95cd719
-# ╟─a73dc68d-7e41-4748-b0bb-458d6ef73305
-# ╟─73c85c85-2fc4-48ac-b5f4-4c35edcf935c
-# ╟─d6406663-77e9-4987-9ddf-955d8101c401
-# ╟─ebc0b228-01c8-42e4-9388-8194be1dd669
-# ╟─5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
-# ╟─e9b7169f-0d75-44bb-8505-ccfde1bdce98
-# ╟─68b4b548-0a96-4f67-baef-921bda3ff0a5
-# ╟─c947d126-092b-4b92-ab56-373d5a387908
-# ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
-# ╟─3f1e1a4c-48bf-44fa-a146-020dde04d2ff
+# ╟─bbfef040-b3cd-11f0-20ca-a5cbafbafd95
+# ╟─d20e7502-fa03-4448-84f4-dc46acf52c9b
+# ╟─14fe8399-7d59-4382-bc53-6e9ae4c05a8c
+# ╟─f240500d-1198-49f7-b043-beea86a248c7
+# ╟─c8102be0-6f8f-406e-9f18-45f462116602
+# ╟─381fd867-f404-40e5-a270-ae98f50bf9b5
+# ╟─1b15f3f8-fd8e-43c5-8c21-0b6fca139427
+# ╟─81edb295-c20f-47a9-8a6f-d21e475df6a9
+# ╟─0dbf180e-8b27-4be7-8747-e424f37e2e50
+# ╟─a6381315-af21-4117-beed-6e3f7b8b8ca9
+# ╟─c6dfdffe-8dd7-4264-9b75-c435c5bbf941
+# ╟─3b475ddd-be05-4c56-9b28-68a808fc6e11
+# ╟─e243649b-b920-4ca3-b2f3-6e9b5ada13c9
+# ╟─7d6bf89c-4a52-4ed3-93ba-08c9f972c7a4
+# ╟─52c7978a-c51b-40ac-9604-0485ff469141
+# ╟─bf5df253-2d64-470b-8592-e93a6bcd144a
+# ╟─eb75c9bd-d3f1-4cd2-bcf1-b53e6f7bed96
+# ╟─1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
+# ╟─d130ca1e-94be-48b3-9c09-956a7a6b6bf4
+# ╟─e9e28b59-36a2-406c-8f1e-488140aa9bc8
+# ╟─9aad3160-fb56-4407-bdb7-f969d2b982a3
+# ╟─54e44992-423e-4ebb-92e6-2af89b52e7f7
+# ╟─bb55121f-9e67-446d-bf4f-4fc3dfe48062
+# ╟─3280488d-efef-4833-ae37-6ea534f50df4
+# ╟─facb5dae-3ee9-4380-8c92-0e94c93c84bc
+# ╟─14ef768c-7039-4f34-862d-f58acf89e7d6
+# ╟─0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
+# ╟─56554cd8-e858-43d8-b6ef-7593d044920c
+# ╟─132a1594-326c-4d48-88ce-b7756656b606
+# ╟─c0418e2e-a6b6-4af5-a639-6d13952c88de
+# ╟─7e1bcb20-a71a-4e9b-b797-dea6922f4cf8
+# ╟─edeab52f-317e-42dc-840e-5bedece45dd8
+# ╟─8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
+# ╟─faaa4542-2066-49fc-b978-a6a45a4cca4e
+# ╟─67918393-0efb-4c8a-a291-3d86f7853cce
+# ╟─fd446c33-d439-439f-bd0a-f36770856cd2
+# ╟─67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
+# ╟─4349710e-529b-4036-8986-6140292457c2
+# ╟─9c73d7b0-547a-4577-8655-45a4e13df7a8
+# ╟─7dfbac39-8e1b-4d88-830f-d18d94ed5e1b
+# ╟─9ddf624d-1e9f-41d9-9dd3-743a2730e89a
+# ╟─a842e84c-2566-4ef2-8801-2dcd489e2f37
+# ╟─616b871e-3229-4cb2-a60e-e9044485a330
+# ╟─32dccd18-3140-446d-b997-8fd01d0dd359
+# ╟─d66a01ba-6040-4935-b36b-065015a0510c
+# ╟─76c60a39-9d68-4765-b698-7c1943572be8
+# ╟─68e6ca68-e895-4f4f-a2a0-945422827e22
+# ╟─6aea3077-0fd9-47ab-8da6-30ef3fc46bda
+# ╟─46a3593e-9653-49e8-8f11-b39b61176897
+# ╟─c8f1e2f2-cefb-4009-8c08-2574e1e6846a
+# ╟─5cfef29e-4687-46b2-89d0-97c7579e198e
+# ╟─106d13d1-5310-4a9f-a688-778351c56a9f
+# ╟─342c4189-1164-4c0f-a4c9-029c8720caea
+# ╟─a365088c-4239-4068-9367-d070b1ad8fce
+# ╟─36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
+# ╟─1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
+# ╟─8e492f7d-b959-4635-b524-feb48ba5f139
+# ╟─ebc42c78-90d4-4a49-84c1-93afa4a3f8d9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
