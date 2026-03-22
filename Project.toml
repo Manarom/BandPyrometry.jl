@@ -1,21 +1,19 @@
 name = "BandPyrometry"
 uuid = "fe3d11be-9380-49a5-9625-6df534737d98"
-authors = ["Manarom <manarom@yandex.ru>"]
 version = "0.1.0"
+authors = ["Manarom <manarom@yandex.ru>"]
 
 [deps]
-DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
-LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MKL = "33e6dc65-8f57-5167-99aa-e5a354878fb2"
 Optimization = "7f7a1694-90dd-40f0-9382-eb1efda571ba"
 OptimizationOptimJL = "36348300-93cb-4f02-beb5-3c3902f8871e"
 OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 PlanckFunctions = "56edaee7-e77f-43d7-994d-8307b8de0a62"
-Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+ScaledPolynomials = "d11bbabd-dab6-4367-9c65-d486568a54a8"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
@@ -23,3 +21,7 @@ Distributions = "0.25.122"
 OrderedCollections = "1.8.0"
 PlanckFunctions = "1.0.0"
 RecipesBase = "1.3.4"
+ScaledPolynomials = "0.1.0"
+
+[workspace]
+projects = ["test" , "notebooks"]

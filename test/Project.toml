@@ -1,0 +1,6 @@
+[deps]
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+PlanckFunctions = "56edaee7-e77f-43d7-994d-8307b8de0a62"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+BandPyrometry = "fe3d11be-9380-49a5-9625-6df534737d98"
