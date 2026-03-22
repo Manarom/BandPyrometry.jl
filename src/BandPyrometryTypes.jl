@@ -1,6 +1,6 @@
 
 # BandPyrometryTypes should be included in the BandPyrometry module
-include("PolynomialWrappers.jl")
+
 #function 
 """
 EmPoint type stores data on thermal emission spectrum and its 
@@ -60,7 +60,7 @@ function EmPoint(I_measured::StaticArray{Tuple{N},T,1},λ::StaticArray{Tuple{N},
 
     end
 end
-VanderMatrix(em::EmPoint,vv::Val{CN};poly_type::Symbol = :stand) where CN = VanderMatrix(em.λ,vv,poly_type = poly_type)
+#VanderMatrix(em::EmPoint,vv::Val{CN};poly_type::Symbol = :stand) where CN = VanderMatrix(em.λ,vv,poly_type = poly_type)
 
 """
     BandPyrometryPoint type stores data of thermal emission spectrum of a real body with 
@@ -124,7 +124,7 @@ function BandPyrometryPoint(measured_Intensity::StaticArray{Tuple{N},T,1},
                         polynomial_type::Symbol=:stand,
                         I_sur::Union{StaticArray{Tuple{N},T,1},Nothing}=nothing) where {N,P,T}
 
-       PolyTypeAbs = haskey(SUPPORTED_POLYNOMIAL_TYPES,polynomial_type) ? SUPPORTED_POLYNOMIAL_TYPES[polynomial_type] : StandPolyWrapper
+       PolyTypeAbs = haskey(ScaledPolynomials.SUPPORTED_POLYNOMIAL_TYPES , polynomial_type) ? ScaledPolynomials.SUPPORTED_POLYNOMIAL_TYPES[polynomial_type] : BernsteinSymPoly
 
        # if entered polynomial type is not supported then it turns to "simple"
        #L = length(λ) #total number of spectral points
@@ -160,7 +160,7 @@ function BandPyrometryPoint(measured_Intensity::StaticArray{Tuple{N},T,1},
                 PxP_T(undef),# approximate hessian
                 PxP_T(undef),# hessian
                 VanderMatrix(SVector{N}(λ), # wavelength
-                            PolyTypeAbs{Pm1,T}
+                            PolyTypeAbs{Pm1,T}()
                 ),
                 Px1_T(undef), # x_em_vec - emissivity evaluation vector
                 Px1_T(undef), # x_jac_vec - Jacobian evaluation vector

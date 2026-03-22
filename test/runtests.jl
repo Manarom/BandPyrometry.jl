@@ -1,5 +1,5 @@
 using BandPyrometry
-using Test,StaticArrays,ForwardDiff#,LinearAlgebra,Statistics
+using Test, StaticArrays, ForwardDiff#,LinearAlgebra,Statistics
 import PlanckFunctions as PL
 import BandPyrometry as BP
 #include(joinpath(@__DIR__,"tests data","TestingData.jl")) # TestingData.benchmark_data
@@ -17,7 +17,7 @@ N = 30
 lam = collect(range(1.0,5.0,30))
 T_real_test = [1453.57, 653.567, 2376.1]
 λ = SVector{N,Float64}(lam)
-λ_norm = BP.normalize_x(λ)[1] # normalized lambda vector to check gradients 
+λ_norm = BP.ScaledPolynomials.scale_x_to_ξ(λ)[1] # normalized lambda vector to check gradients 
 @testset "BandPyrometry.jl" begin
     # testing EmPoint and derivatives, compare to numerical derivarives evaluation
     for T_real in T_real_test

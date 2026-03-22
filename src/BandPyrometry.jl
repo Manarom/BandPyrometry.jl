@@ -9,6 +9,8 @@ module BandPyrometry
     RecipesBase,
     Distributions
     
+    using ScaledPolynomials
+
     import PlanckFunctions as Planck
     include("BandPyrometryTypes.jl") # Brings types and functions for working with types
     #include("Pyrometers.jl") 
@@ -345,6 +347,18 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
         return isnothing(temperature_constraint) ? DEFAULT_TEMPERATURE_RANGE[] : (temperature_constraint[1], temperature_constraint[2]) # limits on the BB temperature
     end
 
+    """
+    fill_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
+                val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P<:BernsteinSymPolyWrapper}
+
+Evaluates box-boundaries for polynomial coefficients for `BernsteinSymPolyWrapper` 
+polynomial basis
+"""
+    function fill_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
+                    val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P <: BernsteinSymPoly}
+        fill!(lb,first(val_bounds))
+        fill!(ub,last(val_bounds))
+    end
     feval!(e::EmPoint,T::AbstractArray) = feval!(e,T[end])
     """
     feval!(e::EmPoint,t::Float64)
