@@ -122,7 +122,7 @@ uuid = "13072b0f-2c55-5437-9ae7-d433b7a33950"
 version = "1.1.0"
 
 [[deps.BandPyrometry]]
-deps = ["Distributions", "Interpolations", "LinearAlgebra", "MKL", "Optimization", "OptimizationOptimJL", "OrderedCollections", "PlanckFunctions", "RecipesBase", "ScaledPolynomials", "StaticArrays"]
+deps = ["Distributions", "Interpolations", "LinearAlgebra", "MKL", "Optimization", "OptimizationOptimJL", "OrderedCollections", "PlanckFunctions", "RecipesBase", "StaticArrays"]
 path = "."
 uuid = "fe3d11be-9380-49a5-9625-6df534737d98"
 version = "0.1.0"
@@ -1365,9 +1365,9 @@ version = "0.7.0"
 
 [[deps.ScaledPolynomials]]
 deps = ["LinearAlgebra", "RecipesBase", "StaticArrays"]
-git-tree-sha1 = "ade28d66a39f243d54ea1e7778d4d65b643fe87d"
+git-tree-sha1 = "284e54e2339dcfc3a4837abfbc2d477c3b477e6f"
 repo-rev = "main"
-repo-url = "https://github.com/Manarom/ScaledPolynomials.jl.git"
+repo-url = "https://github.com/Manarom/ScaledPolynomials.jl"
 uuid = "d11bbabd-dab6-4367-9c65-d486568a54a8"
 version = "0.1.0"
 
