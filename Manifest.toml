@@ -122,7 +122,7 @@ uuid = "13072b0f-2c55-5437-9ae7-d433b7a33950"
 version = "1.1.0"
 
 [[deps.BandPyrometry]]
-deps = ["Distributions", "Interpolations", "LinearAlgebra", "MKL", "Optimization", "OptimizationOptimJL", "OrderedCollections", "PlanckFunctions", "RecipesBase", "StaticArrays"]
+deps = ["Distributions", "Interpolations", "LinearAlgebra", "MKL", "Optimization", "OptimizationOptimJL", "OrderedCollections", "PlanckFunctions", "RecipesBase", "ScaledPolynomials", "StaticArrays"]
 path = "."
 uuid = "fe3d11be-9380-49a5-9625-6df534737d98"
 version = "0.1.0"
