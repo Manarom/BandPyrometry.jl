@@ -57,8 +57,8 @@ The last line will launch the Pluto starting page in your default browser
 
 """
 
-# ╔═╡ 1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
-#=using Plots,PlanckFunctions, StaticArrays, MKL,LinearAlgebra, Optimization, OptimizationOptimJL, Interpolations,   PlutoUI, Polynomials, LegendrePolynomials,  Revise,Printf,PrettyTables, DelimitedFiles, BenchmarkTools,LaTeXStrings, RecipesBase,Distributions=#
+# ╔═╡ c167b60a-ae39-46e1-89b2-bef27b205490
+plot_common_args = (grid = true, gridlinewidth=3, gridstyle = :dot,minorgrid=true, box = :on, linewidth = 3)
 
 # ╔═╡ 171409eb-22b5-4bc5-a8e2-eac0932a24f3
 PlutoUI.TableOfContents(indent=true, depth=4, aside=true)
@@ -279,7 +279,7 @@ begin
 	Vander_test = BandPyrometry.ScaledPolynomials.VanderMatrix(SVector{N1}(λ_fit_vec),PolyType()) # creating new matrix 
 	(a_fit_check,fitted_value,goodness_of_fit) = BandPyrometry.ScaledPolynomials.polyfit(Vander_test,λ_fit_vec,interpolated_values)# fitting polynomial coefficients
 	plot(rt_emissivity_data[:,1],rt_emissivity_data[:,2],label = "ϵ real")
-	scatter!(λ_fit_vec,fitted_value, label="ϵ fitted")
+	scatter!(λ_fit_vec,fitted_value, label="ϵ fitted"; plot_common_args...)
 	xlabel!("Wavelength, μm")
 	ylabel!("Emissivity")
 end
@@ -292,7 +292,7 @@ begin
 	ibb1 = Planck.ibb.(λ_bb,T₁ );ibb2 =  Planck.ibb.(λ_bb,T₂);
 	p_bb = plot(λ_bb,ibb1,label="blackbody T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
 	plot!(λ_bb,ibb2,label="blackbody T=$(T₂),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.3)
-	plot!(λ_bb,ibb1.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2)	
+	plot!(λ_bb,ibb1.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₁),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2; plot_common_args...)	
 	plot!(λ_bb,ibb2.*rt_emissivity_interpolation(λ_bb),label="real surface T=$(T₂),K", xscale=scales_BB[1],yscale =scales_BB[2],fillrange=0, fillalpha=0.2)
 	xlabel!("Wavelength, μm")
 	ylabel!("Spectral intensity, W/m²⋅sr⋅μm")
@@ -301,13 +301,13 @@ end
 # ╔═╡ 03d76e64-ebf4-432b-b9be-d4cb26275f55
 begin 
 	e_real_BB = rt_emissivity_interpolation(λ_bb) # this spectral emissivity was measured up to 18 μm, thus for higher wavelengths it uses flat extrapolation
-	plot(λ_bb, e_real_BB, label=nothing, linewidth=3.0)
+	plot(λ_bb, e_real_BB, label=nothing, linewidth=3.0; plot_common_args...)
 	title!("Real (measured) surface spectral emissivity")
 	xlabel!("Wavelength, μm");ylabel!("Spectral emissivity (ϵ)")
 end
 
 # ╔═╡ efbc4a5f-8853-47b1-8842-c77b060d2de7
-pretty_table(HTML,hcat(["a$(i)" for i in 0:1:poly_fit_degree],a_fit_check),top_left_string="Table of the coefficients of emissivity linear approximation in the band from $(λ_fit_vand[1]) to $(λ_fit_vand[2]) μm using $(em_approx_poly_type) bases type,  the goodness of fit = $(goodness_of_fit)" )
+pretty_table(HTML,hcat(["a$(i)" for i in 0:1:poly_fit_degree],a_fit_check), top_left_string="Table of the coefficients of emissivity linear approximation in the band from $(λ_fit_vand[1]) to $(λ_fit_vand[2]) μm using $(em_approx_poly_type) bases type,  the goodness of fit = $(goodness_of_fit)"  , column_labels = ["coeff","val"])
 
 # ╔═╡ 38300c92-e5e6-4d5e-a394-aa1a47cfd757
 md"""
@@ -398,7 +398,7 @@ md"""
 """
 
 # ╔═╡ 7f56174f-03f2-4996-a158-efcfc9ce9979
-md"Set polynomial degree : $(@bind poly_degree Select(0:15,default=2)) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
+md"Set polynomial degree : $(@bind poly_degree Select(0:11,default=8)) (the polynomial degree= numer of basis functions-1, thus zero order polynomial is constant)"
 
 # ╔═╡ 09f16e07-0f21-4bcc-a6e8-cdba3097d57b
 @bind  a_starting PlutoUI.combine() do Child
@@ -509,7 +509,7 @@ end;
 
 # ╔═╡ 4f2db18c-6f48-4c41-9a53-470042decf5f
 begin 
-	p_em = plot(λ, VVV*[i for i in a_real[1:real_poly_degree + 1]],label=nothing,linewidth=6)
+	p_em = plot(λ, VVV*[i for i in a_real[1:real_poly_degree + 1]],label=nothing,linewidth=6; plot_common_args...)
 	title!(raw"""Generated "real" surface spectral emissivity""")
     xlabel!("Wavelength, μm")
 	ylabel!("ϵ")
@@ -522,7 +522,7 @@ begin
 	
 	p_mode = plot(VVV.xi,VVV.v[:,1], label="n= "*string(0),linewidth=3)
 	for (i,V) in enumerate(eachcol(VVV.v[:,2:end]))
-		plot!(VVV.xi,V, label="n= "*string(i),linewidth=3)
+		plot!(VVV.xi,V, label="n= "*string(i),linewidth=3;plot_common_args...)
 	end
 	title!("Emissivity fitting modes for $(poly_type) -type polynomial")
 	xlabel!("Normalized wavelength")
@@ -539,13 +539,13 @@ begin
 	ϵ_data_check = VV_check*x_starting[1:end-1]# "measured" spectrum emissivity 
 	I_data_check = Ib_check.*ϵ_data_check
 	plot(λ,I_data,label="Real")
-	plot!(λ,I_data_check,label = "check",title = "Spectral intensity",xlabel="Wavelength,μm",ylabel = "I")
+	plot!(λ,I_data_check,label = "check",title = "Spectral intensity",xlabel="Wavelength,μm",ylabel = "I"; plot_common_args...)
 end
 
 # ╔═╡ 08cad9ec-ce1c-4c2e-9758-58a1988cd1d3
 begin 
 	plot(λ,ϵ_data_check,title= "Spectral emissivity",xlabel = "wavelength, μm", ylabel = "ϵ", label = "Starting emissivity")
-	plot!(λ,ϵ_data,label = "real emissivity")
+	plot!(λ,ϵ_data,label = "real emissivity";plot_common_args...)
 end	
 
 # ╔═╡ e9b7178b-f321-477f-bc63-060b9c96f4a0
@@ -604,7 +604,7 @@ end # starting values
 band_fit.hessian[end]
 
 # ╔═╡ 950a61f6-fe83-47a3-b65f-fd4b70ff12ba
-plot(band_fit)
+plot(band_fit;plot_common_args...)
 
 # ╔═╡ a73dc68d-7e41-4748-b0bb-458d6ef73305
 T_fitted = BandPyrometry.temperature(band_fit)
@@ -612,7 +612,7 @@ T_fitted = BandPyrometry.temperature(band_fit)
 # ╔═╡ c947d126-092b-4b92-ab56-373d5a387908
 begin 
 	p3 = plot(λ, I_data, lw=2,label="Data T=  $(T_to_fit) ");
-	plot!(p3,λ, band_fit.Ic, lw=2,label="Fitting T= $(T_fitted)", ls=:dot)
+	plot!(p3,λ, band_fit.Ic, lw=2,label="Fitting T= $(T_fitted)", ls=:dot; plot_common_args...)
 	title!("Initial data vs fitting results")
 	xlabel!("Wavelength, μm") 
 	ylabel!("Emission intensity")
@@ -650,7 +650,7 @@ begin
 	scatter!(p1,λ, e_fitted_spectrum,label="Fitted emissivity") #, a=  $(map(i->@sprintf("%.2f",i), a_vect_fitted ))
 	if is_constraint 
 		plot!(p1,λ,eps_lower*λ./λ,label = "lower bound",linestile = :dash,linewidth = 3)
-		plot!(p1,λ,eps_upper*λ./λ,label = "upper bound",linestile = :dash,linewidth = 3)
+		plot!(p1,λ,eps_upper*λ./λ,label = "upper bound",linestile = :dash,linewidth = 3;plot_common_args...)
 	end
 	ylims!(0, 1.2)
 	xlabel!("Wavelength, μm") 
@@ -701,15 +701,15 @@ end
 # ╔═╡ Cell order:
 # ╟─30743a02-c643-4bdc-837e-b97299f9520a
 # ╠═1621271d-075d-4034-a023-6d5ee1b3bee9
-# ╠═1f7c0e6e-2e2b-11ef-38e8-1fc1dc47e380
+# ╠═c167b60a-ae39-46e1-89b2-bef27b205490
 # ╟─171409eb-22b5-4bc5-a8e2-eac0932a24f3
 # ╟─d442014a-20e6-4be4-ac7f-f13de329dec5
 # ╟─27b3c586-9eb0-4a51-b9ca-a9c0379fccdf
 # ╟─f22d22b6-5d98-4cc4-998f-a53e92809618
 # ╟─7cc110e9-7655-4dfc-b1e0-ab3905866425
-# ╟─4d6337aa-cfc7-4154-a395-5aa53e23d01a
-# ╟─03d76e64-ebf4-432b-b9be-d4cb26275f55
-# ╟─8a066ee5-80e9-462f-9a61-15851468aa63
+# ╠═4d6337aa-cfc7-4154-a395-5aa53e23d01a
+# ╠═03d76e64-ebf4-432b-b9be-d4cb26275f55
+# ╠═8a066ee5-80e9-462f-9a61-15851468aa63
 # ╟─9b08b767-7e8f-4483-9f2f-226022ce10e4
 # ╟─824a6af1-3f70-4de0-8a94-6c63663a546a
 # ╟─5cc20c03-6c6e-4425-b974-242f69fe29be
@@ -726,8 +726,8 @@ end
 # ╟─529b07d7-e622-4816-8de9-e31581ea96a6
 # ╟─5880b468-64ec-4efa-9f6a-c39ecb090440
 # ╟─988274c4-ad6a-42df-aead-5f40e0000998
-# ╟─111122e9-1260-4f00-aba6-0fdf6cf04c4e
-# ╟─efbc4a5f-8853-47b1-8842-c77b060d2de7
+# ╠═111122e9-1260-4f00-aba6-0fdf6cf04c4e
+# ╠═efbc4a5f-8853-47b1-8842-c77b060d2de7
 # ╟─38300c92-e5e6-4d5e-a394-aa1a47cfd757
 # ╟─8a54d856-2298-4225-81ac-23bf66f35136
 # ╟─d14c4a0d-b641-457c-b1ed-491ff047a468
@@ -747,20 +747,20 @@ end
 # ╟─a7861092-024a-4011-820f-79835473a281
 # ╟─3b4308dc-da18-43ab-9f50-2c8bc05acb78
 # ╟─2ef835b8-f62b-4254-9337-e7aa4d44c584
-# ╟─08cad9ec-ce1c-4c2e-9758-58a1988cd1d3
-# ╟─7f56174f-03f2-4996-a158-efcfc9ce9979
+# ╠═08cad9ec-ce1c-4c2e-9758-58a1988cd1d3
+# ╠═7f56174f-03f2-4996-a158-efcfc9ce9979
 # ╟─09f16e07-0f21-4bcc-a6e8-cdba3097d57b
-# ╟─1c60da73-a088-45ac-a08d-885bb1d98dcc
+# ╠═1c60da73-a088-45ac-a08d-885bb1d98dcc
 # ╟─acc77ec3-6afb-4e76-ad2f-ec137555d1bc
 # ╟─808f8601-90fc-4cb1-b455-46cfc11b8fc7
 # ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
 # ╟─6c38418d-9c4d-4bb6-a386-dd0bde9af8d9
 # ╟─01cd1f0d-15b8-474b-a05a-eec840c54fff
-# ╟─c947d126-092b-4b92-ab56-373d5a387908
+# ╠═c947d126-092b-4b92-ab56-373d5a387908
 # ╟─6f17606c-e52e-4913-87f6-56190d209308
 # ╟─c3e9e5e5-0d1b-4329-a5b6-020e0e7321b8
-# ╟─fead76f5-c0b5-4fcb-a39e-c97ded034653
-# ╟─950a61f6-fe83-47a3-b65f-fd4b70ff12ba
+# ╠═fead76f5-c0b5-4fcb-a39e-c97ded034653
+# ╠═950a61f6-fe83-47a3-b65f-fd4b70ff12ba
 # ╟─e9b7178b-f321-477f-bc63-060b9c96f4a0
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
@@ -770,10 +770,10 @@ end
 # ╟─15025715-1ff3-4e7c-8136-cc442b77528a
 # ╟─6118cebc-d18e-42cc-ac1b-aa1ad95cd719
 # ╠═a73dc68d-7e41-4748-b0bb-458d6ef73305
-# ╟─095cbaa2-9dfd-45d9-81a2-c075f7ba4838
+# ╠═095cbaa2-9dfd-45d9-81a2-c075f7ba4838
 # ╟─73c85c85-2fc4-48ac-b5f4-4c35edcf935c
-# ╟─ebc0b228-01c8-42e4-9388-8194be1dd669
-# ╟─5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
+# ╠═ebc0b228-01c8-42e4-9388-8194be1dd669
+# ╠═5e46ca94-1ca2-4af1-88c3-54c7e86d1aef
 # ╟─e9b7169f-0d75-44bb-8505-ccfde1bdce98
-# ╟─3f1e1a4c-48bf-44fa-a146-020dde04d2ff
-# ╟─027f22c1-5309-49d4-86ac-53791c2e0eaf
+# ╠═3f1e1a4c-48bf-44fa-a146-020dde04d2ff
+# ╠═027f22c1-5309-49d4-86ac-53791c2e0eaf
