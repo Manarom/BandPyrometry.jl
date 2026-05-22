@@ -99,21 +99,25 @@ Evaluates box-constraint of the problem
 """
     function evaluate_box_constraints(bp::BandPyrometryPoint{N, Nx3, P, NxP, PxP, Pm1, NxPm1, Pm1xPm1, T},
          emissivity_range::B = nothing,
-         temperature_range::C=nothing) where {N, Nx3, P, NxP, PxP, Pm1, NxPm1, Pm1xPm1, T, B <: Union{Nothing,NTuple{2,T}},C <: Union{Nothing,NTuple{2,T}} }
+         temperature_range::C=nothing)  where {B <: Union{Nothing , NTuple{2 , T} , NTuple{2 , <: Union{NTuple{Pm1 ,T} , StaticVector{Pm1 , T}} } } , C <: Union{Nothing,NTuple{2,T}} } where {N, Nx3, P, NxP, PxP, Pm1, NxPm1, Pm1xPm1, T}
         # method calculates box constraints 
         # of the feasible region (dumb version)
             lb = copy(bp.x)
             ub = copy(bp.x)
-            e_lb = @view lb[1:end-1] 
-            e_ub = @view ub[1:end-1] 
-            b_all = isnothing(emissivity_range) ? (0.0,1.0) : (first(emissivity_range), last(emissivity_range))
-            fill_box_constraint!(e_lb, e_ub, bp.vandermonde, b_all)
+            e_lb = @view lb[1:end - 1] 
+            e_ub = @view ub[1:end - 1] 
+            # b_all = isnothing(emissivity_range) ? (0.0 , 1.0) : (first(emissivity_range), last(emissivity_range))
+            fill_emissivity_box_constraint!(e_lb , e_ub , bp.vandermonde, emissivity_range)
             (lb[end], ub[end]) = isnothing(temperature_range) ? extract_temperature_range(bp,emissivity_range) : (first(temperature_range),last(temperature_range))
-        return (lb=lb,ub=ub)
+        return (lb=lb , ub=ub)
     end
     extract_temperature_range(::BandPyrometryPoint,::Nothing) = DEFAULT_TEMPERATURE_RANGE[]
- 
-    function extract_temperature_range(p::BandPyrometryPoint,emissivity_range::NTuple{2,T}) where T
+    function extract_temperature_range(p::BandPyrometryPoint , e_range::NTuple{2 , <: Union{NTuple , StaticVector} } )
+        lb = first(e_range)
+        ub = last(e_range)
+        return extract_temperature_range(p , (minimum(lb) , maximum(ub)))
+    end
+    function extract_temperature_range(p::BandPyrometryPoint , emissivity_range::NTuple{2,T}) where T
         return ( last(emissivity_range) |> p.e_p, first(emissivity_range) |> p.e_p) # the lower and the upper limits on temperature
     end
     
@@ -348,17 +352,28 @@ function hess!(h,x::AbstractVector,bp::BandPyrometryPoint)
     end
 
     """
-    fill_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
-                val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P<:BernsteinSymPolyWrapper}
+    fill_emissivity_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
+                val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P<:BernsteinSymPoly}
 
-Evaluates box-boundaries for polynomial coefficients for `BernsteinSymPolyWrapper` 
+Evaluates box-boundaries for polynomial coefficients for `BernsteinSymPoly` 
 polynomial basis
 """
-    function fill_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
-                    val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P <: BernsteinSymPoly}
-        fill!(lb,first(val_bounds))
-        fill!(ub,last(val_bounds))
+    function fill_emissivity_box_constraint!(lb , ub , ::VanderMatrix{N, CN, T},
+                    val_bounds::NTuple{2,T}) where {N, CN, T}
+
+        fill!(lb , first(val_bounds))
+        fill!(ub , last(val_bounds))
+
     end
+    fill_emissivity_box_constraint!(lb , ub , V::VanderMatrix{N,CN,T},::Nothing) where {N,CN,T} = fill_emissivity_box_constraint!(lb , ub , V, (zero(T) , one(T)))
+
+    function fill_emissivity_box_constraint!(lb , ub , ::VanderMatrix{N , CN , T},
+                    val_bounds::NTuple{2 , <:Union{NTuple{CN , T}, StaticVector{CN , T}}}) where {N, CN, T}
+                    
+        copyto!(lb , first(val_bounds) ) 
+        copyto!(ub , last(val_bounds) )
+    end
+
     feval!(e::EmPoint,T::AbstractArray) = feval!(e,T[end])
     """
     feval!(e::EmPoint,t::Float64)
@@ -526,7 +541,7 @@ Returns:
                             res - optimization output object,
                             optimizer - chosen optimizer)                
 """
-function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
+function fit_T!(point::Union{EmPoint , BandPyrometryPoint};
             optimizer_name::String="Default",
             is_box_constraint::Bool=false,
             is_lagrange_constraint::Bool=false, 
@@ -554,12 +569,12 @@ function fit_T!(point::Union{EmPoint,BandPyrometryPoint};
                             lcons = lb, # both min and max of emissivity should be not smaller than zero
                             ucons = ub) # both min and max should be higher than one        
         elseif is_box_constraint
-            (lb,ub) = evaluate_box_constraints(point, emissivity_range, temperature_range)
+            (lb , ub) = evaluate_box_constraints(point, emissivity_range, temperature_range)
             trim_starting_vector_to_box!(starting_vector,lb,ub)
             probl= OptimizationProblem(fun, 
                             starting_vector,
                             point,
-                            lb=lb,
+                            lb=lb, 
                             ub=ub)
         else # unconstraint
             probl= OptimizationProblem(fun, 
