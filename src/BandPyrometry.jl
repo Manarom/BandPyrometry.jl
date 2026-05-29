@@ -546,7 +546,8 @@ function fit_T!(point::Union{EmPoint , BandPyrometryPoint};
             is_box_constraint::Bool=false,
             is_lagrange_constraint::Bool=false, 
             emissivity_range::C=nothing, 
-            temperature_range::B=nothing) where {B <: Union{AbstractVector,Nothing,NTuple{2}},C <: Union{AbstractVector,Nothing,NTuple{2}}}
+            temperature_range::B=nothing , 
+            kwargs...) where {B <: Union{AbstractVector,Nothing,NTuple{2}},C <: Union{AbstractVector,Nothing,NTuple{2}}}
             
             !(optimizer_name == "Default")  || return fitT_default(point)
 
@@ -562,24 +563,24 @@ function fit_T!(point::Union{EmPoint , BandPyrometryPoint};
             starting_vector = copy(point.x);
         end
         if is_lagrange_constraint
-            (lb,ub) = evaluate_lagrange_constraints(point,emissivity_range,temperature_range)
+            (lb , ub) = evaluate_lagrange_constraints(point,emissivity_range,temperature_range)
             probl= OptimizationProblem(fun, 
                             starting_vector,
                             point, 
                             lcons = lb, # both min and max of emissivity should be not smaller than zero
-                            ucons = ub) # both min and max should be higher than one        
+                            ucons = ub, kwargs...) # both min and max should be higher than one        
         elseif is_box_constraint
             (lb , ub) = evaluate_box_constraints(point, emissivity_range, temperature_range)
-            trim_starting_vector_to_box!(starting_vector,lb,ub)
+            trim_starting_vector_to_box!(starting_vector , lb , ub)
             probl= OptimizationProblem(fun, 
                             starting_vector,
                             point,
                             lb=lb, 
-                            ub=ub)
+                            ub=ub, kwargs...)
         else # unconstraint
             probl= OptimizationProblem(fun, 
                                 starting_vector,
-                                point)           
+                                point; kwargs...)           
         end
         results = solve(probl,optimizer())
         feval!(point,results.u)
