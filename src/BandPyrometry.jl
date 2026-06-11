@@ -9,7 +9,7 @@ module BandPyrometry
     RecipesBase,
     Distributions
     
-    Base.convert(::Type{SciMLBase.ReturnCode.T}, s::Symbol) = SciMLBase.ReturnCode.T(s)
+    #Base.convert(::Type{SciMLBase.ReturnCode.T}, s::Symbol) = SciMLBase.ReturnCode.T(s)
     using ScaledPolynomials
 
     import PlanckFunctions as Planck
