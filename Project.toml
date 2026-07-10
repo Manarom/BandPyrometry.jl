@@ -24,4 +24,3 @@ ScaledPolynomials = {url = "https://github.com/Manarom/ScaledPolynomials.jl.git"
 
 [compat]
 PlanckFunctions = "1.0.0"
-ScaledPolynomials = "0.1.0"
