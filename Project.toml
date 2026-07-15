@@ -19,8 +19,8 @@ RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 ScaledPolynomials = "d11bbabd-dab6-4367-9c65-d486568a54a8"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
-[compat]
-PlanckFunctions = "1.0.0"
-
 [sources]
 ScaledPolynomials = {url = "https://github.com/Manarom/ScaledPolynomials.jl.git"}
+
+[compat]
+PlanckFunctions = "1.0.0"
