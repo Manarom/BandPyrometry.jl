@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.24
+# v1.0.3
 
 using Markdown
 using InteractiveUtils
@@ -593,11 +593,13 @@ begin
 	band_fit =BandPyrometry.BandPyrometryPoint(I_data,λ,x_starting,polynomial_type=poly_type)# creating BandPyrometryPoint from the data to be fitted, wavelength region and starting optimization variables vector x_starting
 	e_range = (eps_lower,eps_upper)
 	t_range = is_temp_constr ? (t_lower,t_upper) : nothing
+	@show band_fit.x
 	@time out = BandPyrometry.fit_T!(band_fit,optimizer_name=optim_type,
 										  is_lagrange_constraint = false,
 										 is_box_constraint = is_constraint,
 										 emissivity_range = e_range,
 										 temperature_range = t_range) # this function runs the optimizaiton is_box_constraint=is_constraint,
+	@show band_fit.x
 end # starting values
 
 # ╔═╡ c3e9e5e5-0d1b-4329-a5b6-020e0e7321b8
@@ -750,7 +752,7 @@ end
 # ╠═08cad9ec-ce1c-4c2e-9758-58a1988cd1d3
 # ╠═7f56174f-03f2-4996-a158-efcfc9ce9979
 # ╟─09f16e07-0f21-4bcc-a6e8-cdba3097d57b
-# ╠═1c60da73-a088-45ac-a08d-885bb1d98dcc
+# ╟─1c60da73-a088-45ac-a08d-885bb1d98dcc
 # ╟─acc77ec3-6afb-4e76-ad2f-ec137555d1bc
 # ╟─808f8601-90fc-4cb1-b455-46cfc11b8fc7
 # ╟─9016369d-bc8b-4907-bdb2-f4e81c444d30
@@ -764,11 +766,11 @@ end
 # ╟─e9b7178b-f321-477f-bc63-060b9c96f4a0
 # ╟─c3fc6fbf-5358-4d68-acf1-40fbc82c13dc
 # ╟─50517cca-c1c9-4ecc-b6c7-e0549ea1e14a
-# ╠═0ca01e99-bf48-4e24-b937-c3863eb03f50
+# ╟─0ca01e99-bf48-4e24-b937-c3863eb03f50
 # ╟─c01d5d8c-06f7-42b2-b845-e3ec0e82078e
 # ╟─c9253144-b8c6-4a24-98d4-3faa4175d96a
 # ╟─15025715-1ff3-4e7c-8136-cc442b77528a
-# ╟─6118cebc-d18e-42cc-ac1b-aa1ad95cd719
+# ╠═6118cebc-d18e-42cc-ac1b-aa1ad95cd719
 # ╠═a73dc68d-7e41-4748-b0bb-458d6ef73305
 # ╠═095cbaa2-9dfd-45d9-81a2-c075f7ba4838
 # ╟─73c85c85-2fc4-48ac-b5f4-4c35edcf935c
