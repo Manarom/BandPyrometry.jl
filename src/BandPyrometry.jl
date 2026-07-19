@@ -177,7 +177,7 @@ Input:
     function feval!(bp::BandPyrometryPoint,x::AbstractVector)
         # evaluates residual vector
         #a = @view x[1:end-1] #emissivity approximation variables
-        feval!(bp.e_p,x[end]) # refreshes planck function values
+        feval!(bp.e_p , x[end]) # refreshes planck function values
         if x!=bp.x_em_vec # x_em_vec - emissivity calculation vector
             emissivity!(bp,x)
             if bp.is_has_Iₛᵤᵣ # has surrounding radiation correction
@@ -584,7 +584,7 @@ function fit_T!(point::Union{EmPoint , BandPyrometryPoint};
                                 point; kwargs...)           
         end
         results = solve(probl,optimizer())
-        feval!(point,results.u)
+        isa(point, BandPyrometryPoint) ? copyto!(point.x , results.u) : feval!(point,results.u)
         return  fitting_result(point, results, optimizer) 
                         
     end
