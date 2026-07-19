@@ -1399,7 +1399,8 @@ version = "0.7.0"
 [[deps.ScaledPolynomials]]
 deps = ["LinearAlgebra", "RecipesBase", "StaticArrays"]
 git-tree-sha1 = "0e220a8685dcc2cb004d83e2a3035b9281ef8cad"
-repo-url = "https://github.com/Manarom/ScaledPolynomials.jl.git"
+repo-rev = "main"
+repo-url = "https://github.com/Manarom/ScaledPolynomials.jl"
 uuid = "d11bbabd-dab6-4367-9c65-d486568a54a8"
 version = "0.1.0"
 

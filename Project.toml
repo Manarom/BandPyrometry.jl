@@ -20,7 +20,7 @@ ScaledPolynomials = "d11bbabd-dab6-4367-9c65-d486568a54a8"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [sources]
-ScaledPolynomials = {url = "https://github.com/Manarom/ScaledPolynomials.jl.git"}
+ScaledPolynomials = {rev = "main", url = "https://github.com/Manarom/ScaledPolynomials.jl"}
 
 [compat]
 PlanckFunctions = "1.0.0"
